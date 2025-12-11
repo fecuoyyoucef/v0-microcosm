@@ -50,7 +50,7 @@ export function LayerFilter({
   }
 
   return (
-    <div className="shrink-0 border-b border-border/50 bg-background/50 backdrop-blur-md w-full">
+    <div className="shrink-0 border-b border-border/30 bg-black/30 backdrop-blur-xl w-full">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full flex items-center justify-between px-3 py-2 hover:bg-muted/50 transition-colors"
