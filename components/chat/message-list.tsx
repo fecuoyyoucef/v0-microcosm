@@ -242,7 +242,7 @@ export function MessageList({
 
   return (
     <TooltipProvider>
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-2">
+      <div className="h-full overflow-y-auto overflow-x-hidden px-3 py-2">
         <div className="space-y-0.5">
           {messages.map((message, index) => {
             const isOwn = message.sender_id === currentUserId

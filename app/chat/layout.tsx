@@ -16,7 +16,7 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
   }
 
   return (
-    <div className="fixed inset-0 flex bg-background overflow-hidden">
+    <div className="h-dvh flex bg-background">
       <InstallPromptNotification />
 
       {/* Sidebar - hidden on mobile, visible on desktop */}
@@ -25,11 +25,11 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
       </aside>
 
       {/* Main content area */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 min-h-0">
         {/* Mobile swipe sidebar - no header bar */}
         <ChatSidebar userId={user.id} mobileOnly />
 
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">{children}</div>
+        <div className="flex-1 flex flex-col min-w-0 min-h-0">{children}</div>
       </main>
     </div>
   )

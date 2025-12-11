@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Download } from "lucide-react"
+import { Download, X } from "lucide-react"
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -14,11 +14,10 @@ const INSTALL_PROMPT_INTERVAL = 3 * 24 * 60 * 60 * 1000 // 3 days
 
 export function InstallButton() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
-  const [isInstalled, setIsInstalled] = useState(true) // Start as true to avoid flash
+  const [isInstalled, setIsInstalled] = useState(true)
   const [showButton, setShowButton] = useState(false)
 
   useEffect(() => {
-    // Check if already installed (standalone mode)
     const isStandalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       (window.navigator as Navigator & { standalone?: boolean }).standalone === true
@@ -31,7 +30,6 @@ export function InstallButton() {
 
     setIsInstalled(false)
 
-    // Listen for install prompt
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault()
       setDeferredPrompt(e as BeforeInstallPromptEvent)
@@ -40,7 +38,6 @@ export function InstallButton() {
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
 
-    // Listen for app installed
     const handleAppInstalled = () => {
       setIsInstalled(true)
       setDeferredPrompt(null)
@@ -57,11 +54,8 @@ export function InstallButton() {
 
   const handleInstall = async () => {
     if (!deferredPrompt) return
-
-    // Trigger install prompt directly
     await deferredPrompt.prompt()
     const { outcome } = await deferredPrompt.userChoice
-
     if (outcome === "accepted") {
       setIsInstalled(true)
       setShowButton(false)
@@ -69,7 +63,6 @@ export function InstallButton() {
     setDeferredPrompt(null)
   }
 
-  // Don't show if installed or no prompt available
   if (isInstalled || !showButton || !deferredPrompt) return null
 
   return (
@@ -80,32 +73,28 @@ export function InstallButton() {
   )
 }
 
-// Separate component for the recurring install prompt notification
 export function InstallPromptNotification() {
   const [show, setShow] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
 
   useEffect(() => {
-    // Check if already installed
     const isStandalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       (window.navigator as Navigator & { standalone?: boolean }).standalone === true
 
     if (isStandalone) return
 
-    // Check if we should show the prompt
     const lastDismissed = localStorage.getItem(INSTALL_PROMPT_KEY)
     if (lastDismissed) {
       const timeSinceDismissed = Date.now() - Number.parseInt(lastDismissed, 10)
       if (timeSinceDismissed < INSTALL_PROMPT_INTERVAL) {
-        return // Don't show yet
+        return
       }
     }
 
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault()
       setDeferredPrompt(e as BeforeInstallPromptEvent)
-      // Show notification after 3 seconds
       setTimeout(() => setShow(true), 3000)
     }
 
@@ -139,25 +128,27 @@ export function InstallPromptNotification() {
   if (!show || !deferredPrompt) return null
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-80 z-50 animate-in slide-in-from-bottom duration-300">
-      <div className="bg-card border rounded-lg shadow-lg p-4" dir="rtl">
-        <div className="flex items-start gap-3">
-          <div className="p-2 bg-primary/10 rounded-full">
-            <Download className="w-5 h-5 text-primary" />
+    <div className="fixed bottom-20 inset-x-0 z-50 px-4 pointer-events-none">
+      <div
+        className="max-w-sm mx-auto bg-card border rounded-xl shadow-xl p-3 pointer-events-auto animate-in slide-in-from-bottom duration-300"
+        dir="rtl"
+      >
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-full shrink-0">
+            <Download className="w-4 h-4 text-primary" />
           </div>
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <p className="font-medium text-sm">ثبّت التطبيق</p>
-            <p className="text-xs text-muted-foreground mt-1">احصل على إشعارات فورية ووصول سريع من شاشتك الرئيسية</p>
+            <p className="text-xs text-muted-foreground truncate">إشعارات فورية ووصول سريع</p>
           </div>
-        </div>
-        <div className="flex gap-2 mt-3">
-          <Button size="sm" onClick={handleInstall} className="flex-1">
-            <Download className="w-4 h-4 ml-1" />
-            تثبيت
-          </Button>
-          <Button size="sm" variant="ghost" onClick={handleDismiss}>
-            لاحقاً
-          </Button>
+          <div className="flex items-center gap-1 shrink-0">
+            <Button size="sm" onClick={handleInstall} className="h-8 px-3 text-xs">
+              تثبيت
+            </Button>
+            <Button size="icon" variant="ghost" onClick={handleDismiss} className="h-8 w-8">
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>

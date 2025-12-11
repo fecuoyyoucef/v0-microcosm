@@ -349,7 +349,7 @@ export function ChatContainer({
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden">
+    <div className="flex flex-col h-full min-h-0">
       <ChatHeader
         group={group}
         members={members}
@@ -370,7 +370,7 @@ export function ChatContainer({
         groupId={groupId}
       />
 
-      <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-auto">
         <MessageList
           messages={filteredMessages}
           currentUserId={currentUserId}
