@@ -349,7 +349,7 @@ export function ChatContainer({
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden">
       <ChatHeader
         group={group}
         members={members}

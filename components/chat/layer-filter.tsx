@@ -50,7 +50,7 @@ export function LayerFilter({
   }
 
   return (
-    <div className="shrink-0 border-b border-border bg-card/80 backdrop-blur-sm w-full max-w-full overflow-hidden">
+    <div className="shrink-0 border-b border-border bg-card/80 backdrop-blur-sm w-full overflow-hidden">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full flex items-center justify-between px-3 py-2 hover:bg-muted/50 transition-colors"
@@ -59,7 +59,7 @@ export function LayerFilter({
           <Filter className="w-4 h-4 text-muted-foreground shrink-0" />
           <span className="text-sm font-medium shrink-0">الأدوات</span>
           {!isExpanded && (
-            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full truncate">
+            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full truncate max-w-[120px]">
               {getFilterSummary()}
             </span>
           )}
@@ -117,15 +117,15 @@ export function LayerFilter({
           isExpanded ? "max-h-40 opacity-100" : "max-h-0 opacity-0",
         )}
       >
-        <div className="px-3 pb-3 w-full max-w-full overflow-x-auto scrollbar-hide">
-          <div className="flex items-center gap-2 w-max">
+        <div className="px-3 pb-3 w-full overflow-hidden">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Layer Filters */}
-            <div className="flex items-center gap-1 shrink-0 bg-muted/50 rounded-xl p-1">
+            <div className="flex items-center gap-1 bg-muted/50 rounded-xl p-1">
               <Button
                 variant={activeLayer === "all" ? "secondary" : "ghost"}
                 size="sm"
                 onClick={() => onLayerChange("all")}
-                className={cn("h-8 text-xs gap-1.5 rounded-lg px-3", activeLayer === "all" && "shadow-sm")}
+                className={cn("h-8 text-xs gap-1 rounded-lg px-2", activeLayer === "all" && "shadow-sm")}
               >
                 <Layers className="w-3.5 h-3.5" />
                 الكل
@@ -136,7 +136,7 @@ export function LayerFilter({
                 size="sm"
                 onClick={() => onLayerChange("upper")}
                 className={cn(
-                  "h-8 text-xs gap-1.5 rounded-lg px-3",
+                  "h-8 text-xs gap-1 rounded-lg px-2",
                   activeLayer === "upper" && "bg-orange-100 dark:bg-orange-900/40 shadow-sm",
                 )}
               >
@@ -148,7 +148,7 @@ export function LayerFilter({
                 variant={activeLayer === "standard" ? "secondary" : "ghost"}
                 size="sm"
                 onClick={() => onLayerChange("standard")}
-                className={cn("h-8 text-xs gap-1.5 rounded-lg px-3", activeLayer === "standard" && "shadow-sm")}
+                className={cn("h-8 text-xs gap-1 rounded-lg px-2", activeLayer === "standard" && "shadow-sm")}
               >
                 <span>⚪</span>
                 عادي
@@ -159,7 +159,7 @@ export function LayerFilter({
                 size="sm"
                 onClick={() => onLayerChange("shadow")}
                 className={cn(
-                  "h-8 text-xs gap-1.5 rounded-lg px-3",
+                  "h-8 text-xs gap-1 rounded-lg px-2",
                   activeLayer === "shadow" && "bg-gray-200 dark:bg-gray-800 shadow-sm",
                 )}
               >
@@ -168,10 +168,8 @@ export function LayerFilter({
               </Button>
             </div>
 
-            <div className="w-px h-6 bg-border shrink-0" />
-
             {/* Quick Actions */}
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex items-center gap-1 flex-wrap">
               {/* Nodes Panel */}
               <Sheet open={isNodesPanelOpen} onOpenChange={setIsNodesPanelOpen}>
                 <SheetTrigger asChild>
@@ -179,12 +177,12 @@ export function LayerFilter({
                     variant={selectedNodeId ? "secondary" : "ghost"}
                     size="sm"
                     className={cn(
-                      "h-8 text-xs gap-1.5 rounded-lg px-3 hover:bg-violet-500/10",
+                      "h-8 text-xs gap-1 rounded-lg px-2 hover:bg-violet-500/10",
                       selectedNodeId && "shadow-sm",
                     )}
                   >
                     <GitBranch className="w-3.5 h-3.5 text-violet-600" />
-                    {selectedNode ? selectedNode.title : "العقد"}
+                    العقد
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="right" className="w-80 p-0">
@@ -206,36 +204,28 @@ export function LayerFilter({
               </Sheet>
 
               <Link href={`/chat/${groupId}/map`}>
-                <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-lg px-3 hover:bg-primary/10">
+                <Button variant="ghost" size="sm" className="h-8 text-xs gap-1 rounded-lg px-2 hover:bg-primary/10">
                   <Map className="w-3.5 h-3.5 text-primary" />
                   الخريطة
                 </Button>
               </Link>
 
               <Link href={`/chat/${groupId}/notebook`}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 text-xs gap-1.5 rounded-lg px-3 hover:bg-emerald-500/10"
-                >
+                <Button variant="ghost" size="sm" className="h-8 text-xs gap-1 rounded-lg px-2 hover:bg-emerald-500/10">
                   <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
                   المفكرة
                 </Button>
               </Link>
 
               <Link href={`/chat/${groupId}/memory`}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 text-xs gap-1.5 rounded-lg px-3 hover:bg-purple-500/10"
-                >
+                <Button variant="ghost" size="sm" className="h-8 text-xs gap-1 rounded-lg px-2 hover:bg-purple-500/10">
                   <Brain className="w-3.5 h-3.5 text-purple-600" />
                   الذاكرة
                 </Button>
               </Link>
 
               <Link href={`/chat/${groupId}/decisions`}>
-                <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-lg px-3 hover:bg-amber-500/10">
+                <Button variant="ghost" size="sm" className="h-8 text-xs gap-1 rounded-lg px-2 hover:bg-amber-500/10">
                   <Vote className="w-3.5 h-3.5 text-amber-600" />
                   القرارات
                 </Button>
