@@ -226,7 +226,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
     : nodes
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-background">
+    <div className="flex flex-col h-[100dvh] bg-background overflow-hidden">
       {/* Header */}
       <div className="h-14 border-b border-border px-3 md:px-4 flex items-center justify-between bg-card/50 shrink-0">
         <div className="flex items-center gap-2 md:gap-3 min-w-0">
@@ -364,18 +364,21 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
         {/* Map Canvas */}
         <div
           ref={containerRef}
-          className="flex-1 overflow-hidden cursor-grab active:cursor-grabbing map-canvas"
+          className="flex-1 overflow-hidden cursor-grab active:cursor-grabbing map-canvas relative"
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
           onWheel={handleWheel}
+          style={{ touchAction: "none" }}
         >
           <div
-            className="w-full h-full relative map-canvas"
+            className="absolute inset-0 map-canvas"
             style={{
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-              transformOrigin: "center center",
+              transformOrigin: "0 0",
+              minWidth: "100%",
+              minHeight: "100%",
             }}
           >
             {/* SVG for connections */}
@@ -427,7 +430,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
 
         {/* Node Details Panel */}
         {selectedNode && (
-          <div className="w-72 md:w-80 border-r border-border bg-card flex flex-col shrink-0">
+          <div className="w-72 md:w-80 border-r border-border bg-card flex flex-col shrink-0 max-h-full overflow-hidden">
             <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2 min-w-0">
                 <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: selectedNode.color }} />

@@ -647,7 +647,8 @@ export default function AdminDashboard() {
                         <p className="text-sm flex-1">{note.content}</p>
                         <button
                           onClick={() => handleDeleteNote(note.id)}
-                          className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-opacity"
+                          className="text-red-400 hover:text-red-300 transition-colors p-1 rounded hover:bg-red-500/20"
+                          title="حذف الملاحظة"
                         >
                           <X className="w-4 h-4" />
                         </button>

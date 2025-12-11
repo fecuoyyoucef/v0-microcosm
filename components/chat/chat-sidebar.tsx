@@ -42,6 +42,8 @@ import { useSettings } from "@/components/settings-provider"
 interface ChatSidebarProps {
   userId: string
   mobileOnly?: boolean
+  isOpen?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 interface ExtendedProfile extends Profile {
@@ -129,14 +131,16 @@ const translations = {
   },
 }
 
-export function ChatSidebar({ userId, mobileOnly = false }: ChatSidebarProps) {
+export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }: ChatSidebarProps) {
   const [profile, setProfile] = useState<ExtendedProfile | null>(null)
   const [userEmail, setUserEmail] = useState<string>("")
   const [isCreating, setIsCreating] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [newGroupName, setNewGroupName] = useState("")
   const [newGroupDescription, setNewGroupDescription] = useState("")
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+  const isMobileMenuOpen = isOpen !== undefined ? isOpen : internalOpen
+  const setIsMobileMenuOpen = onOpenChange || setInternalOpen
   const [error, setError] = useState<string | null>(null)
   const [unreadNotifications, setUnreadNotifications] = useState(0)
   const router = useRouter()
@@ -232,7 +236,7 @@ export function ChatSidebar({ userId, mobileOnly = false }: ChatSidebarProps) {
       document.removeEventListener("touchmove", handleTouchMove)
       document.removeEventListener("touchend", handleTouchEnd)
     }
-  }, [mobileOnly])
+  }, [mobileOnly, setIsMobileMenuOpen])
 
   const fetchProfile = async () => {
     const { data } = await supabase.from("profiles").select("*").eq("id", userId).single()
@@ -323,6 +327,10 @@ export function ChatSidebar({ userId, mobileOnly = false }: ChatSidebarProps) {
     router.refresh()
   }
 
+  const closeSidebar = () => {
+    setIsMobileMenuOpen(false)
+  }
+
   const SidebarContent = () => (
     <div className="flex flex-col h-full bg-card">
       <div className="p-4 bg-primary/10">
@@ -344,20 +352,21 @@ export function ChatSidebar({ userId, mobileOnly = false }: ChatSidebarProps) {
         </div>
         <div>
           <p className="font-semibold text-lg">{profile?.display_name || t.user}</p>
-          <p className="text-sm text-muted-foreground">{userEmail}</p>
+          {profile?.username && <p className="text-sm text-muted-foreground">@{profile.username}</p>}
+          <p className="text-xs text-muted-foreground mt-0.5">{userEmail}</p>
         </div>
       </div>
 
       <ScrollArea className="flex-1">
         <div className="py-2">
-          <Link href="/chat" onClick={() => setIsMobileMenuOpen(false)}>
+          <Link href="/chat" onClick={closeSidebar}>
             <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
               <Home className="w-5 h-5 text-muted-foreground" />
               <span className="text-sm font-medium">{t.home}</span>
             </div>
           </Link>
 
-          <Link href="/chat/notifications" onClick={() => setIsMobileMenuOpen(false)}>
+          <Link href="/chat/notifications" onClick={closeSidebar}>
             <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
               <div className="relative">
                 <Bell className="w-5 h-5 text-muted-foreground" />
@@ -376,7 +385,7 @@ export function ChatSidebar({ userId, mobileOnly = false }: ChatSidebarProps) {
             </div>
           </Link>
 
-          <Link href="/chat/settings/account" onClick={() => setIsMobileMenuOpen(false)}>
+          <Link href="/chat/settings/account" onClick={closeSidebar}>
             <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
               <User className="w-5 h-5 text-muted-foreground" />
               <span className="text-sm font-medium">{t.profile}</span>
@@ -448,7 +457,7 @@ export function ChatSidebar({ userId, mobileOnly = false }: ChatSidebarProps) {
             <span className="text-xs text-muted-foreground mr-auto">{t.comingSoon}</span>
           </div>
 
-          <Link href="/chat/settings/appearance" onClick={() => setIsMobileMenuOpen(false)}>
+          <Link href="/chat/settings/appearance" onClick={closeSidebar}>
             <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
               <Settings className="w-5 h-5 text-muted-foreground" />
               <span className="text-sm font-medium">{t.settings}</span>
@@ -463,7 +472,7 @@ export function ChatSidebar({ userId, mobileOnly = false }: ChatSidebarProps) {
             <span className="text-xs text-muted-foreground mr-auto">{t.comingSoon}</span>
           </div>
 
-          <Link href="/chat/about" onClick={() => setIsMobileMenuOpen(false)}>
+          <Link href="/chat/about" onClick={closeSidebar}>
             <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
               <Info className="w-5 h-5 text-muted-foreground" />
               <span className="text-sm font-medium">{t.about}</span>

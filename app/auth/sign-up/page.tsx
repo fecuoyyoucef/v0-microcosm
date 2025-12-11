@@ -9,19 +9,22 @@ import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
-import { Loader2, Check, X } from "lucide-react"
+import { Loader2, Check, X, AtSign } from "lucide-react"
 import { useDebouncedCallback } from "use-debounce"
 import Image from "next/image"
 
 export default function SignUpPage() {
   const [displayName, setDisplayName] = useState("")
+  const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [repeatPassword, setRepeatPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isCheckingName, setIsCheckingName] = useState(false)
+  const [isCheckingUsername, setIsCheckingUsername] = useState(false)
   const [nameAvailable, setNameAvailable] = useState<boolean | null>(null)
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -33,6 +36,13 @@ export default function SignUpPage() {
 
   const allRequirementsMet = passwordRequirements.every((r) => r.met)
   const passwordsMatch = password === repeatPassword && repeatPassword.length > 0
+
+  const usernameRequirements = [
+    { label: "3-20 حرف", met: username.length >= 3 && username.length <= 20 },
+    { label: "أحرف إنجليزية وأرقام و _ فقط", met: /^[a-zA-Z0-9_]*$/.test(username) },
+    { label: "يبدأ بحرف", met: /^[a-zA-Z]/.test(username) },
+  ]
+  const allUsernameRequirementsMet = usernameRequirements.every((r) => r.met)
 
   const checkNameAvailability = useDebouncedCallback(async (name: string) => {
     if (name.trim().length < 2) {
@@ -56,6 +66,28 @@ export default function SignUpPage() {
     }
   }, 500)
 
+  const checkUsernameAvailability = useDebouncedCallback(async (uname: string) => {
+    if (!allUsernameRequirementsMet) {
+      setUsernameAvailable(null)
+      return
+    }
+
+    setIsCheckingUsername(true)
+    try {
+      const { data, error } = await supabase.from("profiles").select("id").ilike("username", uname.trim()).limit(1)
+
+      if (error) {
+        setUsernameAvailable(null)
+      } else {
+        setUsernameAvailable(data.length === 0)
+      }
+    } catch {
+      setUsernameAvailable(null)
+    } finally {
+      setIsCheckingUsername(false)
+    }
+  }, 500)
+
   useEffect(() => {
     if (displayName.trim().length >= 2) {
       checkNameAvailability(displayName)
@@ -63,6 +95,14 @@ export default function SignUpPage() {
       setNameAvailable(null)
     }
   }, [displayName, checkNameAvailability])
+
+  useEffect(() => {
+    if (username.trim().length >= 3) {
+      checkUsernameAvailability(username)
+    } else {
+      setUsernameAvailable(null)
+    }
+  }, [username, checkUsernameAvailability])
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -87,6 +127,12 @@ export default function SignUpPage() {
       return
     }
 
+    if (!allUsernameRequirementsMet || usernameAvailable === false) {
+      setError("المعرف غير صالح أو مستخدم بالفعل")
+      setIsLoading(false)
+      return
+    }
+
     try {
       const { error } = await supabase.auth.signUp({
         email,
@@ -94,7 +140,10 @@ export default function SignUpPage() {
         options: {
           emailRedirectTo:
             process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/auth/callback`,
-          data: { display_name: displayName.trim() },
+          data: {
+            display_name: displayName.trim(),
+            username: username.trim().toLowerCase(),
+          },
         },
       })
       if (error) throw error
@@ -163,6 +212,51 @@ export default function SignUpPage() {
                     <p className={`text-xs ${nameAvailable ? "text-green-500" : "text-destructive"}`}>
                       {nameAvailable ? "هذا الاسم متاح" : "هذا الاسم مستخدم بالفعل"}
                     </p>
+                  )}
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="username">المعرف (Username)</Label>
+                  <div className="relative">
+                    <AtSign className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="username"
+                      type="text"
+                      placeholder="username"
+                      required
+                      minLength={3}
+                      maxLength={20}
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+                      className="bg-background pr-10 pl-10"
+                      dir="ltr"
+                    />
+                    {username.length >= 3 && (
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                        {isCheckingUsername ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                        ) : usernameAvailable === true && allUsernameRequirementsMet ? (
+                          <Check className="w-4 h-4 text-green-500" />
+                        ) : (
+                          <X className="w-4 h-4 text-destructive" />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">يمكن للآخرين العثور عليك بـ @{username || "username"}</p>
+                  {username.length > 0 && !allUsernameRequirementsMet && (
+                    <div className="mt-1 p-2 rounded-lg bg-secondary/50 space-y-1">
+                      {usernameRequirements.map((req, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs">
+                          {req.met ? (
+                            <Check className="w-3 h-3 text-green-500" />
+                          ) : (
+                            <X className="w-3 h-3 text-muted-foreground" />
+                          )}
+                          <span className={req.met ? "text-green-500" : "text-muted-foreground"}>{req.label}</span>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
 
@@ -238,7 +332,14 @@ export default function SignUpPage() {
                   type="submit"
                   className="w-full"
                   disabled={
-                    isLoading || !allRequirementsMet || !passwordsMatch || nameAvailable === false || isCheckingName
+                    isLoading ||
+                    !allRequirementsMet ||
+                    !passwordsMatch ||
+                    nameAvailable === false ||
+                    isCheckingName ||
+                    !allUsernameRequirementsMet ||
+                    usernameAvailable === false ||
+                    isCheckingUsername
                   }
                 >
                   {isLoading ? (

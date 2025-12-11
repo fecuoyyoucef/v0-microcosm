@@ -141,6 +141,7 @@ export function MessageList({
     const existingReaction = reactions[messageId]?.find((r) => r.user_id === currentUserId && r.reaction === reactionId)
 
     if (existingReaction) {
+      // Remove the reaction
       await supabase.from("message_reactions").delete().eq("id", existingReaction.id)
 
       setReactions((prev) => ({
@@ -148,6 +149,18 @@ export function MessageList({
         [messageId]: prev[messageId].filter((r) => r.id !== existingReaction.id),
       }))
     } else {
+      const userExistingReaction = reactions[messageId]?.find((r) => r.user_id === currentUserId)
+
+      if (userExistingReaction) {
+        // Remove old reaction first
+        await supabase.from("message_reactions").delete().eq("id", userExistingReaction.id)
+        setReactions((prev) => ({
+          ...prev,
+          [messageId]: prev[messageId].filter((r) => r.id !== userExistingReaction.id),
+        }))
+      }
+
+      // Add new reaction
       const { data, error } = await supabase
         .from("message_reactions")
         .insert({
@@ -171,13 +184,14 @@ export function MessageList({
 
   const getGroupedReactions = (messageId: string) => {
     const messageReactions = reactions[messageId] || []
-    const grouped: Record<string, { count: number; hasOwn: boolean }> = {}
+    const grouped: Record<string, { count: number; hasOwn: boolean; users: string[] }> = {}
 
     messageReactions.forEach((r) => {
       if (!grouped[r.reaction]) {
-        grouped[r.reaction] = { count: 0, hasOwn: false }
+        grouped[r.reaction] = { count: 0, hasOwn: false, users: [] }
       }
       grouped[r.reaction].count++
+      grouped[r.reaction].users.push(r.user_id)
       if (r.user_id === currentUserId) {
         grouped[r.reaction].hasOwn = true
       }
@@ -375,10 +389,15 @@ export function MessageList({
                     >
                       {Object.entries(groupedReactions).map(([reactionId, data]) => {
                         const reactionImage = getReactionImage(reactionId)
+                        const memberNames = data.users.map((uid) => {
+                          const member = members.find((m) => m.user_id === uid)
+                          return member?.profile?.display_name || "مستخدم"
+                        })
                         return (
                           <button
                             key={reactionId}
                             onClick={() => toggleReaction(message.id, reactionId)}
+                            title={memberNames.join("، ")}
                             className={cn(
                               "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-colors",
                               data.hasOwn

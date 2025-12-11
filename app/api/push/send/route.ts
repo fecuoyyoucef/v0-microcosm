@@ -1,26 +1,34 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
-import webpush from "web-push"
 
-// Configure VAPID
-const vapidPublicKey =
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
-  "BDj8yhVUy0-Ued2Dw4joucx73R8-0HOjAcL5XeUGwxvp_KPrp1uBeFxvmGVXN2pvCnKtR_MG5pSPv0wx3f_OKzs"
-const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || ""
+let webpushConfigured = false
 
-if (vapidPrivateKey) {
-  webpush.setVapidDetails("mailto:youcef192837@gmail.com", vapidPublicKey, vapidPrivateKey)
+async function getWebPush() {
+  const webpush = (await import("web-push")).default
+
+  if (!webpushConfigured && process.env.VAPID_PRIVATE_KEY) {
+    const vapidPublicKey =
+      process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
+      "BDj8yhVUy0-Ued2Dw4joucx73R8-0HOjAcL5XeUGwxvp_KPrp1uBeFxvmGVXN2pvCnKtR_MG5pSPv0wx3f_OKzs"
+    const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY.trim()
+
+    webpush.setVapidDetails("mailto:youcef192837@gmail.com", vapidPublicKey, vapidPrivateKey)
+    webpushConfigured = true
+  }
+
+  return webpush
 }
 
 export async function POST(request: Request) {
   try {
     const { userId, title, body, url, data } = await request.json()
 
-    if (!vapidPrivateKey) {
+    if (!process.env.VAPID_PRIVATE_KEY) {
       console.error("[Push] VAPID_PRIVATE_KEY not configured")
       return NextResponse.json({ error: "Push notifications not configured" }, { status: 500 })
     }
 
+    const webpush = await getWebPush()
     const supabase = await createClient()
 
     // Get user's push subscriptions

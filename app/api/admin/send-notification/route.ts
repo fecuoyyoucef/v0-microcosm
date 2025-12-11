@@ -1,15 +1,23 @@
 import { createClient } from "@/lib/supabase/server"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
-import webpush from "web-push"
 
-const vapidPublicKey =
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
-  "BDj8yhVUy0-Ued2Dw4joucx73R8-0HOjAcL5XeUGwxvp_KPrp1uBeFxvmGVXN2pvCnKtR_MG5pSPv0wx3f_OKzs"
-const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || ""
+let webpushConfigured = false
 
-if (vapidPrivateKey) {
-  webpush.setVapidDetails("mailto:youcef192837@gmail.com", vapidPublicKey, vapidPrivateKey)
+async function getWebPush() {
+  const webpush = (await import("web-push")).default
+
+  if (!webpushConfigured && process.env.VAPID_PRIVATE_KEY) {
+    const vapidPublicKey =
+      process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
+      "BDj8yhVUy0-Ued2Dw4joucx73R8-0HOjAcL5XeUGwxvp_KPrp1uBeFxvmGVXN2pvCnKtR_MG5pSPv0wx3f_OKzs"
+    const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY.trim()
+
+    webpush.setVapidDetails("mailto:youcef192837@gmail.com", vapidPublicKey, vapidPrivateKey)
+    webpushConfigured = true
+  }
+
+  return webpush
 }
 
 async function verifyAdmin() {
@@ -73,41 +81,48 @@ export async function POST(request: Request) {
     }
 
     let pushSentCount = 0
-    if (vapidPrivateKey) {
-      // Get all push subscriptions
-      const { data: allSubscriptions } = await supabase.from("push_subscriptions").select("*")
 
-      if (allSubscriptions && allSubscriptions.length > 0) {
-        const payload = JSON.stringify({
-          title: title || "Synaptic Space",
-          body: body || "لديك إشعار جديد",
-          icon: "/icons/icon-192x192.png",
-          badge: "/icons/icon-72x72.png",
-          url: actionUrl || "/chat/notifications",
-          tag: "admin-notification",
-          priority: priority || "normal",
-        })
+    if (process.env.VAPID_PRIVATE_KEY) {
+      try {
+        const webpush = await getWebPush()
 
-        for (const sub of allSubscriptions) {
-          try {
-            await webpush.sendNotification(
-              {
-                endpoint: sub.endpoint,
-                keys: {
-                  p256dh: sub.p256dh,
-                  auth: sub.auth,
+        // Get all push subscriptions
+        const { data: allSubscriptions } = await supabase.from("push_subscriptions").select("*")
+
+        if (allSubscriptions && allSubscriptions.length > 0) {
+          const payload = JSON.stringify({
+            title: title || "Synaptic Space",
+            body: body || "لديك إشعار جديد",
+            icon: "/icons/icon-192x192.png",
+            badge: "/icons/icon-72x72.png",
+            url: actionUrl || "/chat/notifications",
+            tag: "admin-notification",
+            priority: priority || "normal",
+          })
+
+          for (const sub of allSubscriptions) {
+            try {
+              await webpush.sendNotification(
+                {
+                  endpoint: sub.endpoint,
+                  keys: {
+                    p256dh: sub.p256dh,
+                    auth: sub.auth,
+                  },
                 },
-              },
-              payload,
-            )
-            pushSentCount++
-          } catch (err: any) {
-            // Remove invalid subscriptions
-            if (err.statusCode === 410 || err.statusCode === 404) {
-              await supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint)
+                payload,
+              )
+              pushSentCount++
+            } catch (err: any) {
+              // Remove invalid subscriptions
+              if (err.statusCode === 410 || err.statusCode === 404) {
+                await supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint)
+              }
             }
           }
         }
+      } catch (pushError) {
+        console.error("[Admin] Push notification error:", pushError)
       }
     }
 

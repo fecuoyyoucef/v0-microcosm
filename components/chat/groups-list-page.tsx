@@ -29,7 +29,6 @@ import {
   LogOut,
   Loader2,
   Search,
-  ChevronLeft,
   Home,
   Bookmark,
   Moon,
@@ -48,6 +47,11 @@ interface GroupsListPageProps {
   groups: Group[]
   userId: string
   profile: Profile | null
+}
+
+interface UnreadCount {
+  group_id: string
+  unread_count: number
 }
 
 const translations = {
@@ -162,6 +166,7 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
   const [error, setError] = useState<string | null>(null)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [unreadNotifications, setUnreadNotifications] = useState(0)
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
   const router = useRouter()
   const supabase = createClient()
   const { theme, setTheme } = useTheme()
@@ -175,6 +180,7 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
 
   useEffect(() => {
     fetchUnreadNotifications()
+    fetchUnreadCounts()
 
     // Subscribe to notifications
     const channel = supabase
@@ -208,10 +214,35 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
       )
       .subscribe()
 
+    const unreadChannel = supabase
+      .channel("unread-counts")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "group_unread_counts",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+            const data = payload.new as UnreadCount
+            setUnreadCounts((prev) => ({
+              ...prev,
+              [data.group_id]: data.unread_count,
+            }))
+          }
+        },
+      )
+      .subscribe()
+
     return () => {
       supabase.removeChannel(channel)
+      supabase.removeChannel(unreadChannel)
     }
   }, [userId])
+
+  // ... existing code for touch events ...
 
   useEffect(() => {
     const handleTouchStart = (e: TouchEvent) => {
@@ -262,6 +293,18 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
       .eq("is_read", false)
 
     setUnreadNotifications(count || 0)
+  }
+
+  const fetchUnreadCounts = async () => {
+    const { data } = await supabase.from("group_unread_counts").select("group_id, unread_count").eq("user_id", userId)
+
+    if (data) {
+      const counts: Record<string, number> = {}
+      data.forEach((item) => {
+        counts[item.group_id] = item.unread_count
+      })
+      setUnreadCounts(counts)
+    }
   }
 
   const filteredGroups = searchQuery
@@ -328,6 +371,16 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
     return colors[name.charCodeAt(0) % colors.length]
   }
 
+  const totalUnread = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0) + unreadNotifications
+
+  useEffect(() => {
+    if ("setAppBadge" in navigator && totalUnread > 0) {
+      ;(navigator as any).setAppBadge(totalUnread)
+    } else if ("clearAppBadge" in navigator && totalUnread === 0) {
+      ;(navigator as any).clearAppBadge()
+    }
+  }, [totalUnread])
+
   const SidebarContent = () => (
     <div className="flex flex-col h-full bg-card">
       <div className="p-4 bg-primary/10">
@@ -349,6 +402,7 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
         </div>
         <div>
           <p className="font-semibold text-lg">{profile?.display_name || t.user}</p>
+          {profile?.username && <p className="text-sm text-muted-foreground">@{profile.username}</p>}
         </div>
       </div>
 
@@ -546,20 +600,29 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
           <div className="divide-y divide-border">
             {filteredGroups.map((group) => (
               <Link key={group.id} href={`/chat/${group.id}`}>
-                <div className="flex items-center gap-3 p-4 hover:bg-secondary/50 transition-colors active:bg-secondary">
-                  <Avatar className="h-14 w-14 rounded-xl">
-                    <AvatarImage src={group.avatar_url || undefined} />
-                    <AvatarFallback
-                      className={cn("rounded-xl text-white font-bold text-lg", getGroupColor(group.name))}
-                    >
-                      {group.name.charAt(0)}
-                    </AvatarFallback>
+                <div className="flex items-center gap-3 p-4 hover:bg-secondary/50 transition-colors">
+                  <Avatar className={cn("h-12 w-12", getGroupColor(group.name))}>
+                    {group.avatar_url ? (
+                      <AvatarImage src={group.avatar_url || "/placeholder.svg"} />
+                    ) : (
+                      <AvatarFallback className="bg-transparent text-white font-bold">
+                        {group.name.substring(0, 2)}
+                      </AvatarFallback>
+                    )}
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold truncate">{group.name}</h3>
-                    {group.description && <p className="text-sm text-muted-foreground truncate">{group.description}</p>}
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold truncate">{group.name}</h3>
+                      {unreadCounts[group.id] > 0 && (
+                        <span className="h-5 min-w-5 px-1.5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium">
+                          {unreadCounts[group.id] > 99 ? "99+" : unreadCounts[group.id]}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground truncate">
+                      {group.description || `${group.member_count || 0} ${t.members}`}
+                    </p>
                   </div>
-                  <ChevronLeft className="w-5 h-5 text-muted-foreground shrink-0" />
                 </div>
               </Link>
             ))}
@@ -567,63 +630,13 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
         )}
       </main>
 
-      <Dialog
-        open={isDialogOpen}
-        onOpenChange={(open) => {
-          setIsDialogOpen(open)
-          setError(null)
-        }}
+      <Button
+        onClick={() => setIsDialogOpen(true)}
+        size="icon"
+        className="fixed left-4 bottom-4 h-14 w-14 rounded-full shadow-lg z-10"
       >
-        <DialogTrigger asChild>
-          <Button size="lg" className="fixed bottom-6 left-6 w-14 h-14 rounded-full shadow-lg z-10">
-            <Plus className="w-6 h-6" />
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{t.createGroupTitle}</DialogTitle>
-            <DialogDescription>{t.createGroupDesc}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 mt-4">
-            {error && <div className="p-3 rounded-xl bg-destructive/10 text-destructive text-sm">{error}</div>}
-            <div className="space-y-2">
-              <Label htmlFor="groupName2">{t.groupName}</Label>
-              <Input
-                id="groupName2"
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
-                placeholder={t.groupNamePlaceholder}
-                className="bg-background rounded-xl"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="groupDescription2">{t.description}</Label>
-              <Textarea
-                id="groupDescription2"
-                value={newGroupDescription}
-                onChange={(e) => setNewGroupDescription(e.target.value)}
-                placeholder={t.descPlaceholder}
-                className="bg-background resize-none rounded-xl"
-                rows={3}
-              />
-            </div>
-            <Button
-              onClick={createGroup}
-              disabled={!newGroupName.trim() || isCreating}
-              className="w-full rounded-xl h-11"
-            >
-              {isCreating ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin ml-2" />
-                  {t.creating}
-                </>
-              ) : (
-                t.create
-              )}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        <Plus className="h-6 w-6" />
+      </Button>
 
       <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
         <SheetContent side="right" className="w-80 p-0">
