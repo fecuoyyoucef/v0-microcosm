@@ -58,9 +58,27 @@ export function ChatContainer({
       .from("conversation_nodes")
       .select("*")
       .eq("group_id", groupId)
-      .order("created_at", { ascending: true })
+      .order("sort_order", { ascending: true })
 
-    if (data && isMounted.current) setNodes(data)
+    if (data && isMounted.current) {
+      // Get message counts for each node
+      const nodeIds = data.map((n) => n.id)
+      const { data: messageCounts } = await supabase.from("messages").select("node_id").in("node_id", nodeIds)
+
+      const countMap: Record<string, number> = {}
+      messageCounts?.forEach((m) => {
+        if (m.node_id) {
+          countMap[m.node_id] = (countMap[m.node_id] || 0) + 1
+        }
+      })
+
+      const nodesWithCounts = data.map((node) => ({
+        ...node,
+        messages_count: countMap[node.id] || 0,
+      }))
+
+      setNodes(nodesWithCounts)
+    }
   }, [groupId, supabase])
 
   const fetchMessages = useCallback(async () => {
@@ -144,6 +162,8 @@ export function ChatContainer({
             return [...prev, { ...newMsg, sender: null } as Message]
           })
           setTimeout(scrollToBottom, 100)
+          // Update node message counts
+          fetchNodes()
         },
       )
       .on(
@@ -157,6 +177,7 @@ export function ChatContainer({
         (payload) => {
           if (!isMounted.current) return
           setMessages((prev) => prev.filter((m) => m.id !== payload.old.id))
+          fetchNodes()
         },
       )
       .on(
@@ -318,6 +339,10 @@ export function ChatContainer({
         nodes={nodes}
         selectedNodeId={selectedNodeId}
         onNodeChange={setSelectedNodeId}
+        onNodesUpdate={fetchNodes}
+        currentUserId={currentUserId}
+        isAdmin={currentUserRole === "admin"}
+        groupId={groupId}
       />
 
       <div className="flex-1 min-h-0 overflow-hidden">

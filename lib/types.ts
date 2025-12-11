@@ -108,6 +108,8 @@ export interface MessageWithReactions extends Message {
   reactions?: MessageReaction[]
 }
 
+export type NodeType = "primary" | "secondary"
+
 export interface ConversationNode {
   id: string
   group_id: string
@@ -115,6 +117,10 @@ export interface ConversationNode {
   title: string
   description: string | null
   color: string
+  icon: string
+  node_type: NodeType
+  sort_order: number
+  is_default: boolean
   position_x: number
   position_y: number
   created_by: string
@@ -123,8 +129,6 @@ export interface ConversationNode {
   messages_count?: number
   children?: ConversationNode[]
 }
-
-export type NotebookPageType = "text" | "list" | "table" | "canvas" | "links"
 
 export interface NotebookPage {
   id: string
@@ -227,6 +231,27 @@ export interface DecisionResults {
   disagree: number
   neutral: number
   total: number
+}
+
+export type NotebookPageType = "text" | "list" | "table" | "canvas" | "links"
+
+export interface NodeSummary {
+  id: string
+  node_id: string
+  group_id: string
+  summary: string
+  key_points: string[]
+  decisions: string[]
+  questions: string[]
+  discussions: string[]
+  message_count: number
+  sub_nodes_summary: Array<{
+    node_title: string
+    summary: string
+    message_count: number
+  }>
+  generated_at: string
+  created_at: string
 }
 
 export type NotificationType =

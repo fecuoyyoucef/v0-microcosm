@@ -1,18 +1,13 @@
 "use client"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu"
-import { Layers, GitBranch, X, Map, BookOpen, Brain, Vote, ChevronDown, ChevronUp, Filter } from "lucide-react"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Layers, Map, BookOpen, Brain, Vote, ChevronDown, ChevronUp, Filter, GitBranch } from "lucide-react"
 import type { MessageLayer, ConversationNode } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { useParams } from "next/navigation"
+import { NodesPanel } from "./nodes-panel"
 
 interface LayerFilterProps {
   activeLayer: MessageLayer | "all"
@@ -20,6 +15,10 @@ interface LayerFilterProps {
   nodes?: ConversationNode[]
   selectedNodeId?: string | null
   onNodeChange?: (nodeId: string | null) => void
+  onNodesUpdate?: () => void
+  currentUserId?: string
+  isAdmin?: boolean
+  groupId?: string
 }
 
 export function LayerFilter({
@@ -28,11 +27,16 @@ export function LayerFilter({
   nodes = [],
   selectedNodeId,
   onNodeChange,
+  onNodesUpdate,
+  currentUserId,
+  isAdmin = false,
+  groupId: propGroupId,
 }: LayerFilterProps) {
   const params = useParams()
-  const groupId = params.groupId as string
+  const groupId = propGroupId || (params.groupId as string)
   const selectedNode = nodes.find((n) => n.id === selectedNodeId)
   const [isExpanded, setIsExpanded] = useState(false)
+  const [isNodesPanelOpen, setIsNodesPanelOpen] = useState(false)
 
   const getFilterSummary = () => {
     const parts: string[] = []
@@ -61,9 +65,32 @@ export function LayerFilter({
           )}
         </div>
         <div className="flex items-center gap-2">
-          {/* Quick access icons when collapsed */}
           {!isExpanded && (
             <div className="flex items-center gap-1 mr-2">
+              {/* Nodes Panel Trigger */}
+              <Sheet open={isNodesPanelOpen} onOpenChange={setIsNodesPanelOpen}>
+                <SheetTrigger asChild onClick={(e) => e.stopPropagation()}>
+                  <div className="w-7 h-7 rounded-full hover:bg-muted flex items-center justify-center cursor-pointer">
+                    <GitBranch className="w-3.5 h-3.5 text-violet-600" />
+                  </div>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-80 p-0">
+                  {currentUserId && onNodeChange && onNodesUpdate && (
+                    <NodesPanel
+                      groupId={groupId}
+                      nodes={nodes}
+                      selectedNodeId={selectedNodeId}
+                      onNodeSelect={(id) => {
+                        onNodeChange(id)
+                        setIsNodesPanelOpen(false)
+                      }}
+                      onNodesUpdate={onNodesUpdate}
+                      currentUserId={currentUserId}
+                      isAdmin={isAdmin}
+                    />
+                  )}
+                </SheetContent>
+              </Sheet>
               <Link href={`/chat/${groupId}/map`} onClick={(e) => e.stopPropagation()}>
                 <div className="w-7 h-7 rounded-full hover:bg-muted flex items-center justify-center">
                   <Map className="w-3.5 h-3.5 text-primary" />
@@ -145,6 +172,39 @@ export function LayerFilter({
 
             {/* Quick Actions */}
             <div className="flex items-center gap-1 shrink-0">
+              {/* Nodes Panel */}
+              <Sheet open={isNodesPanelOpen} onOpenChange={setIsNodesPanelOpen}>
+                <SheetTrigger asChild>
+                  <Button
+                    variant={selectedNodeId ? "secondary" : "ghost"}
+                    size="sm"
+                    className={cn(
+                      "h-8 text-xs gap-1.5 rounded-lg px-3 hover:bg-violet-500/10",
+                      selectedNodeId && "shadow-sm",
+                    )}
+                  >
+                    <GitBranch className="w-3.5 h-3.5 text-violet-600" />
+                    {selectedNode ? selectedNode.title : "العقد"}
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-80 p-0">
+                  {currentUserId && onNodeChange && onNodesUpdate && (
+                    <NodesPanel
+                      groupId={groupId}
+                      nodes={nodes}
+                      selectedNodeId={selectedNodeId}
+                      onNodeSelect={(id) => {
+                        onNodeChange(id)
+                        setIsNodesPanelOpen(false)
+                      }}
+                      onNodesUpdate={onNodesUpdate}
+                      currentUserId={currentUserId}
+                      isAdmin={isAdmin}
+                    />
+                  )}
+                </SheetContent>
+              </Sheet>
+
               <Link href={`/chat/${groupId}/map`}>
                 <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-lg px-3 hover:bg-primary/10">
                   <Map className="w-3.5 h-3.5 text-primary" />
@@ -181,54 +241,6 @@ export function LayerFilter({
                 </Button>
               </Link>
             </div>
-
-            {/* Node Filter */}
-            {nodes.length > 0 && onNodeChange && (
-              <>
-                <div className="w-px h-6 bg-border shrink-0" />
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant={selectedNodeId ? "secondary" : "ghost"}
-                      size="sm"
-                      className={cn("h-8 text-xs gap-1.5 rounded-lg px-3", selectedNodeId && "shadow-sm")}
-                    >
-                      <GitBranch className="w-3.5 h-3.5" />
-                      {selectedNode ? selectedNode.title : "العقد"}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="max-h-64 overflow-auto">
-                    <DropdownMenuItem onClick={() => onNodeChange(null)}>
-                      <Layers className="w-3.5 h-3.5 ml-2" />
-                      كل العقد
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    {nodes.map((node) => (
-                      <DropdownMenuItem
-                        key={node.id}
-                        onClick={() => onNodeChange(node.id)}
-                        className={cn(selectedNodeId === node.id && "bg-secondary")}
-                      >
-                        <div className="w-3 h-3 rounded-full ml-2" style={{ backgroundColor: node.color }} />
-                        {node.title}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
-                {selectedNodeId && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 rounded-full shrink-0"
-                    onClick={() => onNodeChange(null)}
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </Button>
-                )}
-              </>
-            )}
           </div>
         </div>
       </div>
