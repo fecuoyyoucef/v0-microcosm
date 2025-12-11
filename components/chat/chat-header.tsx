@@ -144,7 +144,7 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
   const onlineCount = Math.min(members.length, Math.ceil(members.length * 0.6))
 
   return (
-    <div className="shrink-0 h-14 md:h-16 border-b border-border px-3 md:px-4 flex items-center justify-between bg-card/95 backdrop-blur-sm">
+    <div className="shrink-0 h-14 md:h-16 border-b border-border/50 px-3 md:px-4 flex items-center justify-between bg-background/50 backdrop-blur-md">
       <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
         {/* Group Avatar */}
         <Avatar className="w-9 h-9 md:w-10 md:h-10 rounded-xl ring-2 ring-background shadow-md shrink-0">
