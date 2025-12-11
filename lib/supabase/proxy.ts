@@ -26,6 +26,47 @@ export async function updateSession(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser()
 
+    if (request.nextUrl.pathname.startsWith("/admin") && !request.nextUrl.pathname.startsWith("/admin/login")) {
+      const adminSession = request.cookies.get("admin_session")?.value
+      if (!adminSession) {
+        const url = request.nextUrl.clone()
+        url.pathname = "/admin/login"
+        return NextResponse.redirect(url)
+      }
+
+      // التحقق من صلاحية الجلسة
+      try {
+        const decoded = JSON.parse(Buffer.from(adminSession, "base64").toString())
+        if (decoded.exp < Date.now()) {
+          const url = request.nextUrl.clone()
+          url.pathname = "/admin/login"
+          const response = NextResponse.redirect(url)
+          response.cookies.delete("admin_session")
+          return response
+        }
+      } catch {
+        const url = request.nextUrl.clone()
+        url.pathname = "/admin/login"
+        return NextResponse.redirect(url)
+      }
+    }
+
+    if (request.nextUrl.pathname === "/admin/login") {
+      const adminSession = request.cookies.get("admin_session")?.value
+      if (adminSession) {
+        try {
+          const decoded = JSON.parse(Buffer.from(adminSession, "base64").toString())
+          if (decoded.exp > Date.now()) {
+            const url = request.nextUrl.clone()
+            url.pathname = "/admin"
+            return NextResponse.redirect(url)
+          }
+        } catch {
+          // Session invalid, continue to login
+        }
+      }
+    }
+
     // حماية صفحات التطبيق
     if (request.nextUrl.pathname.startsWith("/chat") && !user) {
       const url = request.nextUrl.clone()

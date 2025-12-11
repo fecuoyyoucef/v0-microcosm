@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { User, Mail, Check, Loader2, Camera, Download, Activity, Monitor, Info, X } from "lucide-react"
+import { User, Mail, Check, Loader2, Camera, Download, Activity, Monitor, Info, X, Shield } from "lucide-react"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 import type { Profile } from "@/lib/types"
 import Link from "next/link"
@@ -31,6 +31,7 @@ export default function AccountSettingsPage() {
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [isCheckingName, setIsCheckingName] = useState(false)
   const [nameAvailable, setNameAvailable] = useState<boolean | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const supabase = createClient()
@@ -93,6 +94,15 @@ export default function AccountSettingsPage() {
           setBio(profileData.bio || "")
           setAvatarUrl(profileData.avatar_url || null)
         }
+
+        const { data: adminData } = await supabase
+          .from("admins")
+          .select("id, is_active")
+          .eq("email", authUser.email)
+          .eq("is_active", true)
+          .single()
+
+        setIsAdmin(!!adminData)
       } catch (error) {
         console.error("Error loading data:", error)
       } finally {
@@ -208,6 +218,31 @@ export default function AccountSettingsPage() {
         </h1>
         <p className="text-sm text-muted-foreground mt-1">إدارة معلومات حسابك الشخصية</p>
       </div>
+
+      {isAdmin && (
+        <Card className="border-cyan-500/50 bg-cyan-500/5">
+          <CardContent className="p-4">
+            <Link href="/admin" className="flex items-center justify-between group">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center">
+                  <Shield className="w-5 h-5 text-cyan-400" />
+                </div>
+                <div>
+                  <p className="font-semibold text-cyan-400">لوحة تحكم المالك</p>
+                  <p className="text-xs text-muted-foreground">إدارة التطبيق والمستخدمين</p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/10 bg-transparent"
+              >
+                فتح
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
