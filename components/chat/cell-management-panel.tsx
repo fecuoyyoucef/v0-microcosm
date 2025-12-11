@@ -248,8 +248,13 @@ export function CellManagementPanel({ group, members, currentUserId, isAdmin }: 
     setIsProcessing(null)
   }
 
-  // Only show for primary cells or admins
-  if (!isPrimary && !isAdmin) return null
+  console.log("[v0] CellManagementPanel - group.group_type:", group.group_type)
+  console.log("[v0] CellManagementPanel - isPrimary:", isPrimary)
+  console.log("[v0] CellManagementPanel - isAdmin:", isAdmin)
+  console.log("[v0] CellManagementPanel - maxMembers:", maxMembers)
+  console.log("[v0] CellManagementPanel - members.length:", members.length)
+
+  if (!isAdmin) return null
 
   return (
     <div className="space-y-6 p-4">

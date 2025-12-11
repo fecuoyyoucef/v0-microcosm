@@ -37,9 +37,11 @@ import {
   BarChart3,
   Download,
   ShieldCheck,
+  GitBranch,
 } from "lucide-react"
 import Link from "next/link"
 import type { Group, GroupMember, GroupSettings, UpperLayerPermission, GroupStatistics } from "@/lib/types"
+import { CellManagementPanel } from "@/components/chat/cell-management-panel" // Import CellManagementPanel
 
 interface GroupSettingsFormProps {
   group: Group
@@ -48,7 +50,7 @@ interface GroupSettingsFormProps {
   isAdmin: boolean
 }
 
-export function GroupSettingsForm({ group, members, currentUserId, isAdmin }: GroupSettingsFormProps) {
+export function GroupSettingsForm({ group, members: initialMembers, currentUserId, isAdmin }: GroupSettingsFormProps) {
   const [name, setName] = useState(group.name)
   const [description, setDescription] = useState(group.description || "")
   const [avatarUrl, setAvatarUrl] = useState(group.avatar_url || "")
@@ -196,7 +198,7 @@ export function GroupSettingsForm({ group, members, currentUserId, isAdmin }: Gr
           upperMessages: messages.filter((m) => m.layer === "upper").length,
           standardMessages: messages.filter((m) => m.layer === "standard").length,
           shadowMessages: messages.filter((m) => m.layer === "shadow").length,
-          memberStats: members
+          memberStats: initialMembers
             .map((m) => ({
               userId: m.user_id,
               displayName: m.profile?.display_name || "مستخدم",
@@ -272,6 +274,14 @@ export function GroupSettingsForm({ group, members, currentUserId, isAdmin }: Gr
     }
   }
 
+  const isPrimaryCell = group.group_type === "primary" || !group.group_type || !group.parent_group_id
+
+  console.log("[v0] Group settings - isAdmin:", isAdmin)
+  console.log("[v0] Group settings - isPrimaryCell:", isPrimaryCell)
+  console.log("[v0] Group settings - group.group_type:", group.group_type)
+  console.log("[v0] Group settings - group.parent_group_id:", group.parent_group_id)
+  console.log("[v0] Group settings - Should show cells tab:", isPrimaryCell && isAdmin)
+
   return (
     <div className="flex-1 bg-background overflow-auto">
       <div className="max-w-3xl mx-auto p-4 md:p-6 space-y-6 pb-20">
@@ -283,13 +293,13 @@ export function GroupSettingsForm({ group, members, currentUserId, isAdmin }: Gr
             </Button>
           </Link>
           <div>
-            <h1 className="text-xl md:text-2xl font-bold">إعدادات المجموعة</h1>
-            <p className="text-sm text-muted-foreground">إدارة إعدادات مجموعة {group.name}</p>
+            <h1 className="text-xl md:text-2xl font-bold">إعدادات الخلية</h1>
+            <p className="text-sm text-muted-foreground">إدارة إعدادات خلية {group.name}</p>
           </div>
         </div>
 
         <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 h-auto">
+          <TabsList className="grid w-full grid-cols-6 h-auto">
             <TabsTrigger value="general" className="text-xs md:text-sm py-2">
               <Settings className="w-4 h-4 md:ml-2" />
               <span className="hidden md:inline">عام</span>
@@ -298,6 +308,12 @@ export function GroupSettingsForm({ group, members, currentUserId, isAdmin }: Gr
               <Users className="w-4 h-4 md:ml-2" />
               <span className="hidden md:inline">الأعضاء</span>
             </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="cells" className="text-xs md:text-sm py-2">
+                <GitBranch className="w-4 h-4 md:ml-2" />
+                <span className="hidden md:inline">الخلايا</span>
+              </TabsTrigger>
+            )}
             <TabsTrigger value="permissions" className="text-xs md:text-sm py-2" disabled={!isAdmin}>
               <ShieldCheck className="w-4 h-4 md:ml-2" />
               <span className="hidden md:inline">الصلاحيات</span>
@@ -312,7 +328,7 @@ export function GroupSettingsForm({ group, members, currentUserId, isAdmin }: Gr
           <TabsContent value="general" className="space-y-4 mt-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">صورة المجموعة</CardTitle>
+                <CardTitle className="text-lg">صورة الخلية</CardTitle>
               </CardHeader>
               <CardContent className="flex items-center gap-6">
                 <div className="relative">
@@ -344,18 +360,18 @@ export function GroupSettingsForm({ group, members, currentUserId, isAdmin }: Gr
                   />
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  {isAdmin ? "اضغط على أيقونة الكاميرا لتغيير صورة المجموعة" : "فقط المسؤول يمكنه تغيير الصورة"}
+                  {isAdmin ? "اضغط على أيقونة الكاميرا لتغيير صورة الخلية" : "فقط المسؤول يمكنه تغيير الصورة"}
                 </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">معلومات المجموعة</CardTitle>
+                <CardTitle className="text-lg">معلومات الخلية</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">اسم المجموعة</Label>
+                  <Label htmlFor="name">اسم الخلية</Label>
                   <Input id="name" value={name} onChange={(e) => setName(e.target.value)} disabled={!isAdmin} />
                 </div>
                 <div className="space-y-2">
@@ -364,7 +380,7 @@ export function GroupSettingsForm({ group, members, currentUserId, isAdmin }: Gr
                     id="description"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="وصف قصير للمجموعة..."
+                    placeholder="وصف قصير للخلية..."
                     disabled={!isAdmin}
                   />
                 </div>
@@ -390,7 +406,7 @@ export function GroupSettingsForm({ group, members, currentUserId, isAdmin }: Gr
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">تصدير المحادثة</CardTitle>
-                <CardDescription>تصدير جميع رسائل المجموعة</CardDescription>
+                <CardDescription>تصدير جميع رسائل الخلية</CardDescription>
               </CardHeader>
               <CardContent className="flex gap-2 flex-wrap">
                 <Button variant="outline" onClick={() => handleExportChat("txt")}>
@@ -422,7 +438,7 @@ export function GroupSettingsForm({ group, members, currentUserId, isAdmin }: Gr
                         ) : (
                           <>
                             <Trash2 className="h-4 w-4 ml-2" />
-                            حذف المجموعة
+                            حذف الخلية
                           </>
                         )}
                       </Button>
@@ -430,7 +446,7 @@ export function GroupSettingsForm({ group, members, currentUserId, isAdmin }: Gr
                     <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
-                        <AlertDialogDescription>سيتم حذف المجموعة وجميع الرسائل نهائياً.</AlertDialogDescription>
+                        <AlertDialogDescription>سيتم حذف الخلية وجميع الرسائل نهائياً.</AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>إلغاء</AlertDialogCancel>
@@ -452,11 +468,11 @@ export function GroupSettingsForm({ group, members, currentUserId, isAdmin }: Gr
           <TabsContent value="members" className="mt-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">الأعضاء ({members.length})</CardTitle>
+                <CardTitle className="text-lg">الأعضاء ({initialMembers.length})</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 max-h-96 overflow-auto">
-                  {members.map((member) => (
+                  {initialMembers.map((member) => (
                     <div key={member.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary">
                       <Avatar className="h-10 w-10">
                         <AvatarImage src={member.profile?.avatar_url || undefined} />
@@ -516,145 +532,170 @@ export function GroupSettingsForm({ group, members, currentUserId, isAdmin }: Gr
             </Card>
           </TabsContent>
 
+          {/* Cells Tab */}
+          {isAdmin && (
+            <TabsContent value="cells" className="mt-4">
+              <CellManagementPanel
+                group={group}
+                members={initialMembers}
+                currentUserId={currentUserId}
+                isAdmin={isAdmin}
+              />
+            </TabsContent>
+          )}
+
           {/* Permissions Tab */}
           <TabsContent value="permissions" className="space-y-4 mt-4">
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">التحكم في الطبقات</CardTitle>
-                <CardDescription>من يمكنه النشر في الطبقة المهمة (Upper)</CardDescription>
+                <CardDescription>من يمكنه إرسال رسائل في الطبقة العلوية</CardDescription>
               </CardHeader>
               <CardContent>
                 <RadioGroup
                   value={settings.upper_layer_permission}
-                  onValueChange={(value: UpperLayerPermission) =>
-                    setSettings({ ...settings, upper_layer_permission: value })
+                  onValueChange={(value) =>
+                    setSettings({ ...settings, upper_layer_permission: value as UpperLayerPermission })
                   }
-                  className="space-y-3"
+                  disabled={!isAdmin}
                 >
                   <div className="flex items-center space-x-2 space-x-reverse">
                     <RadioGroupItem value="all" id="all" />
-                    <Label htmlFor="all">الكل</Label>
+                    <Label htmlFor="all">الجميع</Label>
                   </div>
                   <div className="flex items-center space-x-2 space-x-reverse">
                     <RadioGroupItem value="admin_only" id="admin_only" />
-                    <Label htmlFor="admin_only">المسؤول فقط</Label>
+                    <Label htmlFor="admin_only">المسؤولون فقط</Label>
                   </div>
                   <div className="flex items-center space-x-2 space-x-reverse">
                     <RadioGroupItem value="selected_members" id="selected_members" />
-                    <Label htmlFor="selected_members">أعضاء محددين</Label>
+                    <Label htmlFor="selected_members">أعضاء محددون</Label>
                   </div>
                 </RadioGroup>
+                {isAdmin && (
+                  <Button onClick={handleSave} className="mt-4" disabled={isSaving}>
+                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin ml-2" /> : <Save className="h-4 w-4 ml-2" />}
+                    حفظ
+                  </Button>
+                )}
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">الميزات</CardTitle>
+                <CardTitle className="text-lg">ميزات الخلية</CardTitle>
+                <CardDescription>تفعيل أو تعطيل ميزات الخلية</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="notebook">المفكرة الجماعية</Label>
+                  <div>
+                    <p className="font-medium">المفكرة التعاونية</p>
+                    <p className="text-sm text-muted-foreground">السماح بتدوين الملاحظات المشتركة</p>
+                  </div>
                   <Switch
-                    id="notebook"
                     checked={settings.allow_notebook}
                     onCheckedChange={(checked) => setSettings({ ...settings, allow_notebook: checked })}
+                    disabled={!isAdmin}
                   />
                 </div>
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="mindmap">الخريطة الذهنية</Label>
+                  <div>
+                    <p className="font-medium">الخريطة الذهنية</p>
+                    <p className="text-sm text-muted-foreground">عرض المحادثات في شكل شجري</p>
+                  </div>
                   <Switch
-                    id="mindmap"
                     checked={settings.allow_mindmap}
                     onCheckedChange={(checked) => setSettings({ ...settings, allow_mindmap: checked })}
+                    disabled={!isAdmin}
                   />
                 </div>
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="summary">الملخصات الذكية</Label>
+                  <div>
+                    <p className="font-medium">التلخيص الذكي</p>
+                    <p className="text-sm text-muted-foreground">استخدام الذكاء الاصطناعي للتلخيص</p>
+                  </div>
                   <Switch
-                    id="summary"
                     checked={settings.allow_smart_summary}
                     onCheckedChange={(checked) => setSettings({ ...settings, allow_smart_summary: checked })}
+                    disabled={!isAdmin}
                   />
                 </div>
-
-                <Button onClick={handleSave} disabled={isSaving} className="w-full mt-4">
-                  {isSaving ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin ml-2" />
-                      جاري الحفظ...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4 ml-2" />
-                      حفظ التغييرات
-                    </>
-                  )}
-                </Button>
+                {isAdmin && (
+                  <Button onClick={handleSave} disabled={isSaving}>
+                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin ml-2" /> : <Save className="h-4 w-4 ml-2" />}
+                    حفظ
+                  </Button>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
 
           {/* Stats Tab */}
-          <TabsContent value="stats" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">إحصائيات المجموعة</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoadingStats ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                  </div>
-                ) : statistics ? (
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-4 rounded-lg bg-secondary">
-                        <p className="text-2xl font-bold">{statistics.totalMessages}</p>
-                        <p className="text-sm text-muted-foreground">إجمالي الرسائل</p>
-                      </div>
-                      <div className="p-4 rounded-lg bg-orange-500/10">
-                        <p className="text-2xl font-bold text-orange-500">{statistics.upperMessages}</p>
-                        <p className="text-sm text-muted-foreground">رسائل مهمة</p>
-                      </div>
-                      <div className="p-4 rounded-lg bg-secondary">
-                        <p className="text-2xl font-bold">{statistics.standardMessages}</p>
-                        <p className="text-sm text-muted-foreground">رسائل عادية</p>
-                      </div>
-                      <div className="p-4 rounded-lg bg-secondary/50">
-                        <p className="text-2xl font-bold text-muted-foreground">{statistics.shadowMessages}</p>
-                        <p className="text-sm text-muted-foreground">رسائل ظل</p>
-                      </div>
-                    </div>
+          <TabsContent value="stats" className="space-y-4 mt-4">
+            {isLoadingStats ? (
+              <div className="flex items-center justify-center p-12">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : statistics ? (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="text-2xl font-bold">{statistics.totalMessages}</div>
+                      <p className="text-xs text-muted-foreground">إجمالي الرسائل</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="text-2xl font-bold text-amber-500">{statistics.upperMessages}</div>
+                      <p className="text-xs text-muted-foreground">الطبقة العلوية</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="text-2xl font-bold text-blue-500">{statistics.standardMessages}</div>
+                      <p className="text-xs text-muted-foreground">الطبقة العادية</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="text-2xl font-bold text-gray-500">{statistics.shadowMessages}</div>
+                      <p className="text-xs text-muted-foreground">الطبقة الخفية</p>
+                    </CardContent>
+                  </Card>
+                </div>
 
-                    <div>
-                      <h4 className="font-medium mb-3">نشاط الأعضاء</h4>
-                      <div className="space-y-2">
-                        {statistics.memberStats.map((stat, i) => (
-                          <div
-                            key={stat.userId}
-                            className="flex items-center justify-between p-2 rounded-lg bg-secondary/50"
-                          >
-                            <span className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground">#{i + 1}</span>
-                              <span>{stat.displayName}</span>
-                            </span>
-                            <span className="text-sm font-medium">{stat.messageCount} رسالة</span>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">نشاط الأعضاء</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {statistics.memberStats.slice(0, 10).map((member, index) => (
+                        <div key={member.userId} className="flex items-center gap-3">
+                          <span className="text-sm text-muted-foreground w-6">{index + 1}.</span>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">{member.displayName}</p>
                           </div>
-                        ))}
-                      </div>
+                          <span className="text-sm font-medium">{member.messageCount} رسالة</span>
+                        </div>
+                      ))}
                     </div>
+                  </CardContent>
+                </Card>
 
-                    {statistics.lastActivity && (
-                      <p className="text-sm text-muted-foreground">
-                        آخر نشاط: {new Date(statistics.lastActivity).toLocaleString("ar-EG")}
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-center text-muted-foreground py-8">اضغط لتحميل الإحصائيات</p>
+                {statistics.lastActivity && (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <p className="text-sm text-muted-foreground">آخر نشاط</p>
+                      <p className="font-medium">{new Date(statistics.lastActivity).toLocaleString("ar-EG")}</p>
+                    </CardContent>
+                  </Card>
                 )}
-              </CardContent>
-            </Card>
+              </>
+            ) : (
+              <div className="text-center p-12 text-muted-foreground">اضغط على تبويب الإحصائيات لتحميل البيانات</div>
+            )}
           </TabsContent>
         </Tabs>
       </div>
