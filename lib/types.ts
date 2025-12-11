@@ -2,12 +2,20 @@ export type MessageLayer = "upper" | "standard" | "shadow"
 
 export type UpperLayerPermission = "all" | "admin_only" | "selected_members"
 
+export type GroupType = "primary" | "secondary"
+
 export interface GroupSettings {
   upper_layer_permission: UpperLayerPermission
   upper_layer_members?: string[]
   allow_notebook: boolean
   allow_mindmap: boolean
   allow_smart_summary: boolean
+}
+
+export interface SupervisorPermissions {
+  can_delete_messages: boolean
+  can_remove_members: boolean
+  can_edit_settings: boolean
 }
 
 export interface Profile {
@@ -29,6 +37,35 @@ export interface Group {
   created_at: string
   updated_at: string
   settings?: GroupSettings
+  // Hierarchical fields
+  parent_group_id: string | null
+  group_type: GroupType
+  // Virtual fields (populated by queries)
+  member_count?: number
+  secondary_groups?: Group[]
+  parent_group?: Group | null
+}
+
+export interface GroupSupervisor {
+  id: string
+  group_id: string
+  user_id: string
+  assigned_by: string
+  permissions: SupervisorPermissions
+  created_at: string
+  profile?: Profile | null
+}
+
+export interface GroupJoinRequest {
+  id: string
+  group_id: string
+  user_id: string
+  status: "pending" | "approved" | "rejected" | "redirected"
+  redirected_to: string | null
+  created_at: string
+  processed_at: string | null
+  processed_by: string | null
+  profile?: Profile | null
 }
 
 export interface GroupMember {
@@ -203,6 +240,8 @@ export type NotificationType =
   | "decision_closed"
   | "memory_generated"
   | "system"
+  | "join_request" // Added new notification types
+  | "secondary_created"
 
 export interface Notification {
   id: string
