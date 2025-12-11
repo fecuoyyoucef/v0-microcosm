@@ -2,7 +2,6 @@ import type React from "react"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { ChatSidebar } from "@/components/chat/chat-sidebar"
-import { PushNotificationManager } from "@/components/notifications/push-notification-manager"
 import { InstallPromptNotification } from "@/components/pwa/install-button"
 
 export default async function ChatLayout({ children }: { children: React.ReactNode }) {
@@ -17,8 +16,7 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
   }
 
   return (
-    <div className="flex h-[100dvh] bg-background overflow-hidden">
-      <PushNotificationManager userId={user.id} />
+    <div className="flex h-[100dvh] w-screen max-w-[100vw] bg-background overflow-x-hidden overflow-y-hidden">
       <InstallPromptNotification />
 
       {/* Sidebar - hidden on mobile, visible on desktop */}
@@ -27,11 +25,11 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
       </aside>
 
       {/* Main content area */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 w-full overflow-hidden">
         {/* Mobile swipe sidebar - no header bar */}
         <ChatSidebar userId={user.id} mobileOnly />
 
-        <div className="flex-1 flex flex-col overflow-hidden">{children}</div>
+        <div className="flex-1 flex flex-col w-full overflow-hidden">{children}</div>
       </main>
     </div>
   )

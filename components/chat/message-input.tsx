@@ -153,16 +153,18 @@ export function MessageInput({
   }
 
   return (
-    <div className="shrink-0 border-t border-border/50 bg-background">
+    <div className="shrink-0 border-t border-border/50 bg-background w-full max-w-full overflow-hidden">
       {/* Reply preview */}
       {replyingTo && (
         <div className="px-3 py-1.5 bg-muted/50 border-b border-border/50 flex items-center justify-between animate-in slide-in-from-bottom-2 duration-200">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-0.5 h-6 bg-primary rounded-full" />
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="w-0.5 h-6 bg-primary rounded-full shrink-0" />
             <Reply className="w-3.5 h-3.5 text-primary shrink-0" />
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium text-primary">{replyingTo.sender?.display_name || "مستخدم"}</p>
-              <p className="text-[11px] text-muted-foreground truncate max-w-[250px]">{replyingTo.content}</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-medium text-primary truncate">
+                {replyingTo.sender?.display_name || "مستخدم"}
+              </p>
+              <p className="text-[11px] text-muted-foreground truncate">{replyingTo.content}</p>
             </div>
           </div>
           <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 rounded-full" onClick={onCancelReply}>
@@ -171,7 +173,7 @@ export function MessageInput({
         </div>
       )}
 
-      <div className="p-2">
+      <div className="p-2 w-full max-w-full">
         {/* Image preview */}
         {imagePreview && (
           <div className="mb-2 relative inline-block animate-in zoom-in-95 duration-200">
@@ -185,9 +187,9 @@ export function MessageInput({
           </div>
         )}
 
-        {/* Instagram-style input row */}
-        <div className="flex items-center gap-2">
-          {/* Camera button - Instagram style circular */}
+        {/* Input row - redesigned to prevent overflow */}
+        <div className="flex items-center gap-2 w-full max-w-full">
+          {/* Camera button */}
           <Button
             variant="outline"
             size="icon"
@@ -199,46 +201,47 @@ export function MessageInput({
           </Button>
           <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
 
-          {/* Text input - Instagram style pill shape */}
-          <div className="flex-1 relative min-w-0">
+          {/* Text input container */}
+          <div className="flex-1 min-w-0 flex items-center gap-1 border border-border/80 bg-muted/30 rounded-full px-3 py-1">
+            {/* Layer picker */}
+            <Popover open={isLayerOpen} onOpenChange={setIsLayerOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 rounded-full p-0">
+                  <span className="text-sm">{currentLayerOption.icon}</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-28 p-1" align="start">
+                {availableLayers.map((layer) => (
+                  <Button
+                    key={layer.value}
+                    variant={selectedLayer === layer.value ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => {
+                      setSelectedLayer(layer.value)
+                      setIsLayerOpen(false)
+                    }}
+                    className="w-full justify-start gap-2 h-8 text-xs"
+                  >
+                    <span>{layer.icon}</span>
+                    <span>{layer.label}</span>
+                  </Button>
+                ))}
+              </PopoverContent>
+            </Popover>
+
+            {/* Text input */}
             <Textarea
               ref={textareaRef}
               value={content}
               onChange={(e) => setContent(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Message..."
-              className="min-h-[40px] max-h-24 resize-none border border-border/80 bg-muted/30 rounded-full px-4 pr-4 pl-28 text-sm py-2.5 focus-visible:ring-1 focus-visible:ring-primary/50"
+              className="min-h-[32px] max-h-20 resize-none border-0 bg-transparent px-2 text-sm py-1.5 focus-visible:ring-0 flex-1 min-w-0"
               rows={1}
             />
 
-            {/* Inline action buttons */}
-            <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-              {/* Layer picker */}
-              <Popover open={isLayerOpen} onOpenChange={setIsLayerOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full">
-                    <span className="text-sm">{currentLayerOption.icon}</span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-28 p-1" align="start">
-                  {availableLayers.map((layer) => (
-                    <Button
-                      key={layer.value}
-                      variant={selectedLayer === layer.value ? "secondary" : "ghost"}
-                      size="sm"
-                      onClick={() => {
-                        setSelectedLayer(layer.value)
-                        setIsLayerOpen(false)
-                      }}
-                      className="w-full justify-start gap-2 h-8 text-xs"
-                    >
-                      <span>{layer.icon}</span>
-                      <span>{layer.label}</span>
-                    </Button>
-                  ))}
-                </PopoverContent>
-              </Popover>
-
+            {/* Action buttons */}
+            <div className="flex items-center gap-0.5 shrink-0">
               {/* Node selector */}
               {nodes.length > 0 && (
                 <Select
@@ -266,7 +269,7 @@ export function MessageInput({
               {selectedLayer === "shadow" && (
                 <Popover open={isVisibilityOpen} onOpenChange={setIsVisibilityOpen}>
                   <PopoverTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full">
+                    <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full p-0">
                       <Eye className={cn("w-4 h-4", visibleTo.length > 0 ? "text-primary" : "text-muted-foreground")} />
                     </Button>
                   </PopoverTrigger>
@@ -294,13 +297,13 @@ export function MessageInput({
                 </Popover>
               )}
 
-              {/* Send button inline */}
+              {/* Send button */}
               <Button
                 onClick={handleSend}
                 disabled={(!content.trim() && !selectedImage) || isSending}
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 rounded-full text-primary hover:text-primary"
+                className="h-7 w-7 rounded-full p-0 text-primary hover:text-primary"
               >
                 {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               </Button>
