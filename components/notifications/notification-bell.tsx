@@ -49,7 +49,7 @@ export function NotificationBell({ userId }: NotificationBellProps) {
 
     // Subscribe to realtime notifications
     const channel = supabase
-      .channel("notifications")
+      .channel(`notifications-${userId}`)
       .on(
         "postgres_changes",
         {
@@ -62,6 +62,9 @@ export function NotificationBell({ userId }: NotificationBellProps) {
           const newNotification = payload.new as Notification
           setNotifications((prev) => [newNotification, ...prev])
           setUnreadCount((prev) => prev + 1)
+
+          // Show browser notification if permission granted
+          showBrowserNotification(newNotification)
         },
       )
       .on(
@@ -82,26 +85,85 @@ export function NotificationBell({ userId }: NotificationBellProps) {
       )
       .subscribe()
 
+    // Request notification permission on mount
+    requestNotificationPermission()
+
     return () => {
       supabase.removeChannel(channel)
     }
   }, [userId])
 
+  const requestNotificationPermission = async () => {
+    if ("Notification" in window && Notification.permission === "default") {
+      await Notification.requestPermission()
+    }
+  }
+
+  const showBrowserNotification = (notification: Notification) => {
+    if ("Notification" in window && Notification.permission === "granted") {
+      const browserNotif = new Notification(notification.title, {
+        body: notification.body || "",
+        icon: "/icons/icon-192x192.png",
+        badge: "/icons/icon-72x72.png",
+        tag: notification.id,
+        data: notification.data,
+        requireInteraction: notification.data?.priority === "high",
+      })
+
+      browserNotif.onclick = () => {
+        window.focus()
+        if (notification.data?.action_url) {
+          window.location.href = notification.data.action_url
+        }
+        browserNotif.close()
+      }
+    }
+  }
+
   const fetchNotifications = async () => {
     const { data, error } = await supabase
       .from("notifications")
-      .select(`
-        *,
-        sender:profiles!sender_id(id, display_name, avatar_url),
-        group:groups!group_id(id, name, avatar_url)
-      `)
+      .select("*")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(20)
 
-    if (!error && data) {
-      setNotifications(data)
-      setUnreadCount(data.filter((n) => !n.is_read).length)
+    if (error) {
+      console.error("[v0] Error fetching notifications:", error)
+      return
+    }
+
+    if (data) {
+      // Fetch related data separately to handle nulls
+      const notificationsWithRelations = await Promise.all(
+        data.map(async (notif) => {
+          let sender = null
+          let group = null
+
+          if (notif.sender_id) {
+            const { data: senderData } = await supabase
+              .from("profiles")
+              .select("id, display_name, avatar_url")
+              .eq("id", notif.sender_id)
+              .single()
+            sender = senderData
+          }
+
+          if (notif.group_id) {
+            const { data: groupData } = await supabase
+              .from("groups")
+              .select("id, name, avatar_url")
+              .eq("id", notif.group_id)
+              .single()
+            group = groupData
+          }
+
+          return { ...notif, sender, group }
+        }),
+      )
+
+      setNotifications(notificationsWithRelations)
+      setUnreadCount(notificationsWithRelations.filter((n) => !n.is_read).length)
     }
   }
 
@@ -129,7 +191,7 @@ export function NotificationBell({ userId }: NotificationBellProps) {
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center font-medium">
+            <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center font-medium animate-pulse">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}

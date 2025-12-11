@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { NotificationItem } from "@/components/notifications/notification-item"
 import type { Notification } from "@/lib/types"
-import { ArrowRight, Bell, CheckCheck, Trash2 } from "lucide-react"
+import { ArrowRight, Bell, CheckCheck, Trash2, BellRing, Loader2 } from "lucide-react"
 import { useSettings } from "@/components/settings-provider"
 import Image from "next/image"
 
@@ -24,6 +24,9 @@ const translations = {
     noUnread: "لا توجد إشعارات غير مقروءة",
     noRead: "لا توجد إشعارات مقروءة",
     back: "رجوع",
+    enableNotifications: "تفعيل الإشعارات",
+    notificationsEnabled: "الإشعارات مفعّلة",
+    notificationsBlocked: "الإشعارات محظورة",
   },
   en: {
     notifications: "Notifications",
@@ -36,6 +39,9 @@ const translations = {
     noUnread: "No unread notifications",
     noRead: "No read notifications",
     back: "Back",
+    enableNotifications: "Enable Notifications",
+    notificationsEnabled: "Notifications Enabled",
+    notificationsBlocked: "Notifications Blocked",
   },
   fr: {
     notifications: "Notifications",
@@ -48,6 +54,9 @@ const translations = {
     noUnread: "Pas de notifications non lues",
     noRead: "Pas de notifications lues",
     back: "Retour",
+    enableNotifications: "Activer les notifications",
+    notificationsEnabled: "Notifications activées",
+    notificationsBlocked: "Notifications bloquées",
   },
 }
 
@@ -56,6 +65,7 @@ export default function NotificationsPage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("all")
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>("default")
   const router = useRouter()
   const supabase = createClient()
   const { language } = useSettings()
@@ -64,6 +74,11 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     checkUser()
+
+    // Check notification permission
+    if ("Notification" in window) {
+      setNotificationPermission(Notification.permission)
+    }
   }, [])
 
   const checkUser = async () => {
@@ -82,16 +97,52 @@ export default function NotificationsPage() {
   const fetchNotifications = async (uid: string) => {
     const { data, error } = await supabase
       .from("notifications")
-      .select(`
-        *,
-        sender:profiles!sender_id(id, display_name, avatar_url),
-        group:groups!group_id(id, name, avatar_url)
-      `)
+      .select("*")
       .eq("user_id", uid)
       .order("created_at", { ascending: false })
 
-    if (!error && data) {
-      setNotifications(data)
+    if (error) {
+      console.error("[v0] Error fetching notifications:", error)
+      return
+    }
+
+    if (data) {
+      // Fetch related data separately to handle nulls
+      const notificationsWithRelations = await Promise.all(
+        data.map(async (notif) => {
+          let sender = null
+          let group = null
+
+          if (notif.sender_id) {
+            const { data: senderData } = await supabase
+              .from("profiles")
+              .select("id, display_name, avatar_url")
+              .eq("id", notif.sender_id)
+              .single()
+            sender = senderData
+          }
+
+          if (notif.group_id) {
+            const { data: groupData } = await supabase
+              .from("groups")
+              .select("id, name, avatar_url")
+              .eq("id", notif.group_id)
+              .single()
+            group = groupData
+          }
+
+          return { ...notif, sender, group }
+        }),
+      )
+
+      setNotifications(notificationsWithRelations)
+    }
+  }
+
+  const requestNotificationPermission = async () => {
+    if ("Notification" in window) {
+      const permission = await Notification.requestPermission()
+      setNotificationPermission(permission)
     }
   }
 
@@ -137,7 +188,7 @@ export default function NotificationsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
   }
@@ -159,6 +210,23 @@ export default function NotificationsPage() {
           </span>
         )}
       </div>
+
+      {/* Notification Permission Banner */}
+      {notificationPermission !== "granted" && (
+        <div className="p-3 bg-primary/10 border-b flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <BellRing className="h-5 w-5 text-primary" />
+            <span className="text-sm">
+              {notificationPermission === "denied" ? t.notificationsBlocked : t.enableNotifications}
+            </span>
+          </div>
+          {notificationPermission === "default" && (
+            <Button size="sm" onClick={requestNotificationPermission}>
+              {t.enableNotifications}
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex items-center gap-2 p-3 border-b">

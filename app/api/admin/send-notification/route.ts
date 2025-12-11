@@ -31,7 +31,7 @@ export async function POST(request: Request) {
 
     const supabase = await createClient()
 
-    // جلب جميع المستخدمين
+    // Get all users
     const { data: users, error: usersError } = await supabase.from("profiles").select("id")
 
     if (usersError) throw usersError
@@ -40,50 +40,62 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "لا يوجد مستخدمين" }, { status: 400 })
     }
 
-    // إنشاء الإشعارات
+    // Create notifications for all users
     const notifications = users.map((user) => ({
       user_id: user.id,
       type: "system",
       title,
-      body,
+      body: body || "",
       data: {
-        priority,
-        action_url: actionUrl,
-        action_label: actionLabel,
+        priority: priority || "normal",
+        action_url: actionUrl || null,
+        action_label: actionLabel || null,
+        sent_by_admin: true,
       },
     }))
 
     const { error: notifError } = await supabase.from("notifications").insert(notifications)
 
-    if (notifError) throw notifError
+    if (notifError) {
+      console.error("[v0] Notification insert error:", notifError)
+      throw notifError
+    }
 
-    // حفظ في سجل الإعلانات
-    await supabase.from("system_announcements").insert({
-      admin_id: admin.id,
-      title,
-      body,
-      target,
-      priority,
-      action_url: actionUrl,
-      action_label: actionLabel,
-      sent_at: new Date().toISOString(),
-      recipients_count: users.length,
-    })
+    // Try to save announcement log (may fail if table doesn't exist yet)
+    try {
+      await supabase.from("system_announcements").insert({
+        admin_id: admin.id,
+        title,
+        body,
+        target: target || "all",
+        priority: priority || "normal",
+        action_url: actionUrl,
+        action_label: actionLabel,
+        sent_at: new Date().toISOString(),
+        recipients_count: users.length,
+      })
+    } catch (e) {
+      console.log("[v0] system_announcements table may not exist, skipping log")
+    }
 
-    // تسجيل النشاط
-    await supabase.from("admin_activity_log").insert({
-      admin_id: admin.id,
-      action_type: "send_notification",
-      description: `إرسال إشعار: ${title}`,
-      metadata: { recipients: users.length, target, priority },
-    })
+    // Try to log admin activity
+    try {
+      await supabase.from("admin_activity_log").insert({
+        admin_id: admin.id,
+        action_type: "send_notification",
+        description: `إرسال إشعار: ${title}`,
+        metadata: { recipients: users.length, target, priority },
+      })
+    } catch (e) {
+      console.log("[v0] admin_activity_log table may not exist, skipping log")
+    }
 
     return NextResponse.json({
       success: true,
       recipientsCount: users.length,
     })
   } catch (error) {
-    console.error("Send notification error:", error)
+    console.error("[v0] Send notification error:", error)
     return NextResponse.json({ error: "فشل إرسال الإشعار" }, { status: 500 })
   }
 }
