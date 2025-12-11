@@ -45,11 +45,12 @@ export function NotificationBell({ userId }: NotificationBellProps) {
   const t = translations[language]
 
   useEffect(() => {
+    console.log("[v0] NotificationBell mounted for user:", userId)
     fetchNotifications()
 
     // Subscribe to realtime notifications
     const channel = supabase
-      .channel(`notifications-${userId}`)
+      .channel(`notifications-bell-${userId}`)
       .on(
         "postgres_changes",
         {
@@ -59,6 +60,7 @@ export function NotificationBell({ userId }: NotificationBellProps) {
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
+          console.log("[v0] New notification received in bell:", payload.new)
           const newNotification = payload.new as Notification
           setNotifications((prev) => [newNotification, ...prev])
           setUnreadCount((prev) => prev + 1)
@@ -76,6 +78,7 @@ export function NotificationBell({ userId }: NotificationBellProps) {
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
+          console.log("[v0] Notification updated:", payload.new)
           const updated = payload.new as Notification
           setNotifications((prev) => prev.map((n) => (n.id === updated.id ? updated : n)))
           if (updated.is_read) {
@@ -83,7 +86,9 @@ export function NotificationBell({ userId }: NotificationBellProps) {
           }
         },
       )
-      .subscribe()
+      .subscribe((status) => {
+        console.log("[v0] Bell realtime subscription status:", status)
+      })
 
     // Request notification permission on mount
     requestNotificationPermission()
@@ -95,32 +100,36 @@ export function NotificationBell({ userId }: NotificationBellProps) {
 
   const requestNotificationPermission = async () => {
     if ("Notification" in window && Notification.permission === "default") {
-      await Notification.requestPermission()
+      const result = await Notification.requestPermission()
+      console.log("[v0] Notification permission result:", result)
     }
   }
 
   const showBrowserNotification = (notification: Notification) => {
+    console.log("[v0] Showing browser notification:", notification.title)
     if ("Notification" in window && Notification.permission === "granted") {
-      const browserNotif = new Notification(notification.title, {
-        body: notification.body || "",
+      const browserNotif = new Notification(notification.title || "Synaptic Space", {
+        body: notification.body || "لديك إشعار جديد",
         icon: "/icons/icon-192x192.png",
         badge: "/icons/icon-72x72.png",
         tag: notification.id,
-        data: notification.data,
         requireInteraction: notification.data?.priority === "high",
       })
 
       browserNotif.onclick = () => {
         window.focus()
-        if (notification.data?.action_url) {
-          window.location.href = notification.data.action_url
-        }
+        const url = notification.data?.action_url || "/chat/notifications"
+        window.location.href = url
         browserNotif.close()
       }
+    } else {
+      console.log("[v0] Browser notification not shown - permission:", Notification.permission)
     }
   }
 
   const fetchNotifications = async () => {
+    console.log("[v0] Fetching notifications for user:", userId)
+
     const { data, error } = await supabase
       .from("notifications")
       .select("*")
@@ -132,6 +141,8 @@ export function NotificationBell({ userId }: NotificationBellProps) {
       console.error("[v0] Error fetching notifications:", error)
       return
     }
+
+    console.log("[v0] Fetched notifications count:", data?.length || 0)
 
     if (data) {
       // Fetch related data separately to handle nulls
@@ -163,7 +174,9 @@ export function NotificationBell({ userId }: NotificationBellProps) {
       )
 
       setNotifications(notificationsWithRelations)
-      setUnreadCount(notificationsWithRelations.filter((n) => !n.is_read).length)
+      const unread = notificationsWithRelations.filter((n) => !n.is_read).length
+      setUnreadCount(unread)
+      console.log("[v0] Unread count:", unread)
     }
   }
 

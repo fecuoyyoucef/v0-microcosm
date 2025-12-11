@@ -1,14 +1,15 @@
 import { createClient } from "@/lib/supabase/server"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
-import webPush from "web-push"
+import webpush from "web-push"
 
-// Configure web-push with VAPID keys
-const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY
+const vapidPublicKey =
+  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
+  "BDj8yhVUy0-Ued2Dw4joucx73R8-0HOjAcL5XeUGwxvp_KPrp1uBeFxvmGVXN2pvCnKtR_MG5pSPv0wx3f_OKzs"
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || ""
 
-if (vapidPublicKey && vapidPrivateKey) {
-  webPush.setVapidDetails("mailto:youcef192837@gmail.com", vapidPublicKey, vapidPrivateKey)
+if (vapidPrivateKey) {
+  webpush.setVapidDetails("mailto:youcef192837@gmail.com", vapidPublicKey, vapidPrivateKey)
 }
 
 async function verifyAdmin() {
@@ -23,44 +24,6 @@ async function verifyAdmin() {
   } catch {
     return null
   }
-}
-
-async function sendPushToUser(supabase: any, userId: string, payload: string) {
-  if (!vapidPublicKey || !vapidPrivateKey) return 0
-
-  const { data: subscriptions } = await supabase.from("push_subscriptions").select("*").eq("user_id", userId)
-
-  if (!subscriptions || subscriptions.length === 0) return 0
-
-  let sent = 0
-  const failedEndpoints: string[] = []
-
-  for (const sub of subscriptions) {
-    try {
-      await webPush.sendNotification(
-        {
-          endpoint: sub.endpoint,
-          keys: {
-            p256dh: sub.p256dh,
-            auth: sub.auth,
-          },
-        },
-        payload,
-      )
-      sent++
-    } catch (err: any) {
-      if (err.statusCode === 410 || err.statusCode === 404) {
-        failedEndpoints.push(sub.endpoint)
-      }
-    }
-  }
-
-  // Clean up invalid subscriptions
-  if (failedEndpoints.length > 0) {
-    await supabase.from("push_subscriptions").delete().eq("user_id", userId).in("endpoint", failedEndpoints)
-  }
-
-  return sent
 }
 
 export async function POST(request: Request) {
@@ -93,9 +56,10 @@ export async function POST(request: Request) {
       type: "system",
       title,
       body: body || "",
+      is_read: false,
       data: {
         priority: priority || "normal",
-        action_url: actionUrl || null,
+        action_url: actionUrl || "/chat/notifications",
         action_label: actionLabel || null,
         sent_by_admin: true,
       },
@@ -104,47 +68,50 @@ export async function POST(request: Request) {
     const { error: notifError } = await supabase.from("notifications").insert(notifications)
 
     if (notifError) {
-      console.error("[v0] Notification insert error:", notifError)
+      console.error("[Admin] Notification insert error:", notifError)
       throw notifError
     }
 
-    const pushPayload = JSON.stringify({
-      title,
-      body: body || "",
-      icon: "/icons/icon-192x192.png",
-      badge: "/icons/icon-72x72.png",
-      tag: "admin-notification",
-      priority: priority || "normal",
-      url: actionUrl || "/chat/notifications",
-      actions: actionLabel ? [{ action: "open", title: actionLabel }] : undefined,
-    })
-
     let pushSentCount = 0
-    for (const user of users) {
-      const sent = await sendPushToUser(supabase, user.id, pushPayload)
-      pushSentCount += sent
+    if (vapidPrivateKey) {
+      // Get all push subscriptions
+      const { data: allSubscriptions } = await supabase.from("push_subscriptions").select("*")
+
+      if (allSubscriptions && allSubscriptions.length > 0) {
+        const payload = JSON.stringify({
+          title: title || "Synaptic Space",
+          body: body || "لديك إشعار جديد",
+          icon: "/icons/icon-192x192.png",
+          badge: "/icons/icon-72x72.png",
+          url: actionUrl || "/chat/notifications",
+          tag: "admin-notification",
+          priority: priority || "normal",
+        })
+
+        for (const sub of allSubscriptions) {
+          try {
+            await webpush.sendNotification(
+              {
+                endpoint: sub.endpoint,
+                keys: {
+                  p256dh: sub.p256dh,
+                  auth: sub.auth,
+                },
+              },
+              payload,
+            )
+            pushSentCount++
+          } catch (err: any) {
+            // Remove invalid subscriptions
+            if (err.statusCode === 410 || err.statusCode === 404) {
+              await supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint)
+            }
+          }
+        }
+      }
     }
 
-    console.log(`[v0] Sent ${pushSentCount} push notifications`)
-
-    // Try to save announcement log
-    try {
-      await supabase.from("system_announcements").insert({
-        admin_id: admin.id,
-        title,
-        body,
-        target: target || "all",
-        priority: priority || "normal",
-        action_url: actionUrl,
-        action_label: actionLabel,
-        sent_at: new Date().toISOString(),
-        recipients_count: users.length,
-      })
-    } catch (e) {
-      console.log("[v0] system_announcements table may not exist, skipping log")
-    }
-
-    // Try to log admin activity
+    // Log admin activity
     try {
       await supabase.from("admin_activity_log").insert({
         admin_id: admin.id,
@@ -153,7 +120,7 @@ export async function POST(request: Request) {
         metadata: { recipients: users.length, pushSent: pushSentCount, target, priority },
       })
     } catch (e) {
-      console.log("[v0] admin_activity_log table may not exist, skipping log")
+      // Table may not exist
     }
 
     return NextResponse.json({
@@ -162,7 +129,7 @@ export async function POST(request: Request) {
       pushSentCount,
     })
   } catch (error) {
-    console.error("[v0] Send notification error:", error)
+    console.error("[Admin] Send notification error:", error)
     return NextResponse.json({ error: "فشل إرسال الإشعار" }, { status: 500 })
   }
 }

@@ -95,6 +95,8 @@ export default function NotificationsPage() {
   }
 
   const fetchNotifications = async (uid: string) => {
+    console.log("[v0] Page: Fetching notifications for user:", uid)
+
     const { data, error } = await supabase
       .from("notifications")
       .select("*")
@@ -102,9 +104,11 @@ export default function NotificationsPage() {
       .order("created_at", { ascending: false })
 
     if (error) {
-      console.error("[v0] Error fetching notifications:", error)
+      console.error("[v0] Page: Error fetching notifications:", error)
       return
     }
+
+    console.log("[v0] Page: Fetched notifications:", data?.length || 0, data)
 
     if (data) {
       // Fetch related data separately to handle nulls
@@ -135,6 +139,7 @@ export default function NotificationsPage() {
         }),
       )
 
+      console.log("[v0] Page: Notifications with relations:", notificationsWithRelations)
       setNotifications(notificationsWithRelations)
     }
   }
