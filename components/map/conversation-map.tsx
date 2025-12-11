@@ -31,8 +31,44 @@ interface ConversationMapProps {
 
 const NODE_COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#06B6D4"]
 
+const calculateNodePositions = (nodes: ConversationNode[]): ConversationNode[] => {
+  const primaryNodes = nodes.filter((n) => !n.parent_id)
+  const childNodes = nodes.filter((n) => n.parent_id)
+
+  const positioned: ConversationNode[] = []
+
+  // Position primary nodes in a grid
+  primaryNodes.forEach((node, index) => {
+    const col = index % 3
+    const row = Math.floor(index / 3)
+    positioned.push({
+      ...node,
+      position_x: 50 + col * 220,
+      position_y: 50 + row * 150,
+    })
+  })
+
+  // Position child nodes relative to their parents
+  childNodes.forEach((node) => {
+    const parent = positioned.find((n) => n.id === node.parent_id)
+    if (parent) {
+      const siblings = childNodes.filter((n) => n.parent_id === parent.id)
+      const siblingIndex = siblings.indexOf(node)
+      positioned.push({
+        ...node,
+        position_x: parent.position_x + 250,
+        position_y: parent.position_y + siblingIndex * 80,
+      })
+    } else {
+      positioned.push(node)
+    }
+  })
+
+  return positioned
+}
+
 export function ConversationMap({ groupId, group, nodes: initialNodes, currentUserId }: ConversationMapProps) {
-  const [nodes, setNodes] = useState<ConversationNode[]>(initialNodes)
+  const [nodes, setNodes] = useState<ConversationNode[]>(() => calculateNodePositions(initialNodes))
   const [selectedNode, setSelectedNode] = useState<ConversationNode | null>(null)
   const [nodeMessages, setNodeMessages] = useState<Message[]>([])
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
@@ -69,7 +105,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
             .order("created_at", { ascending: true })
 
           if (data) {
-            setNodes(data)
+            setNodes(calculateNodePositions(data))
           }
         },
       )
@@ -468,12 +504,14 @@ function MapNode({
   return (
     <div
       className={cn(
-        "absolute px-4 py-3 rounded-xl bg-card border-2 cursor-pointer transition-all hover:shadow-lg min-w-[140px] max-w-[180px]",
-        isSelected ? "shadow-lg scale-105" : "hover:scale-102",
+        "absolute px-4 py-3 rounded-xl bg-card cursor-pointer transition-all hover:shadow-lg min-w-[160px] max-w-[200px]",
+        isSelected ? "shadow-xl scale-105 ring-2 ring-primary" : "hover:scale-[1.02] shadow-md",
       )}
       style={{
         left: node.position_x,
         top: node.position_y,
+        borderWidth: "2px",
+        borderStyle: "solid",
         borderColor: node.color,
       }}
       onClick={onClick}
