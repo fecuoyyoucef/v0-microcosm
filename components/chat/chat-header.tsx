@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import {
@@ -23,11 +23,16 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Users, MoreVertical, UserPlus, Settings, Copy, Check, LogOut } from "lucide-react"
+import { Users, MoreVertical, UserPlus, Settings, Copy, Check, LogOut, Download } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import type { Group, GroupMember } from "@/lib/types"
 import { cn } from "@/lib/utils"
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>
+}
 
 interface ChatHeaderProps {
   group: Group
@@ -42,8 +47,51 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
   const [copied, setCopied] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
   const [isMembersOpen, setIsMembersOpen] = useState(false)
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
+  const [canInstall, setCanInstall] = useState(false)
   const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    // Check if already in standalone mode (installed)
+    const isStandalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      (window.navigator as Navigator & { standalone?: boolean }).standalone === true
+
+    if (isStandalone) {
+      setCanInstall(false)
+      return
+    }
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault()
+      setDeferredPrompt(e as BeforeInstallPromptEvent)
+      setCanInstall(true)
+    }
+
+    const handleAppInstalled = () => {
+      setCanInstall(false)
+      setDeferredPrompt(null)
+    }
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
+    window.addEventListener("appinstalled", handleAppInstalled)
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
+      window.removeEventListener("appinstalled", handleAppInstalled)
+    }
+  }, [])
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) return
+    await deferredPrompt.prompt()
+    const { outcome } = await deferredPrompt.userChoice
+    if (outcome === "accepted") {
+      setCanInstall(false)
+    }
+    setDeferredPrompt(null)
+  }
 
   const inviteLink = typeof window !== "undefined" ? `${window.location.origin}/invite/${group.id}` : ""
 
@@ -129,6 +177,18 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
       </div>
 
       <div className="flex items-center gap-1 shrink-0">
+        {canInstall && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-xl"
+            onClick={handleInstall}
+            title="تثبيت التطبيق"
+          >
+            <Download className="h-4 w-4" />
+          </Button>
+        )}
+
         {/* Members Sheet */}
         <Sheet open={isMembersOpen} onOpenChange={setIsMembersOpen}>
           <SheetTrigger asChild>
