@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -13,14 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   Plus,
   Users,
@@ -29,7 +21,6 @@ import {
   LogOut,
   Loader2,
   Search,
-  Home,
   Bookmark,
   Moon,
   Sun,
@@ -160,7 +151,7 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
   const [groups, setGroups] = useState<Group[]>(initialGroups)
   const [searchQuery, setSearchQuery] = useState("")
   const [isCreating, setIsCreating] = useState(false)
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [newGroupName, setNewGroupName] = useState("")
   const [newGroupDescription, setNewGroupDescription] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -242,38 +233,36 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
     }
   }, [userId])
 
-  // ... existing code for touch events ...
+  const handleTouchStart = (e: TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX
+    touchStartY.current = e.touches[0].clientY
+    isSwiping.current = false
+  }
+
+  const handleTouchMove = (e: TouchEvent) => {
+    touchEndX.current = e.touches[0].clientX
+    const deltaX = touchStartX.current - touchEndX.current
+    const deltaY = Math.abs(e.touches[0].clientY - touchStartY.current)
+
+    if (deltaX > 30 && deltaY < 50) {
+      isSwiping.current = true
+    }
+  }
+
+  const handleTouchEnd = () => {
+    if (!isSwiping.current) return
+
+    const swipeDistance = touchStartX.current - touchEndX.current
+    const startedFromRightHalf = touchStartX.current > window.innerWidth / 2
+
+    if (swipeDistance > 80 && startedFromRightHalf) {
+      setIsSidebarOpen(true)
+    }
+
+    isSwiping.current = false
+  }
 
   useEffect(() => {
-    const handleTouchStart = (e: TouchEvent) => {
-      touchStartX.current = e.touches[0].clientX
-      touchStartY.current = e.touches[0].clientY
-      isSwiping.current = false
-    }
-
-    const handleTouchMove = (e: TouchEvent) => {
-      touchEndX.current = e.touches[0].clientX
-      const deltaX = touchStartX.current - touchEndX.current
-      const deltaY = Math.abs(e.touches[0].clientY - touchStartY.current)
-
-      if (deltaX > 30 && deltaY < 50) {
-        isSwiping.current = true
-      }
-    }
-
-    const handleTouchEnd = () => {
-      if (!isSwiping.current) return
-
-      const swipeDistance = touchStartX.current - touchEndX.current
-      const startedFromRightHalf = touchStartX.current > window.innerWidth / 2
-
-      if (swipeDistance > 80 && startedFromRightHalf) {
-        setIsSidebarOpen(true)
-      }
-
-      isSwiping.current = false
-    }
-
     document.addEventListener("touchstart", handleTouchStart, { passive: true })
     document.addEventListener("touchmove", handleTouchMove, { passive: true })
     document.addEventListener("touchend", handleTouchEnd, { passive: true })
@@ -334,6 +323,7 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
 
       if (groupError) {
         setError(`${t.errorCreating}: ${groupError.message}`)
+        setIsCreating(false)
         return
       }
 
@@ -346,16 +336,18 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
       if (memberError) {
         await supabase.from("groups").delete().eq("id", group.id)
         setError(`${t.errorMember}: ${memberError.message}`)
+        setIsCreating(false)
         return
       }
 
       setNewGroupName("")
       setNewGroupDescription("")
-      setIsDialogOpen(false)
+      setIsCreateDialogOpen(false)
+      setIsSidebarOpen(false)
       setGroups((prev) => [...prev, group])
       router.push(`/chat/${group.id}`)
-    } catch (err: any) {
-      setError(err.message || t.unexpectedError)
+    } catch {
+      setError(t.unexpectedError)
     } finally {
       setIsCreating(false)
     }
@@ -381,205 +373,75 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
     }
   }, [totalUnread])
 
-  const SidebarContent = () => (
-    <div className="flex flex-col h-full bg-card">
-      <div className="p-4 bg-primary/10">
-        <div className="flex items-center justify-between mb-4">
-          <Avatar className="h-16 w-16 border-2 border-primary/20">
-            {profile?.avatar_url && <AvatarImage src={profile.avatar_url || "/placeholder.svg"} />}
-            <AvatarFallback className="bg-primary text-primary-foreground text-xl font-bold">
-              {profile?.display_name?.charAt(0) || <User className="w-6 h-6" />}
-            </AvatarFallback>
-          </Avatar>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-10 w-10 rounded-full"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          >
-            {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-          </Button>
-        </div>
-        <div>
-          <p className="font-semibold text-lg">{profile?.display_name || t.user}</p>
-          {profile?.username && <p className="text-sm text-muted-foreground">@{profile.username}</p>}
-        </div>
-      </div>
+  const handleOpenCreateDialog = () => {
+    setIsSidebarOpen(false)
+    setTimeout(() => {
+      setIsCreateDialogOpen(true)
+    }, 150)
+  }
 
-      <ScrollArea className="flex-1">
-        <div className="py-2">
-          <Link href="/chat" onClick={() => setIsSidebarOpen(false)}>
-            <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
-              <Home className="w-5 h-5 text-muted-foreground" />
-              <span className="text-sm font-medium">{t.home}</span>
-            </div>
-          </Link>
-
-          <Link href="/chat/notifications" onClick={() => setIsSidebarOpen(false)}>
-            <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
-              <div className="relative">
-                <Bell className="w-5 h-5 text-muted-foreground" />
+  return (
+    <div
+      className="flex flex-col h-screen bg-background"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border/50">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full hover:bg-primary/10"
+              onClick={() => setIsSidebarOpen(true)}
+            >
+              <div className="w-8 h-8 relative">
+                <Avatar className="w-8 h-8">
+                  <AvatarImage src={profile?.avatar_url || undefined} />
+                  <AvatarFallback className="bg-primary/10 text-primary">
+                    {profile?.full_name?.charAt(0) || <User className="w-4 h-4" />}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+            </Button>
+            <h1 className="text-lg font-semibold">{t.chats}</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link href="/chat/notifications">
+              <Button variant="ghost" size="icon" className="rounded-full hover:bg-primary/10 relative">
+                <Bell className="w-5 h-5" />
                 {unreadNotifications > 0 && (
-                  <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground text-[10px] flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center">
                     {unreadNotifications > 9 ? "9+" : unreadNotifications}
                   </span>
                 )}
-              </div>
-              <span className="text-sm font-medium">{t.notifications}</span>
-              {unreadNotifications > 0 && (
-                <span className="mr-auto px-2 py-0.5 rounded-full bg-destructive text-destructive-foreground text-xs">
-                  {unreadNotifications}
-                </span>
-              )}
-            </div>
-          </Link>
-
-          <Link href="/chat/settings/account" onClick={() => setIsSidebarOpen(false)}>
-            <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
-              <User className="w-5 h-5 text-muted-foreground" />
-              <span className="text-sm font-medium">{t.profile}</span>
-            </div>
-          </Link>
-
-          <Dialog
-            open={isDialogOpen}
-            onOpenChange={(open) => {
-              setIsDialogOpen(open)
-              setError(null)
-            }}
-          >
-            <DialogTrigger asChild>
-              <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
-                <Users className="w-5 h-5 text-muted-foreground" />
-                <span className="text-sm font-medium">{t.newGroup}</span>
-              </div>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>{t.createGroupTitle}</DialogTitle>
-                <DialogDescription>{t.createGroupDesc}</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 mt-4">
-                {error && <div className="p-3 rounded-xl bg-destructive/10 text-destructive text-sm">{error}</div>}
-                <div className="space-y-2">
-                  <Label htmlFor="groupName">{t.groupName}</Label>
-                  <Input
-                    id="groupName"
-                    value={newGroupName}
-                    onChange={(e) => setNewGroupName(e.target.value)}
-                    placeholder={t.groupNamePlaceholder}
-                    className="bg-background rounded-xl"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="groupDescription">{t.description}</Label>
-                  <Textarea
-                    id="groupDescription"
-                    value={newGroupDescription}
-                    onChange={(e) => setNewGroupDescription(e.target.value)}
-                    placeholder={t.descPlaceholder}
-                    className="bg-background resize-none rounded-xl"
-                    rows={3}
-                  />
-                </div>
-                <Button
-                  onClick={createGroup}
-                  disabled={!newGroupName.trim() || isCreating}
-                  className="w-full rounded-xl h-11"
-                >
-                  {isCreating ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin ml-2" />
-                      {t.creating}
-                    </>
-                  ) : (
-                    t.create
-                  )}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer opacity-50">
-            <Bookmark className="w-5 h-5 text-muted-foreground" />
-            <span className="text-sm font-medium">{t.savedMessages}</span>
-            <span className="text-xs text-muted-foreground mr-auto">{t.comingSoon}</span>
-          </div>
-
-          <Link href="/chat/settings/appearance" onClick={() => setIsSidebarOpen(false)}>
-            <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
-              <Settings className="w-5 h-5 text-muted-foreground" />
-              <span className="text-sm font-medium">{t.settings}</span>
-            </div>
-          </Link>
-
-          <Separator className="my-2" />
-
-          <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer opacity-50">
-            <UserPlus className="w-5 h-5 text-muted-foreground" />
-            <span className="text-sm font-medium">{t.inviteFriends}</span>
-            <span className="text-xs text-muted-foreground mr-auto">{t.comingSoon}</span>
-          </div>
-
-          <Link href="/chat/about" onClick={() => setIsSidebarOpen(false)}>
-            <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
-              <Info className="w-5 h-5 text-muted-foreground" />
-              <span className="text-sm font-medium">{t.about}</span>
-            </div>
-          </Link>
-
-          <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer opacity-50">
-            <HelpCircle className="w-5 h-5 text-muted-foreground" />
-            <span className="text-sm font-medium">{t.help}</span>
-            <span className="text-xs text-muted-foreground mr-auto">{t.comingSoon}</span>
-          </div>
-        </div>
-      </ScrollArea>
-
-      <div className="p-3 border-t border-border">
-        <Button
-          variant="ghost"
-          className="w-full justify-start gap-3 text-destructive hover:text-destructive hover:bg-destructive/10"
-          onClick={handleSignOut}
-        >
-          <LogOut className="w-5 h-5" />
-          {t.signOut}
-        </Button>
-      </div>
-    </div>
-  )
-
-  return (
-    <div className="flex flex-col h-[100dvh] bg-background">
-      <header className="shrink-0 bg-card/80 backdrop-blur-sm sticky top-0 z-10 p-4 pt-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <Image src="/icons/icon-512x512.png" alt="Synaptic Space" width={40} height={40} className="rounded-xl" />
-            <h1 className="font-bold text-2xl">Synaptic Space</h1>
-          </div>
-          <Link href="/chat/notifications">
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5" />
-              {unreadNotifications > 0 && (
-                <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center font-medium">
-                  {unreadNotifications > 9 ? "9+" : unreadNotifications}
-                </span>
-              )}
+              </Button>
+            </Link>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
+              onClick={handleOpenCreateDialog}
+            >
+              <Plus className="w-5 h-5" />
             </Button>
-          </Link>
+          </div>
         </div>
-        <div className="relative">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder={t.search}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pr-10 bg-secondary/50 border-0 rounded-xl"
-          />
+        <div className="px-4 pb-3">
+          <div className="relative">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t.search}
+              className="pr-10 bg-secondary/50 border-0 rounded-xl h-10"
+            />
+          </div>
         </div>
       </header>
 
-      <main className="flex-1 overflow-auto">
+      <ScrollArea className="flex-1">
         {filteredGroups.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full p-8 text-center">
             <div className="w-20 h-20 rounded-2xl bg-secondary flex items-center justify-center mb-4">
@@ -590,7 +452,7 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
               {searchQuery ? t.tryDifferent : t.createGroupHint}
             </p>
             {!searchQuery && (
-              <Button onClick={() => setIsDialogOpen(true)} className="gap-2 rounded-xl">
+              <Button onClick={() => setIsCreateDialogOpen(true)} className="gap-2 rounded-xl">
                 <Plus className="w-4 h-4" />
                 {t.createGroup}
               </Button>
@@ -628,21 +490,175 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
             ))}
           </div>
         )}
-      </main>
-
-      <Button
-        onClick={() => setIsDialogOpen(true)}
-        size="icon"
-        className="fixed left-4 bottom-4 h-14 w-14 rounded-full shadow-lg z-10"
-      >
-        <Plus className="h-6 w-6" />
-      </Button>
+      </ScrollArea>
 
       <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
         <SheetContent side="right" className="w-80 p-0">
-          <SidebarContent />
+          <div className="flex flex-col h-full">
+            <div className="p-6 bg-gradient-to-br from-primary/20 to-primary/5">
+              <div className="flex items-center gap-4">
+                <Avatar className="w-16 h-16 border-2 border-background shadow-lg">
+                  <AvatarImage src={profile?.avatar_url || undefined} />
+                  <AvatarFallback className="bg-primary text-primary-foreground text-xl">
+                    {profile?.full_name?.charAt(0) || <User className="w-8 h-8" />}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <h2 className="font-semibold text-lg truncate">{profile?.full_name || t.user}</h2>
+                  {profile?.username && <p className="text-sm text-muted-foreground truncate">@{profile.username}</p>}
+                </div>
+              </div>
+            </div>
+
+            <ScrollArea className="flex-1">
+              <div className="py-2">
+                <Link href="/chat/profile" onClick={() => setIsSidebarOpen(false)}>
+                  <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
+                    <User className="w-5 h-5 text-muted-foreground" />
+                    <span className="text-sm font-medium">{t.profile}</span>
+                  </div>
+                </Link>
+
+                <div
+                  className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer"
+                  onClick={handleOpenCreateDialog}
+                >
+                  <Users className="w-5 h-5 text-muted-foreground" />
+                  <span className="text-sm font-medium">{t.newGroup}</span>
+                </div>
+
+                <Link href="/chat/saved" onClick={() => setIsSidebarOpen(false)}>
+                  <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
+                    <Bookmark className="w-5 h-5 text-muted-foreground" />
+                    <span className="text-sm font-medium">{t.savedMessages}</span>
+                  </div>
+                </Link>
+
+                <Link href="/chat/notifications" onClick={() => setIsSidebarOpen(false)}>
+                  <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer relative">
+                    <Bell className="w-5 h-5 text-muted-foreground" />
+                    <span className="text-sm font-medium">{t.notifications}</span>
+                    {unreadNotifications > 0 && (
+                      <span className="absolute left-8 top-2 w-2 h-2 bg-destructive rounded-full" />
+                    )}
+                  </div>
+                </Link>
+
+                <Separator className="my-2" />
+
+                <Link href="/chat/settings" onClick={() => setIsSidebarOpen(false)}>
+                  <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
+                    <Settings className="w-5 h-5 text-muted-foreground" />
+                    <span className="text-sm font-medium">{t.settings}</span>
+                  </div>
+                </Link>
+
+                <div
+                  className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer"
+                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                >
+                  {theme === "dark" ? (
+                    <Sun className="w-5 h-5 text-muted-foreground" />
+                  ) : (
+                    <Moon className="w-5 h-5 text-muted-foreground" />
+                  )}
+                  <span className="text-sm font-medium">{theme === "dark" ? "الوضع الفاتح" : "الوضع الداكن"}</span>
+                </div>
+
+                <Separator className="my-2" />
+
+                <Link href="/chat/about" onClick={() => setIsSidebarOpen(false)}>
+                  <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
+                    <Info className="w-5 h-5 text-muted-foreground" />
+                    <span className="text-sm font-medium">{t.about}</span>
+                  </div>
+                </Link>
+
+                <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer opacity-50">
+                  <UserPlus className="w-5 h-5 text-muted-foreground" />
+                  <span className="text-sm font-medium">{t.inviteFriends}</span>
+                  <span className="text-xs text-muted-foreground mr-auto">{t.comingSoon}</span>
+                </div>
+
+                <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer opacity-50">
+                  <HelpCircle className="w-5 h-5 text-muted-foreground" />
+                  <span className="text-sm font-medium">{t.help}</span>
+                  <span className="text-xs text-muted-foreground mr-auto">{t.comingSoon}</span>
+                </div>
+              </div>
+            </ScrollArea>
+
+            <div className="p-4 border-t">
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-4 text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={handleSignOut}
+              >
+                <LogOut className="w-5 h-5" />
+                {t.signOut}
+              </Button>
+            </div>
+          </div>
         </SheetContent>
       </Sheet>
+
+      <Dialog
+        open={isCreateDialogOpen}
+        onOpenChange={(open) => {
+          setIsCreateDialogOpen(open)
+          if (!open) {
+            setError(null)
+            setNewGroupName("")
+            setNewGroupDescription("")
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t.createGroupTitle}</DialogTitle>
+            <DialogDescription>{t.createGroupDesc}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            {error && <div className="p-3 rounded-xl bg-destructive/10 text-destructive text-sm">{error}</div>}
+            <div className="space-y-2">
+              <Label htmlFor="groupName">{t.groupName}</Label>
+              <Input
+                id="groupName"
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                placeholder={t.groupNamePlaceholder}
+                className="bg-background rounded-xl"
+                autoComplete="off"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="groupDescription">{t.description}</Label>
+              <Textarea
+                id="groupDescription"
+                value={newGroupDescription}
+                onChange={(e) => setNewGroupDescription(e.target.value)}
+                placeholder={t.descPlaceholder}
+                className="bg-background resize-none rounded-xl"
+                rows={3}
+              />
+            </div>
+            <Button
+              onClick={createGroup}
+              disabled={!newGroupName.trim() || isCreating}
+              className="w-full rounded-xl h-11"
+            >
+              {isCreating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                  {t.creating}
+                </>
+              ) : (
+                t.create
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

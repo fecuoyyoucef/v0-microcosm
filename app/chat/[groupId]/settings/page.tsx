@@ -17,7 +17,6 @@ export default async function GroupSettingsPage({ params }: PageProps) {
     redirect("/auth/login")
   }
 
-  // التحقق من أن المستخدم عضو في المجموعة
   const { data: membership } = await supabase
     .from("group_members")
     .select("*, groups(*)")
@@ -25,8 +24,48 @@ export default async function GroupSettingsPage({ params }: PageProps) {
     .eq("user_id", user.id)
     .single()
 
+  // If not a member, check if user is a supervisor for this group
+  let isSupervisor = false
+  let groupData = membership?.groups
+
   if (!membership) {
-    notFound()
+    // Check if user is a supervisor
+    const { data: supervisor } = await supabase
+      .from("group_supervisors")
+      .select("*, groups(*)")
+      .eq("group_id", groupId)
+      .eq("user_id", user.id)
+      .single()
+
+    if (supervisor) {
+      isSupervisor = true
+      groupData = supervisor.groups
+    } else {
+      // Also check if user is admin of parent group
+      const { data: group } = await supabase
+        .from("groups")
+        .select("*, parent:parent_group_id(*)")
+        .eq("id", groupId)
+        .single()
+
+      if (group?.parent_group_id) {
+        const { data: parentMembership } = await supabase
+          .from("group_members")
+          .select("role")
+          .eq("group_id", group.parent_group_id)
+          .eq("user_id", user.id)
+          .single()
+
+        if (parentMembership?.role === "admin") {
+          isSupervisor = true
+          groupData = group
+        }
+      }
+    }
+
+    if (!isSupervisor) {
+      notFound()
+    }
   }
 
   const { data: membersData } = await supabase.from("group_members").select("*").eq("group_id", groupId)
@@ -42,12 +81,7 @@ export default async function GroupSettingsPage({ params }: PageProps) {
       profile: profilesData?.find((p) => p.id === member.user_id) || null,
     })) || []
 
-  return (
-    <GroupSettingsForm
-      group={membership.groups}
-      members={members}
-      currentUserId={user.id}
-      isAdmin={membership.role === "admin"}
-    />
-  )
+  const isAdmin = membership?.role === "admin" || isSupervisor
+
+  return <GroupSettingsForm group={groupData} members={members} currentUserId={user.id} isAdmin={isAdmin} />
 }
