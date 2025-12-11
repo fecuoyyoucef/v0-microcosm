@@ -33,6 +33,7 @@ export function ChatContainer({
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
   const isMounted = useRef(true)
+  const pendingMessageIds = useRef<Set<string>>(new Set())
 
   const fetchMembers = useCallback(async () => {
     const { data: membersData } = await supabase.from("group_members").select("*").eq("group_id", groupId)
@@ -61,7 +62,6 @@ export function ChatContainer({
       .order("sort_order", { ascending: true })
 
     if (data && isMounted.current) {
-      // Get message counts for each node
       const nodeIds = data.map((n) => n.id)
       const { data: messageCounts } = await supabase.from("messages").select("node_id").in("node_id", nodeIds)
 
@@ -145,6 +145,31 @@ export function ChatContainer({
           if (!isMounted.current) return
 
           const newMsg = payload.new
+
+          if (pendingMessageIds.current.has(newMsg.id)) {
+            pendingMessageIds.current.delete(newMsg.id)
+            return
+          }
+
+          if (newMsg.sender_id === currentUserId) {
+            setMessages((prev) => {
+              const hasTempMessage = prev.some((m) => m.id.startsWith("temp-") && m.sender_id === currentUserId)
+              if (hasTempMessage) {
+                let replaced = false
+                return prev.map((m) => {
+                  if (!replaced && m.id.startsWith("temp-") && m.sender_id === currentUserId) {
+                    replaced = true
+                    return { ...newMsg, sender: m.sender } as Message
+                  }
+                  return m
+                })
+              }
+              if (prev.some((m) => m.id === newMsg.id)) return prev
+              return prev
+            })
+            return
+          }
+
           setMessages((prev) => {
             if (prev.some((m) => m.id === newMsg.id)) return prev
 
@@ -162,7 +187,6 @@ export function ChatContainer({
             return [...prev, { ...newMsg, sender: null } as Message]
           })
           setTimeout(scrollToBottom, 100)
-          // Update node message counts
           fetchNodes()
         },
       )
@@ -233,7 +257,7 @@ export function ChatContainer({
       supabase.removeChannel(membersChannel)
       supabase.removeChannel(nodesChannel)
     }
-  }, [groupId, fetchMessages, fetchMembers, fetchNodes, supabase])
+  }, [groupId, fetchMessages, fetchMembers, fetchNodes, supabase, currentUserId])
 
   const filteredMessages =
     activeLayer === "all"
@@ -312,6 +336,7 @@ export function ChatContainer({
       setMessages((prev) => prev.filter((m) => m.id !== tempId))
       alert("حدث خطأ في إرسال الرسالة")
     } else if (data) {
+      pendingMessageIds.current.add(data.id)
       setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...data, sender: optimisticMessage.sender } : m)))
     }
   }

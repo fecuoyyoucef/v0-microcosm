@@ -1,54 +1,29 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+
+import { useState, useEffect, useRef } from "react"
+import { createClient } from "@/lib/supabase/client"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Badge } from "@/components/ui/badge"
+import { CheckCheck, Reply, Trash2 } from "lucide-react"
 import { format } from "date-fns"
 import { ar } from "date-fns/locale"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Loader2, Reply, Forward, Copy, Trash2, MoreHorizontal, CheckCheck } from "lucide-react"
-import type { Message, GroupMember, MessageLayer, ConversationNode, MessageReaction } from "@/lib/types"
+import type { Message, GroupMember, ConversationNode } from "@/lib/types"
 import { cn } from "@/lib/utils"
-import { createClient } from "@/lib/supabase/client"
-
-interface MessageListProps {
-  messages: Message[]
-  currentUserId: string
-  members: GroupMember[]
-  isLoading: boolean
-  messagesEndRef: React.RefObject<HTMLDivElement | null>
-  nodes?: ConversationNode[]
-  onReply?: (message: Message) => void
-  onDelete?: (messageId: string) => void
-}
-
-const layerStyles: Record<MessageLayer, { bg: string; ownBg: string; icon: string }> = {
-  upper: {
-    bg: "bg-gradient-to-br from-orange-50 to-amber-100 dark:from-orange-950/50 dark:to-amber-900/40 border-r-4 border-r-orange-500",
-    ownBg: "bg-gradient-to-br from-orange-500 to-amber-600",
-    icon: "🟠",
-  },
-  standard: {
-    bg: "bg-gray-100 dark:bg-gray-800",
-    ownBg: "bg-gradient-to-br from-blue-500 to-blue-600",
-    icon: "⚪",
-  },
-  shadow: {
-    bg: "bg-gray-50/80 dark:bg-gray-900/50 border-r-2 border-dashed border-r-gray-300 dark:border-r-gray-700",
-    ownBg: "bg-gradient-to-br from-gray-400 to-gray-500",
-    icon: "🔘",
-  },
-}
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 const avatarColors = [
   "bg-gradient-to-br from-blue-400 to-blue-600",
@@ -73,9 +48,43 @@ const quickReactions = [
   { id: "neutral", image: "/images/1.webp", name: "محايد" },
   { id: "harmony", image: "/images/2.webp", name: "توازن" },
   { id: "achievement", image: "/images/3.webp", name: "انجاز" },
-  { id: "star", image: "/images/4.webp", name: "نجمة" },
-  { id: "champion", image: "/images/5.webp", name: "بطل" },
+  { id: "creativity", image: "/images/4.webp", name: "ابداع" },
+  { id: "challenge", image: "/images/5.webp", name: "تحدي" },
+  { id: "support", image: "/images/6.webp", name: "دعم" },
 ]
+
+interface MessageListProps {
+  messages: Message[]
+  currentUserId: string
+  members: GroupMember[]
+  isLoading: boolean
+  messagesEndRef: React.RefObject<HTMLDivElement>
+  nodes: ConversationNode[]
+  onReply?: (message: Message) => void
+  onDelete?: (messageId: string) => void
+}
+
+interface Reaction {
+  id: string
+  message_id: string
+  user_id: string
+  reaction: string
+  created_at: string
+}
+
+const layerStyles: Record<string, { bg: string; ownBg: string; icon: string }> = {
+  upper: {
+    bg: "bg-orange-100/80 dark:bg-orange-900/30",
+    ownBg: "bg-gradient-to-br from-orange-500 to-orange-600",
+    icon: "🟠",
+  },
+  standard: { bg: "bg-muted/80", ownBg: "bg-gradient-to-br from-primary to-primary/80", icon: "" },
+  shadow: {
+    bg: "bg-gray-200/60 dark:bg-gray-800/40",
+    ownBg: "bg-gradient-to-br from-gray-500 to-gray-600",
+    icon: "🔘",
+  },
+}
 
 export function MessageList({
   messages,
@@ -83,25 +92,30 @@ export function MessageList({
   members,
   isLoading,
   messagesEndRef,
-  nodes = [],
+  nodes,
   onReply,
   onDelete,
 }: MessageListProps) {
-  const [lightboxImage, setLightboxImage] = useState<string | null>(null)
+  const [reactions, setReactions] = useState<Record<string, Reaction[]>>({})
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null)
   const [showReactionsFor, setShowReactionsFor] = useState<string | null>(null)
-  const [reactions, setReactions] = useState<Record<string, MessageReaction[]>>({})
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [messageToDelete, setMessageToDelete] = useState<string | null>(null)
   const supabase = createClient()
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     if (messages.length === 0) return
 
     const fetchReactions = async () => {
-      const messageIds = messages.map((m) => m.id)
+      const messageIds = messages.map((m) => m.id).filter((id) => !id.startsWith("temp-"))
+      if (messageIds.length === 0) return
+
       const { data } = await supabase.from("message_reactions").select("*").in("message_id", messageIds)
 
       if (data) {
-        const grouped: Record<string, MessageReaction[]> = {}
+        const grouped: Record<string, Reaction[]> = {}
         data.forEach((r) => {
           if (!grouped[r.message_id]) grouped[r.message_id] = []
           grouped[r.message_id].push(r)
@@ -112,156 +126,137 @@ export function MessageList({
 
     fetchReactions()
 
-    // الاشتراك في التفاعلات الجديدة
     const channel = supabase
       .channel("reactions-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "message_reactions" }, (payload) => {
-        if (payload.eventType === "INSERT") {
-          const newReaction = payload.new as MessageReaction
-          setReactions((prev) => ({
-            ...prev,
-            [newReaction.message_id]: [...(prev[newReaction.message_id] || []), newReaction],
-          }))
-        } else if (payload.eventType === "DELETE") {
-          const oldReaction = payload.old as MessageReaction
-          setReactions((prev) => ({
-            ...prev,
-            [oldReaction.message_id]: (prev[oldReaction.message_id] || []).filter((r) => r.id !== oldReaction.id),
-          }))
-        }
-      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "message_reactions" }, () => fetchReactions())
       .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [messages])
+  }, [messages, supabase])
 
   const toggleReaction = async (messageId: string, reactionId: string) => {
-    const existingReaction = reactions[messageId]?.find((r) => r.user_id === currentUserId && r.reaction === reactionId)
+    const existingReaction = reactions[messageId]?.find((r) => r.user_id === currentUserId)
 
     if (existingReaction) {
-      // Remove the reaction
       await supabase.from("message_reactions").delete().eq("id", existingReaction.id)
-
-      setReactions((prev) => ({
-        ...prev,
-        [messageId]: prev[messageId].filter((r) => r.id !== existingReaction.id),
-      }))
-    } else {
-      const userExistingReaction = reactions[messageId]?.find((r) => r.user_id === currentUserId)
-
-      if (userExistingReaction) {
-        // Remove old reaction first
-        await supabase.from("message_reactions").delete().eq("id", userExistingReaction.id)
-        setReactions((prev) => ({
-          ...prev,
-          [messageId]: prev[messageId].filter((r) => r.id !== userExistingReaction.id),
-        }))
-      }
-
-      // Add new reaction
-      const { data, error } = await supabase
-        .from("message_reactions")
-        .insert({
+      if (existingReaction.reaction !== reactionId) {
+        await supabase.from("message_reactions").insert({
           message_id: messageId,
           user_id: currentUserId,
           reaction: reactionId,
         })
-        .select()
-        .single()
-
-      if (data && !error) {
-        setReactions((prev) => ({
-          ...prev,
-          [messageId]: [...(prev[messageId] || []), data],
-        }))
       }
+    } else {
+      await supabase.from("message_reactions").insert({
+        message_id: messageId,
+        user_id: currentUserId,
+        reaction: reactionId,
+      })
     }
-
     setShowReactionsFor(null)
-  }
-
-  const getGroupedReactions = (messageId: string) => {
-    const messageReactions = reactions[messageId] || []
-    const grouped: Record<string, { count: number; hasOwn: boolean; users: string[] }> = {}
-
-    messageReactions.forEach((r) => {
-      if (!grouped[r.reaction]) {
-        grouped[r.reaction] = { count: 0, hasOwn: false, users: [] }
-      }
-      grouped[r.reaction].count++
-      grouped[r.reaction].users.push(r.user_id)
-      if (r.user_id === currentUserId) {
-        grouped[r.reaction].hasOwn = true
-      }
-    })
-
-    return grouped
-  }
-
-  const getReactionImage = (reactionId: string) => {
-    const reaction = quickReactions.find((r) => r.id === reactionId)
-    return reaction?.image || null
-  }
-
-  if (isLoading) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    )
-  }
-
-  if (messages.length === 0) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3 p-4">
-        <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center">
-          <span className="text-4xl">💬</span>
-        </div>
-        <p className="text-lg font-medium">لا توجد رسائل بعد</p>
-        <p className="text-sm text-center">ابدأ المحادثة الآن!</p>
-      </div>
-    )
-  }
-
-  const getNodeForMessage = (nodeId: string | null) => {
-    if (!nodeId) return null
-    return nodes.find((n) => n.id === nodeId)
-  }
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text)
   }
 
   const getReplyPreview = (replyToId: string) => {
     const originalMessage = messages.find((m) => m.id === replyToId)
     if (!originalMessage) return null
     return {
-      sender: originalMessage.sender?.display_name || "مستخدم",
-      content: originalMessage.content?.substring(0, 50) + ((originalMessage.content?.length || 0) > 50 ? "..." : ""),
+      senderName: originalMessage.sender?.display_name || "مستخدم",
+      content: originalMessage.content?.substring(0, 50) + (originalMessage.content?.length > 50 ? "..." : ""),
     }
   }
 
+  const getGroupedReactions = (messageId: string) => {
+    const messageReactions = reactions[messageId] || []
+    const grouped: Record<string, { count: number; users: string[]; hasCurrentUser: boolean }> = {}
+
+    messageReactions.forEach((r) => {
+      if (!grouped[r.reaction]) {
+        grouped[r.reaction] = { count: 0, users: [], hasCurrentUser: false }
+      }
+      grouped[r.reaction].count++
+      const member = members.find((m) => m.user_id === r.user_id)
+      grouped[r.reaction].users.push(member?.profile?.display_name || "مستخدم")
+      if (r.user_id === currentUserId) {
+        grouped[r.reaction].hasCurrentUser = true
+      }
+    })
+
+    return grouped
+  }
+
+  const handleDeleteClick = (messageId: string) => {
+    setMessageToDelete(messageId)
+    setDeleteDialogOpen(true)
+  }
+
+  const confirmDelete = () => {
+    if (messageToDelete && onDelete) {
+      onDelete(messageToDelete)
+    }
+    setDeleteDialogOpen(false)
+    setMessageToDelete(null)
+  }
+
+  const handleTouchStart = (messageId: string) => {
+    longPressTimer.current = setTimeout(() => {
+      setActiveMessageId(messageId)
+    }, 500)
+  }
+
+  const handleTouchEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex-1 p-3 space-y-3">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className={cn("flex gap-2", i % 2 === 0 && "flex-row-reverse")}>
+            <Skeleton className="h-8 w-8 rounded-full shrink-0" />
+            <div className="space-y-1.5">
+              <Skeleton className="h-3 w-16" />
+              <Skeleton className="h-10 w-48 rounded-2xl" />
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  if (messages.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-primary/10 flex items-center justify-center">
+            <span className="text-2xl">💬</span>
+          </div>
+          <p className="text-muted-foreground text-sm">ابدأ المحادثة</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <>
-      <ScrollArea className="h-full">
-        <div className="p-3 md:p-4 space-y-1 max-w-3xl mx-auto">
+    <TooltipProvider>
+      <div className="flex-1 overflow-y-auto px-3 py-2">
+        <div className="space-y-0.5">
           {messages.map((message, index) => {
             const isOwn = message.sender_id === currentUserId
-            const style = layerStyles[message.layer]
             const senderName = message.sender?.display_name || "مستخدم"
-            const node = getNodeForMessage(message.node_id)
-
             const prevMessage = index > 0 ? messages[index - 1] : null
             const nextMessage = index < messages.length - 1 ? messages[index + 1] : null
             const isSameSenderAsPrev = prevMessage?.sender_id === message.sender_id
             const isSameSenderAsNext = nextMessage?.sender_id === message.sender_id
+
+            const style = layerStyles[message.layer] || layerStyles.standard
+            const node = nodes.find((n) => n.id === message.node_id)
+
             const showAvatar = !isOwn && !isSameSenderAsPrev
             const showName = !isOwn && !isSameSenderAsPrev
-
-            const isNewGroup = !isSameSenderAsPrev
-            const marginTop = isNewGroup ? "mt-4" : "mt-0.5"
 
             const hasImage = message.attachment_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i)
             const isActive = activeMessageId === message.id
@@ -274,97 +269,101 @@ export function MessageList({
               <div
                 key={message.id}
                 className={cn(
-                  "group relative",
-                  marginTop,
-                  isOwn ? "flex flex-row-reverse" : "flex",
-                  !isOwn && !showAvatar && "pr-10 md:pr-12",
+                  "group relative flex items-end gap-2",
+                  isOwn ? "flex-row-reverse" : "flex-row",
+                  !isSameSenderAsPrev && "mt-3",
                 )}
                 onMouseEnter={() => setActiveMessageId(message.id)}
                 onMouseLeave={() => {
                   setActiveMessageId(null)
                   setShowReactionsFor(null)
                 }}
-                onTouchStart={() => {
-                  const timer = setTimeout(() => setActiveMessageId(message.id), 500)
-                  return () => clearTimeout(timer)
-                }}
+                onTouchStart={() => handleTouchStart(message.id)}
+                onTouchEnd={handleTouchEnd}
               >
-                {/* Avatar */}
-                {!isOwn && showAvatar && (
-                  <Avatar className="w-8 h-8 md:w-10 md:h-10 shrink-0 mt-auto mb-1 ml-2 shadow-lg ring-2 ring-background">
-                    {message.sender?.avatar_url && (
-                      <AvatarImage src={message.sender.avatar_url || "/placeholder.svg"} />
-                    )}
-                    <AvatarFallback className={cn(getAvatarColor(message.sender_id), "text-white font-bold text-xs")}>
-                      {senderName.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
+                {/* Avatar - Instagram style: small, at bottom */}
+                {!isOwn && (
+                  <div className="w-7 shrink-0">
+                    {showAvatar ? (
+                      <Avatar className="w-7 h-7 ring-2 ring-background">
+                        {message.sender?.avatar_url && (
+                          <AvatarImage src={message.sender.avatar_url || "/placeholder.svg"} />
+                        )}
+                        <AvatarFallback
+                          className={cn(getAvatarColor(message.sender_id), "text-white font-bold text-[10px]")}
+                        >
+                          {senderName.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                    ) : null}
+                  </div>
                 )}
 
-                <div className={cn("max-w-[75%] md:max-w-[70%] flex flex-col", isOwn && "items-end")}>
-                  {/* Sender name */}
+                <div className={cn("max-w-[70%] flex flex-col", isOwn && "items-end")}>
+                  {/* Sender name - Instagram style */}
                   {showName && (
-                    <span className="text-xs font-semibold text-muted-foreground mb-1 px-3">{senderName}</span>
+                    <span className="text-[11px] font-medium text-muted-foreground mb-0.5 px-1">{senderName}</span>
                   )}
 
-                  {/* Reply preview */}
+                  {/* Reply preview - Instagram style with vertical bar */}
                   {replyPreview && (
                     <div
                       className={cn(
-                        "text-xs px-3 py-1.5 rounded-t-xl mb-0 border-r-2 border-primary/50",
-                        isOwn ? "bg-white/10 rounded-tl-xl" : "bg-muted/70 rounded-tr-xl",
+                        "flex items-center gap-1.5 mb-0.5 text-[11px] text-muted-foreground",
+                        isOwn && "flex-row-reverse",
                       )}
                     >
-                      <span className="font-semibold text-primary text-[10px]">{replyPreview.sender}</span>
-                      <p className="text-muted-foreground truncate text-[11px]">{replyPreview.content}</p>
+                      <div className={cn("w-0.5 h-4 rounded-full", isOwn ? "bg-white/50" : "bg-primary/50")} />
+                      <span className="opacity-70">رد على {replyPreview.senderName}</span>
                     </div>
                   )}
 
-                  {/* Message bubble */}
+                  {/* Message bubble - Instagram style: compact, rounded */}
                   <div
                     className={cn(
-                      "relative px-3 py-2 md:px-4 md:py-2.5 shadow-sm transition-all",
+                      "relative px-3 py-1.5 transition-all",
                       isOwn
                         ? [
                             style.ownBg,
                             "text-white",
-                            isSameSenderAsNext ? "rounded-2xl rounded-bl-md" : "rounded-2xl rounded-bl-sm",
-                            isSameSenderAsPrev && "rounded-tr-md",
+                            "rounded-2xl",
+                            isSameSenderAsPrev && !isSameSenderAsNext && "rounded-tr-md",
+                            !isSameSenderAsPrev && isSameSenderAsNext && "rounded-br-md",
+                            isSameSenderAsPrev && isSameSenderAsNext && "rounded-r-md",
                           ]
                         : [
                             style.bg,
-                            isSameSenderAsNext ? "rounded-2xl rounded-br-md" : "rounded-2xl rounded-br-sm",
-                            isSameSenderAsPrev && "rounded-tl-md",
+                            "rounded-2xl",
+                            isSameSenderAsPrev && !isSameSenderAsNext && "rounded-tl-md",
+                            !isSameSenderAsPrev && isSameSenderAsNext && "rounded-bl-md",
+                            isSameSenderAsPrev && isSameSenderAsNext && "rounded-l-md",
                           ],
-                      replyPreview && "rounded-t-none",
                       message.layer === "shadow" && "italic opacity-80",
                     )}
                   >
                     {/* Image */}
                     {hasImage && (
-                      <div className="mb-2 -mx-1 -mt-1">
+                      <div className="mb-1.5 -mx-1 -mt-0.5">
                         <img
                           src={message.attachment_url || "/placeholder.svg"}
                           alt="مرفق"
-                          className="max-w-full max-h-64 rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                          className="max-w-full max-h-56 rounded-xl cursor-pointer hover:opacity-90 transition-opacity"
                           onClick={() => setLightboxImage(message.attachment_url || null)}
                         />
                       </div>
                     )}
 
                     {message.content && message.content !== "📷 صورة" && (
-                      <p className="text-sm md:text-[15px] whitespace-pre-wrap break-words leading-relaxed">
-                        {message.content}
-                      </p>
+                      <p className="text-[14px] whitespace-pre-wrap break-words leading-snug">{message.content}</p>
                     )}
 
-                    {/* Time and status */}
-                    <div className={cn("flex items-center gap-1 mt-1", isOwn ? "justify-start" : "justify-end")}>
-                      <span className={cn("text-[10px]", isOwn ? "text-white/70" : "text-muted-foreground")}>
+                    {/* Time and status - Instagram style: inline */}
+                    <div className={cn("flex items-center gap-1 mt-0.5", isOwn ? "justify-start" : "justify-end")}>
+                      <span className={cn("text-[10px]", isOwn ? "text-white/60" : "text-muted-foreground/70")}>
                         {format(new Date(message.created_at), "p", { locale: ar })}
                       </span>
-                      {isOwn && <CheckCheck className="w-3.5 h-3.5 text-white/70" />}
-                      <span className="text-[10px] opacity-60">{style.icon}</span>
+                      {isOwn && <CheckCheck className="w-3 h-3 text-white/60" />}
+                      {style.icon && <span className="text-[9px] opacity-50">{style.icon}</span>}
                     </div>
 
                     {/* Node badge */}
@@ -372,62 +371,64 @@ export function MessageList({
                       <Badge
                         variant="outline"
                         className={cn(
-                          "absolute -bottom-2.5 text-[9px] px-1.5 py-0 h-4 gap-1 bg-background shadow-sm",
+                          "absolute -bottom-2 text-[8px] px-1 py-0 h-3.5 gap-0.5 bg-background shadow-sm",
                           isOwn ? "right-2" : "left-2",
                         )}
                         style={{ borderColor: node.color, color: node.color }}
                       >
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: node.color }} />
+                        <span className="w-1 h-1 rounded-full" style={{ backgroundColor: node.color }} />
                         {node.title}
                       </Badge>
                     )}
                   </div>
 
+                  {/* Reactions - Instagram style: small emoji badges below message */}
                   {hasReactions && (
                     <div
-                      className={cn("flex items-center gap-1 mt-1 flex-wrap", isOwn ? "justify-end" : "justify-start")}
+                      className={cn(
+                        "flex items-center gap-0.5 mt-0.5 flex-wrap",
+                        isOwn ? "justify-end" : "justify-start",
+                      )}
                     >
                       {Object.entries(groupedReactions).map(([reactionId, data]) => {
-                        const reactionImage = getReactionImage(reactionId)
-                        const memberNames = data.users.map((uid) => {
-                          const member = members.find((m) => m.user_id === uid)
-                          return member?.profile?.display_name || "مستخدم"
-                        })
+                        const reaction = quickReactions.find((r) => r.id === reactionId)
+                        if (!reaction) return null
                         return (
-                          <button
-                            key={reactionId}
-                            onClick={() => toggleReaction(message.id, reactionId)}
-                            title={memberNames.join("، ")}
-                            className={cn(
-                              "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-colors",
-                              data.hasOwn
-                                ? "bg-primary/20 text-primary border border-primary/30"
-                                : "bg-muted hover:bg-muted/80",
-                            )}
-                          >
-                            {reactionImage ? (
-                              <img
-                                src={reactionImage || "/placeholder.svg"}
-                                alt=""
-                                className="w-5 h-5 object-contain"
-                              />
-                            ) : (
-                              <span>{reactionId}</span>
-                            )}
-                            <span className="text-[10px]">{data.count}</span>
-                          </button>
+                          <Tooltip key={reactionId}>
+                            <TooltipTrigger asChild>
+                              <button
+                                className={cn(
+                                  "flex items-center gap-0.5 px-1 py-0.5 rounded-full text-[10px] transition-all",
+                                  data.hasCurrentUser
+                                    ? "bg-primary/20 ring-1 ring-primary/50"
+                                    : "bg-muted/80 hover:bg-muted",
+                                )}
+                                onClick={() => toggleReaction(message.id, reactionId)}
+                              >
+                                <img
+                                  src={reaction.image || "/placeholder.svg"}
+                                  alt={reaction.name}
+                                  className="w-3.5 h-3.5"
+                                />
+                                {data.count > 1 && <span className="text-[9px]">{data.count}</span>}
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">
+                              {data.users.join("، ")}
+                            </TooltipContent>
+                          </Tooltip>
                         )
                       })}
                     </div>
                   )}
                 </div>
 
-                {/* Quick actions */}
+                {/* Action buttons - show on hover/active */}
                 {isActive && (
                   <div
                     className={cn(
-                      "flex items-center gap-0.5 self-center mx-1 animate-in fade-in duration-150",
-                      isOwn ? "flex-row" : "flex-row-reverse",
+                      "absolute top-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity animate-in fade-in duration-150",
+                      isOwn ? "left-0 -translate-x-full pr-1" : "right-0 translate-x-full pl-1",
                     )}
                   >
                     {/* Reaction button */}
@@ -435,24 +436,19 @@ export function MessageList({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 rounded-full hover:bg-muted"
+                        className="h-6 w-6 rounded-full hover:bg-muted"
                         onClick={() => setShowReactionsFor(showReactionsFor === message.id ? null : message.id)}
                       >
-                        <span className="text-sm">😊</span>
+                        <span className="text-xs">😊</span>
                       </Button>
 
                       {showReactionsFor === message.id && (
                         <div
                           className={cn(
-                            "absolute z-50 flex items-center gap-1 p-2 bg-card rounded-2xl shadow-lg border animate-in fade-in zoom-in-95 duration-150",
-                            "bottom-full mb-2",
-                            "left-1/2 -translate-x-1/2",
-                            "md:left-auto md:translate-x-0",
-                            isOwn ? "md:right-0" : "md:left-0",
+                            "absolute z-50 flex items-center gap-0.5 p-1.5 bg-card rounded-full shadow-lg border animate-in fade-in zoom-in-95 duration-150",
+                            "bottom-full mb-1",
+                            isOwn ? "right-0" : "left-0",
                           )}
-                          style={{
-                            maxWidth: "calc(100vw - 32px)",
-                          }}
                         >
                           {quickReactions.map((reaction) => {
                             const hasReacted = reactions[message.id]?.some(
@@ -463,8 +459,8 @@ export function MessageList({
                                 key={reaction.id}
                                 title={reaction.name}
                                 className={cn(
-                                  "w-10 h-10 flex items-center justify-center rounded-full transition-all hover:scale-110 p-1",
-                                  hasReacted ? "bg-primary/20 ring-2 ring-primary" : "hover:bg-muted",
+                                  "w-8 h-8 flex items-center justify-center rounded-full transition-all hover:scale-110 p-0.5",
+                                  hasReacted ? "bg-primary/20 ring-1 ring-primary" : "hover:bg-muted",
                                 )}
                                 onClick={() => toggleReaction(message.id, reaction.id)}
                               >
@@ -480,71 +476,73 @@ export function MessageList({
                       )}
                     </div>
 
-                    {/* Reply */}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 rounded-full hover:bg-muted"
-                      onClick={() => onReply?.(message)}
-                    >
-                      <Reply className="w-3.5 h-3.5" />
-                    </Button>
+                    {/* Reply button */}
+                    {onReply && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 rounded-full hover:bg-muted"
+                        onClick={() => onReply(message)}
+                      >
+                        <Reply className="w-3 h-3" />
+                      </Button>
+                    )}
 
-                    {/* More */}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-muted">
-                          <MoreHorizontal className="w-3.5 h-3.5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align={isOwn ? "start" : "end"} className="w-40">
-                        <DropdownMenuItem onClick={() => onReply?.(message)}>
-                          <Reply className="w-4 h-4 ml-2" />
-                          رد
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Forward className="w-4 h-4 ml-2" />
-                          إعادة توجيه
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => copyToClipboard(message.content || "")}>
-                          <Copy className="w-4 h-4 ml-2" />
-                          نسخ
-                        </DropdownMenuItem>
-                        {isOwn && (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={() => onDelete?.(message.id)}
-                            >
-                              <Trash2 className="w-4 h-4 ml-2" />
-                              حذف
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {/* Delete button */}
+                    {isOwn && onDelete && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 rounded-full hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => handleDeleteClick(message.id)}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
             )
           })}
-          <div ref={messagesEndRef} className="h-4" />
         </div>
-      </ScrollArea>
 
-      {/* Image Lightbox */}
-      <Dialog open={!!lightboxImage} onOpenChange={() => setLightboxImage(null)}>
-        <DialogContent className="max-w-4xl p-0 bg-transparent border-none">
-          {lightboxImage && (
+        <div ref={messagesEndRef} className="h-1" />
+
+        {/* Lightbox */}
+        {lightboxImage && (
+          <div
+            className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+            onClick={() => setLightboxImage(null)}
+          >
             <img
               src={lightboxImage || "/placeholder.svg"}
               alt="صورة مكبرة"
-              className="w-full h-auto max-h-[90vh] object-contain rounded-lg"
+              className="max-w-full max-h-full object-contain rounded-lg"
             />
-          )}
-        </DialogContent>
-      </Dialog>
-    </>
+          </div>
+        )}
+
+        {/* Delete confirmation dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>حذف الرسالة</AlertDialogTitle>
+              <AlertDialogDescription>
+                هل أنت متأكد من حذف هذه الرسالة؟ لا يمكن التراجع عن هذا الإجراء.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                حذف
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </TooltipProvider>
   )
 }

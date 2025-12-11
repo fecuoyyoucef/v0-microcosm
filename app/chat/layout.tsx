@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { ChatSidebar } from "@/components/chat/chat-sidebar"
 import { PushNotificationManager } from "@/components/notifications/push-notification-manager"
+import { InstallButton } from "@/components/pwa/install-button"
 
 export default async function ChatLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -18,6 +19,7 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
   return (
     <div className="flex h-[100dvh] bg-background overflow-hidden">
       <PushNotificationManager userId={user.id} />
+      <InstallButton />
 
       {/* Sidebar - hidden on mobile, visible on desktop */}
       <aside className="hidden md:flex md:w-72 lg:w-80 border-l border-border bg-card flex-col shrink-0">
