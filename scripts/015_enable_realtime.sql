@@ -1,0 +1,9 @@
+-- Enable realtime for messages table
+ALTER PUBLICATION supabase_realtime ADD TABLE messages;
+ALTER PUBLICATION supabase_realtime ADD TABLE group_members;
+ALTER PUBLICATION supabase_realtime ADD TABLE conversation_nodes;
+ALTER PUBLICATION supabase_realtime ADD TABLE decisions;
+ALTER PUBLICATION supabase_realtime ADD TABLE decision_votes;
+ALTER PUBLICATION supabase_realtime ADD TABLE collective_memory;
+ALTER PUBLICATION supabase_realtime ADD TABLE notebook_pages;
+ALTER PUBLICATION supabase_realtime ADD TABLE notebook_contributions;
