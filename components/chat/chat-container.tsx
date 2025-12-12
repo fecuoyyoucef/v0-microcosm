@@ -6,6 +6,7 @@ import { ChatHeader } from "./chat-header"
 import { MessageList } from "./message-list"
 import { MessageInput } from "./message-input"
 import { LayerFilter } from "./layer-filter"
+import { AnimatedBackground, type BackgroundStyle } from "@/components/background/animated-background"
 import type { Group, GroupMember, Message, MessageLayer, ConversationNode, GroupSettings } from "@/lib/types"
 
 interface ChatContainerProps {
@@ -349,52 +350,56 @@ export function ChatContainer({
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0">
-      <ChatHeader
-        group={group}
-        members={members}
-        currentUserRole={currentUserRole}
-        currentUserId={currentUserId}
-        onMembersUpdate={fetchMembers}
-      />
+    <div className="flex flex-col h-full min-h-0 relative">
+      <AnimatedBackground style={(group.background_style as BackgroundStyle) || "neural_mesh"} />
 
-      <LayerFilter
-        activeLayer={activeLayer}
-        onLayerChange={setActiveLayer}
-        nodes={nodes}
-        selectedNodeId={selectedNodeId}
-        onNodeChange={setSelectedNodeId}
-        onNodesUpdate={fetchNodes}
-        currentUserId={currentUserId}
-        isAdmin={currentUserRole === "admin"}
-        groupId={groupId}
-      />
-
-      <div className="flex-1 min-h-0 overflow-auto">
-        <MessageList
-          messages={filteredMessages}
-          currentUserId={currentUserId}
+      <div className="relative z-10 flex flex-col h-full min-h-0">
+        <ChatHeader
+          group={group}
           members={members}
-          isLoading={isLoading}
-          messagesEndRef={messagesEndRef}
+          currentUserRole={currentUserRole}
+          currentUserId={currentUserId}
+          onMembersUpdate={fetchMembers}
+        />
+
+        <LayerFilter
+          activeLayer={activeLayer}
+          onLayerChange={setActiveLayer}
           nodes={nodes}
-          onReply={handleReply}
-          onDelete={handleDeleteMessage}
+          selectedNodeId={selectedNodeId}
+          onNodeChange={setSelectedNodeId}
+          onNodesUpdate={fetchNodes}
+          currentUserId={currentUserId}
+          isAdmin={currentUserRole === "admin"}
+          groupId={groupId}
+        />
+
+        <div className="flex-1 min-h-0 overflow-auto">
+          <MessageList
+            messages={filteredMessages}
+            currentUserId={currentUserId}
+            members={members}
+            isLoading={isLoading}
+            messagesEndRef={messagesEndRef}
+            nodes={nodes}
+            onReply={handleReply}
+            onDelete={handleDeleteMessage}
+          />
+        </div>
+
+        <MessageInput
+          onSend={sendMessage}
+          members={members}
+          currentUserId={currentUserId}
+          nodes={nodes}
+          selectedNodeId={selectedNodeId}
+          groupId={groupId}
+          isAdmin={currentUserRole === "admin"}
+          groupSettings={groupSettings}
+          replyingTo={replyingTo}
+          onCancelReply={() => setReplyingTo(null)}
         />
       </div>
-
-      <MessageInput
-        onSend={sendMessage}
-        members={members}
-        currentUserId={currentUserId}
-        nodes={nodes}
-        selectedNodeId={selectedNodeId}
-        groupId={groupId}
-        isAdmin={currentUserRole === "admin"}
-        groupSettings={groupSettings}
-        replyingTo={replyingTo}
-        onCancelReply={() => setReplyingTo(null)}
-      />
     </div>
   )
 }

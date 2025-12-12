@@ -4,6 +4,8 @@ export type UpperLayerPermission = "all" | "admin_only" | "selected_members"
 
 export type GroupType = "primary" | "secondary"
 
+export type BackgroundStyle = "neural_mesh" | "neural_network" | "matrix_code" | "neuron_cell" | "none"
+
 export interface GroupSettings {
   upper_layer_permission: UpperLayerPermission
   upper_layer_members?: string[]
@@ -41,6 +43,7 @@ export interface Group {
   // Hierarchical fields
   parent_group_id: string | null
   group_type: GroupType
+  background_style?: BackgroundStyle
   // Virtual fields (populated by queries)
   member_count?: number
   secondary_groups?: Group[]

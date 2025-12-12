@@ -38,10 +38,18 @@ import {
   Download,
   ShieldCheck,
   GitBranch,
+  Palette,
 } from "lucide-react"
 import Link from "next/link"
-import type { Group, GroupMember, GroupSettings, UpperLayerPermission, GroupStatistics } from "@/lib/types"
-import { CellManagementPanel } from "@/components/chat/cell-management-panel" // Import CellManagementPanel
+import type {
+  Group,
+  GroupMember,
+  GroupSettings,
+  UpperLayerPermission,
+  GroupStatistics,
+  BackgroundStyle,
+} from "@/lib/types"
+import { CellManagementPanel } from "@/components/chat/cell-management-panel"
 
 interface GroupSettingsFormProps {
   group: Group
@@ -54,6 +62,7 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
   const [name, setName] = useState(group.name)
   const [description, setDescription] = useState(group.description || "")
   const [avatarUrl, setAvatarUrl] = useState(group.avatar_url || "")
+  const [backgroundStyle, setBackgroundStyle] = useState<BackgroundStyle>(group.background_style || "neural_mesh")
   const [settings, setSettings] = useState<GroupSettings>(
     group.settings || {
       upper_layer_permission: "admin_only",
@@ -109,7 +118,7 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
     try {
       const { error } = await supabase
         .from("groups")
-        .update({ name, description, avatar_url: avatarUrl, settings })
+        .update({ name, description, avatar_url: avatarUrl, settings, background_style: backgroundStyle })
         .eq("id", group.id)
 
       if (error) throw error
@@ -402,21 +411,89 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
               </CardContent>
             </Card>
 
+            {/* Background Selection Card */}
+            {isAdmin && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Palette className="w-5 h-5" />
+                    خلفية الخلية
+                  </CardTitle>
+                  <CardDescription>اختر الخلفية الديناميكية للمحادثات</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <RadioGroup
+                    value={backgroundStyle}
+                    onValueChange={(value) => setBackgroundStyle(value as BackgroundStyle)}
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2 space-x-reverse p-3 rounded-lg border hover:bg-secondary cursor-pointer">
+                        <RadioGroupItem value="neural_network" id="neural_network" />
+                        <Label htmlFor="neural_network" className="flex-1 cursor-pointer">
+                          <div className="font-medium">شبكة عصبية (أزرق/بنفسجي)</div>
+                          <div className="text-xs text-muted-foreground">خلايا عصبية متصلة بإضاءة متوهجة</div>
+                        </Label>
+                      </div>
+
+                      <div className="flex items-center space-x-2 space-x-reverse p-3 rounded-lg border hover:bg-secondary cursor-pointer">
+                        <RadioGroupItem value="matrix_code" id="matrix_code" />
+                        <Label htmlFor="matrix_code" className="flex-1 cursor-pointer">
+                          <div className="font-medium">كود ماتريكس (أخضر)</div>
+                          <div className="text-xs text-muted-foreground">مكعبات ديجتال مع تأثيرات برمجية</div>
+                        </Label>
+                      </div>
+
+                      <div className="flex items-center space-x-2 space-x-reverse p-3 rounded-lg border hover:bg-secondary cursor-pointer">
+                        <RadioGroupItem value="neuron_cell" id="neuron_cell" />
+                        <Label htmlFor="neuron_cell" className="flex-1 cursor-pointer">
+                          <div className="font-medium">خلية عصبية (أزرق سماوي)</div>
+                          <div className="text-xs text-muted-foreground">خلية عصبية مفصلة مع نبضات ضوئية</div>
+                        </Label>
+                      </div>
+
+                      <div className="flex items-center space-x-2 space-x-reverse p-3 rounded-lg border hover:bg-secondary cursor-pointer">
+                        <RadioGroupItem value="none" id="none" />
+                        <Label htmlFor="none" className="flex-1 cursor-pointer">
+                          <div className="font-medium">بدون خلفية</div>
+                          <div className="text-xs text-muted-foreground">خلفية سادة بدون تأثيرات</div>
+                        </Label>
+                      </div>
+                    </div>
+                  </RadioGroup>
+                  <Button onClick={handleSave} disabled={isSaving} className="mt-4">
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin ml-2" />
+                        جاري الحفظ...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 ml-2" />
+                        حفظ الخلفية
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Export */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">تصدير المحادثة</CardTitle>
                 <CardDescription>تصدير جميع رسائل الخلية</CardDescription>
               </CardHeader>
-              <CardContent className="flex gap-2 flex-wrap">
-                <Button variant="outline" onClick={() => handleExportChat("txt")}>
-                  <Download className="h-4 w-4 ml-2" />
-                  تصدير نص
-                </Button>
-                <Button variant="outline" onClick={() => handleExportChat("json")}>
-                  <Download className="h-4 w-4 ml-2" />
-                  تصدير JSON
-                </Button>
+              <CardContent>
+                <div className="flex gap-2 flex-wrap">
+                  <Button variant="outline" onClick={() => handleExportChat("txt")}>
+                    <Download className="h-4 w-4 ml-2" />
+                    تصدير نص
+                  </Button>
+                  <Button variant="outline" onClick={() => handleExportChat("json")}>
+                    <Download className="h-4 w-4 ml-2" />
+                    تصدير JSON
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
