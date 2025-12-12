@@ -10,28 +10,23 @@ export function NeuralMesh({ disabled = false }: NeuralMeshProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
-    console.log("[v0] NeuralMesh component mounted")
-
     // Respect user's motion preferences
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
     if (prefersReducedMotion || disabled) {
-      console.log("[v0] NeuralMesh disabled due to user preference or prop")
       return
     }
 
     const canvas = canvasRef.current
     if (!canvas) {
-      console.log("[v0] Canvas ref not available")
       return
     }
 
     const ctx = canvas.getContext("2d")
     if (!ctx) {
-      console.log("[v0] Canvas context not available")
       return
     }
 
-    console.log("[v0] NeuralMesh starting animation")
+    const isDark = document.documentElement.classList.contains("dark")
 
     // Set canvas size
     const setCanvasSize = () => {
@@ -81,6 +76,9 @@ export function NeuralMesh({ disabled = false }: NeuralMeshProps) {
 
       const pulseOpacity = 0.08 + Math.sin(pulsePhase) * 0.035
 
+      const nodeColor = isDark ? "rgba(0, 220, 220" : "rgba(50, 100, 180"
+      const lineColor = isDark ? "rgba(0, 200, 200" : "rgba(70, 120, 200"
+
       // Update and draw nodes
       nodes.forEach((node, i) => {
         // Drift nodes slightly
@@ -104,7 +102,7 @@ export function NeuralMesh({ disabled = false }: NeuralMeshProps) {
 
           if (dist < 220) {
             const opacity = (1 - dist / 220) * pulseOpacity
-            ctx.strokeStyle = `rgba(0, 200, 200, ${opacity})`
+            ctx.strokeStyle = `${lineColor}, ${opacity})`
             ctx.lineWidth = 0.8
             ctx.beginPath()
             ctx.moveTo(node.x, node.y)
@@ -114,7 +112,7 @@ export function NeuralMesh({ disabled = false }: NeuralMeshProps) {
         }
 
         // Draw node
-        ctx.fillStyle = `rgba(0, 220, 220, ${pulseOpacity * 3})`
+        ctx.fillStyle = `${nodeColor}, ${pulseOpacity * 3})`
         ctx.beginPath()
         ctx.arc(node.x, node.y, 2, 0, Math.PI * 2)
         ctx.fill()
