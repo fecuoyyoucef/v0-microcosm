@@ -36,7 +36,7 @@ export function NeuralMesh({ disabled = false }: NeuralMeshProps) {
     setCanvasSize()
     window.addEventListener("resize", setCanvasSize)
 
-    // Neural nodes
+    const gridSize = 80
     const nodes: Array<{
       x: number
       y: number
@@ -44,23 +44,24 @@ export function NeuralMesh({ disabled = false }: NeuralMeshProps) {
       vy: number
       baseX: number
       baseY: number
+      pulse: number
     }> = []
 
-    const gridSize = 120
     for (let x = 0; x < canvas.width; x += gridSize) {
       for (let y = 0; y < canvas.height; y += gridSize) {
         nodes.push({
           x,
           y,
-          vx: (Math.random() - 0.5) * 0.08,
-          vy: (Math.random() - 0.5) * 0.08,
+          vx: (Math.random() - 0.5) * 0.1,
+          vy: (Math.random() - 0.5) * 0.1,
           baseX: x,
           baseY: y,
+          pulse: Math.random() * Math.PI * 2, // Individual pulse for each node
         })
       }
     }
 
-    let pulsePhase = 0
+    let globalPhase = 0
     let lastTime = Date.now()
 
     const animate = () => {
@@ -71,13 +72,12 @@ export function NeuralMesh({ disabled = false }: NeuralMeshProps) {
       // Clear canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-      // Update pulse phase (8-12 second cycle)
-      pulsePhase += deltaTime / 10000
+      // Update global phase
+      globalPhase += deltaTime / 8000
 
-      const pulseOpacity = 0.08 + Math.sin(pulsePhase) * 0.035
-
-      const nodeColor = isDark ? "rgba(0, 220, 220" : "rgba(50, 100, 180"
-      const lineColor = isDark ? "rgba(0, 200, 200" : "rgba(70, 120, 200"
+      const nodeColorDark = isDark ? [0, 220, 220] : [50, 100, 180]
+      const nodeColorLight = isDark ? [100, 200, 200] : [100, 150, 220]
+      const lineColorDark = isDark ? [0, 180, 180] : [80, 130, 200]
 
       // Update and draw nodes
       nodes.forEach((node, i) => {
@@ -100,10 +100,10 @@ export function NeuralMesh({ disabled = false }: NeuralMeshProps) {
           const other = nodes[j]
           const dist = Math.hypot(node.x - other.x, node.y - other.y)
 
-          if (dist < 220) {
-            const opacity = (1 - dist / 220) * pulseOpacity
-            ctx.strokeStyle = `${lineColor}, ${opacity})`
-            ctx.lineWidth = 0.8
+          if (dist < 280) {
+            const opacity = (1 - dist / 280) * 0.25 // Increased from 0.08 to 0.25
+            ctx.strokeStyle = `rgba(${lineColorDark[0]}, ${lineColorDark[1]}, ${lineColorDark[2]}, ${opacity})`
+            ctx.lineWidth = 1.2 // Increased from 0.8 to 1.2
             ctx.beginPath()
             ctx.moveTo(node.x, node.y)
             ctx.lineTo(other.x, other.y)
@@ -111,10 +111,18 @@ export function NeuralMesh({ disabled = false }: NeuralMeshProps) {
           }
         }
 
-        // Draw node
-        ctx.fillStyle = `${nodeColor}, ${pulseOpacity * 3})`
+        const nodePulse = 0.15 + Math.sin(globalPhase * 2 + node.pulse) * 0.08
+
+        // Draw outer glow
+        ctx.fillStyle = `rgba(${nodeColorLight[0]}, ${nodeColorLight[1]}, ${nodeColorLight[2]}, ${nodePulse * 0.4})`
         ctx.beginPath()
-        ctx.arc(node.x, node.y, 2, 0, Math.PI * 2)
+        ctx.arc(node.x, node.y, 5, 0, Math.PI * 2)
+        ctx.fill()
+
+        // Draw main node
+        ctx.fillStyle = `rgba(${nodeColorDark[0]}, ${nodeColorDark[1]}, ${nodeColorDark[2]}, ${nodePulse})`
+        ctx.beginPath()
+        ctx.arc(node.x, node.y, 2.5, 0, Math.PI * 2)
         ctx.fill()
       })
 
@@ -132,7 +140,7 @@ export function NeuralMesh({ disabled = false }: NeuralMeshProps) {
     <canvas
       ref={canvasRef}
       className="fixed inset-0 pointer-events-none z-0"
-      style={{ opacity: 0.6 }}
+      style={{ opacity: 0.8 }}
       aria-hidden="true"
     />
   )
