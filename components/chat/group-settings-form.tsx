@@ -292,7 +292,7 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
   console.log("[v0] Group settings - Should show cells tab:", isPrimaryCell && isAdmin)
 
   return (
-    <div className="flex-1 bg-background overflow-auto">
+    <div className="flex-1 bg-background/95 backdrop-blur-sm overflow-auto">
       <div className="max-w-3xl mx-auto p-4 md:p-6 space-y-6 pb-20">
         {/* Header */}
         <div className="flex items-center gap-4">

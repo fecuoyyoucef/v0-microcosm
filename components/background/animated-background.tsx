@@ -40,7 +40,7 @@ export function AnimatedBackground({ style }: AnimatedBackgroundProps) {
         className="absolute inset-0 bg-cover bg-center bg-no-repeat animate-pulse-slow"
         style={{
           backgroundImage: `url(${backgroundImage})`,
-          filter: "blur(8px)",
+          filter: "blur(4px)",
           opacity: 0.4,
           animationDuration: "10s",
         }}
