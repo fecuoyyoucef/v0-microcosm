@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { ChatSidebar } from "@/components/chat/chat-sidebar"
 import { InstallPromptNotification } from "@/components/pwa/install-button"
+import { NeuralMesh } from "@/components/background/neural-mesh"
 
 export default async function ChatLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -16,7 +17,9 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
   }
 
   return (
-    <div className="h-dvh flex bg-background">
+    <div className="h-dvh flex bg-background relative">
+      <NeuralMesh />
+
       <InstallPromptNotification />
 
       {/* Sidebar - hidden on mobile, visible on desktop */}
