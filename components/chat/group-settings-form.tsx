@@ -37,6 +37,7 @@ import type {
   BackgroundStyle,
   CellCategory,
 } from "@/lib/types"
+import { MetricCard } from "@/components/ui/metric-card" // Assuming MetricCard is imported from this path
 
 interface GroupSettingsFormProps {
   group: Group
@@ -726,19 +727,13 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
                 {/* Metrics Section */}
                 {metricsEnabled && (
                   <div className="grid grid-cols-2 gap-4 mb-6">
-                    <Card className="p-4">
-                      <div className="text-center space-y-2">
-                        <div className="text-3xl font-bold">{group.responsibility_score ?? 100}%</div>
-                        <p className="text-sm font-medium">معيار المسؤولية</p>
-                      </div>
-                    </Card>
+                    <div className="col-span-2 sm:col-span-1">
+                      <MetricCard label="معيار المسؤولية" value={group.responsibility_score ?? 100} size="md" />
+                    </div>
                     {group.cell_category === "project" && (
-                      <Card className="p-4">
-                        <div className="text-center space-y-2">
-                          <div className="text-3xl font-bold">{group.progress_score ?? 0}%</div>
-                          <p className="text-sm font-medium">معيار التقدم</p>
-                        </div>
-                      </Card>
+                      <div className="col-span-2 sm:col-span-1">
+                        <MetricCard label="معيار التقدم" value={group.progress_score ?? 0} size="md" />
+                      </div>
                     )}
                   </div>
                 )}

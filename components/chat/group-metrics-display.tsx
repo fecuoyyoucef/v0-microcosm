@@ -42,6 +42,7 @@ export function GroupMetricsDisplay({ group, className }: GroupMetricsDisplayPro
     return { label: "راكد", color: "text-red-500" }
   }, [progressScore])
 
+  // هذا المكون معطل - البطاقات الصغيرة موجودة في chat-header
   if (!metricsEnabled) {
     return null
   }

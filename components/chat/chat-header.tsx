@@ -28,7 +28,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import type { Group, GroupMember } from "@/lib/types"
 import { cn } from "@/lib/utils"
-import { MetricCard } from "./metric-card"
+import { MetricCard } from "@/components/ui/metric-card"
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -191,7 +191,7 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
                 </span>
               )}
               {metricsEnabled && (
-                <div className="flex gap-1.5 ml-2">
+                <div className="flex gap-1 ml-2">
                   <MetricCard label="المسؤولية" value={group.responsibility_score ?? 100} size="sm" />
                   {group.cell_category === "project" && (
                     <MetricCard label="التقدم" value={group.progress_score ?? 0} size="sm" />

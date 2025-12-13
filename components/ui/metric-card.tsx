@@ -22,11 +22,11 @@ export function MetricCard({ label, value, size = "sm" }: MetricCardProps) {
       className={cn(
         "border rounded-lg backdrop-blur-sm flex flex-col items-center justify-center font-medium",
         getMetricColor(value),
-        size === "sm" ? "px-2 py-1 text-[8px] gap-0" : "px-4 py-3 text-sm gap-1",
+        size === "sm" ? "px-2.5 py-1.5 text-[10px] gap-0.5" : "px-4 py-3 text-sm gap-1",
       )}
     >
-      <div className={cn("font-bold", size === "sm" ? "text-xs" : "text-2xl")}>{value}%</div>
-      <div className={cn(size === "sm" ? "text-[7px]" : "text-xs")}>{label}</div>
+      <div className={cn("font-bold", size === "sm" ? "text-sm" : "text-2xl")}>{value}%</div>
+      <div className={cn(size === "sm" ? "text-[9px]" : "text-xs")}>{label}</div>
     </div>
   )
 }
