@@ -32,6 +32,7 @@ import {
   Target,
   Brain,
   Shield,
+  Bug,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -775,6 +776,15 @@ export default function AdminDashboard() {
               >
                 <RefreshCw className="w-6 h-6 text-cyan-400" />
                 <span className="text-sm">تحديث البيانات</span>
+              </Button>
+
+              <Button
+                variant="outline"
+                className="h-auto py-4 flex flex-col items-center gap-2 bg-slate-700/50 border-slate-600 hover:bg-slate-700"
+                onClick={() => router.push("/admin/errors")}
+              >
+                <Bug className="w-6 h-6 text-red-400" />
+                <span className="text-sm">سجل الأخطاء</span>
               </Button>
             </div>
           </CardContent>
