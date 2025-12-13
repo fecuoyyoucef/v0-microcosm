@@ -6,6 +6,8 @@ export type GroupType = "primary" | "secondary"
 
 export type BackgroundStyle = "neural_mesh" | "neural_network" | "matrix_code" | "neuron_cell" | "none"
 
+export type CellCategory = "project" | "discussion"
+
 export interface GroupSettings {
   upper_layer_permission: UpperLayerPermission
   upper_layer_members?: string[]
@@ -44,6 +46,12 @@ export interface Group {
   parent_group_id: string | null
   group_type: GroupType
   background_style?: BackgroundStyle
+  cell_category?: CellCategory
+  goal?: string | null
+  responsibility_score?: number
+  progress_score?: number
+  last_activity_date?: string
+  metrics_last_calculated?: string | null
   // Virtual fields (populated by queries)
   member_count?: number
   secondary_groups?: Group[]

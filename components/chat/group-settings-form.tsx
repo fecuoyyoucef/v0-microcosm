@@ -14,20 +14,8 @@ import { Switch } from "@/components/ui/switch"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import {
   ArrowRight,
   Save,
-  Trash2,
   UserMinus,
   Shield,
   Loader2,
@@ -35,10 +23,9 @@ import {
   Settings,
   Users,
   BarChart3,
-  Download,
   ShieldCheck,
-  GitBranch,
   Palette,
+  Activity,
 } from "lucide-react"
 import Link from "next/link"
 import type {
@@ -48,8 +35,9 @@ import type {
   UpperLayerPermission,
   GroupStatistics,
   BackgroundStyle,
+  CellCategory,
 } from "@/lib/types"
-import { CellManagementPanel } from "@/components/chat/cell-management-panel"
+import { GroupMetricsDisplay } from "./group-metrics-display"
 
 interface GroupSettingsFormProps {
   group: Group
@@ -63,6 +51,8 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
   const [description, setDescription] = useState(group.description || "")
   const [avatarUrl, setAvatarUrl] = useState(group.avatar_url || "")
   const [backgroundStyle, setBackgroundStyle] = useState<BackgroundStyle>(group.background_style || "neural_mesh")
+  const [cellCategory, setCellCategory] = useState<CellCategory>(group.cell_category || "discussion")
+  const [goal, setGoal] = useState(group.goal || "")
   const [settings, setSettings] = useState<GroupSettings>(
     group.settings || {
       upper_layer_permission: "admin_only",
@@ -118,13 +108,23 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
     try {
       const { error } = await supabase
         .from("groups")
-        .update({ name, description, avatar_url: avatarUrl, settings, background_style: backgroundStyle })
+        .update({
+          name,
+          description: description || null,
+          avatar_url: avatarUrl || null,
+          settings,
+          background_style: backgroundStyle,
+          cell_category: cellCategory,
+          goal: goal || null,
+        })
         .eq("id", group.id)
 
       if (error) throw error
+
+      alert("تم حفظ التغييرات بنجاح")
       router.refresh()
-    } catch (err) {
-      console.error("Error updating group:", err)
+    } catch (error) {
+      console.error("Error saving settings:", error)
       alert("حدث خطأ في حفظ التغييرات")
     } finally {
       setIsSaving(false)
@@ -307,8 +307,10 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
           </div>
         </div>
 
+        {isAdmin && <GroupMetricsDisplay group={group} />}
+
         <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid w-full grid-cols-6 h-auto">
+          <TabsList className="grid w-full grid-cols-5 h-auto">
             <TabsTrigger value="general" className="text-xs md:text-sm py-2">
               <Settings className="w-4 h-4 md:ml-2" />
               <span className="hidden md:inline">عام</span>
@@ -317,15 +319,13 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
               <Users className="w-4 h-4 md:ml-2" />
               <span className="hidden md:inline">الأعضاء</span>
             </TabsTrigger>
-            {isAdmin && (
-              <TabsTrigger value="cells" className="text-xs md:text-sm py-2">
-                <GitBranch className="w-4 h-4 md:ml-2" />
-                <span className="hidden md:inline">الخلايا</span>
-              </TabsTrigger>
-            )}
             <TabsTrigger value="permissions" className="text-xs md:text-sm py-2" disabled={!isAdmin}>
               <ShieldCheck className="w-4 h-4 md:ml-2" />
               <span className="hidden md:inline">الصلاحيات</span>
+            </TabsTrigger>
+            <TabsTrigger value="appearance" className="text-xs md:text-sm">
+              <Palette className="w-4 h-4 md:ml-2" />
+              المظهر
             </TabsTrigger>
             <TabsTrigger value="stats" className="text-xs md:text-sm py-2" onClick={loadStatistics}>
               <BarChart3 className="w-4 h-4 md:ml-2" />
@@ -337,51 +337,113 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
           <TabsContent value="general" className="space-y-4 mt-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">صورة الخلية</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="w-5 h-5" />
+                  تصنيف الخلية
+                </CardTitle>
+                <CardDescription>نوع وهدف الخلية</CardDescription>
               </CardHeader>
-              <CardContent className="flex items-center gap-6">
-                <div className="relative">
-                  <Avatar className="w-20 h-20 md:w-24 md:h-24">
-                    <AvatarImage src={avatarUrl || undefined} />
-                    <AvatarFallback className="text-2xl bg-primary/20 text-primary">
-                      {name?.charAt(0) || "م"}
-                    </AvatarFallback>
-                  </Avatar>
-                  {isAdmin && (
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploadingAvatar}
-                      className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90"
-                    >
-                      {isUploadingAvatar ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Camera className="w-4 h-4" />
-                      )}
-                    </button>
-                  )}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleAvatarUpload}
-                    className="hidden"
-                  />
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>نوع الخلية</Label>
+                  <RadioGroup
+                    value={cellCategory}
+                    onValueChange={(value) => setCellCategory(value as CellCategory)}
+                    disabled={!isAdmin}
+                    className="space-y-3"
+                  >
+                    <div className="flex items-center space-x-2 space-x-reverse">
+                      <RadioGroupItem value="project" id="project-cat" />
+                      <Label htmlFor="project-cat" className="font-normal cursor-pointer">
+                        خلية مشروع (يتم قياس معيار التقدم)
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2 space-x-reverse">
+                      <RadioGroupItem value="discussion" id="discussion-cat" />
+                      <Label htmlFor="discussion-cat" className="font-normal cursor-pointer">
+                        خلية حوار (معيار المسؤولية فقط)
+                      </Label>
+                    </div>
+                  </RadioGroup>
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  {isAdmin ? "اضغط على أيقونة الكاميرا لتغيير صورة الخلية" : "فقط المسؤول يمكنه تغيير الصورة"}
+
+                <div className="space-y-2">
+                  <Label htmlFor="goal">{cellCategory === "project" ? "هدف المشروع" : "موضوع الحوار"}</Label>
+                  <Textarea
+                    id="goal"
+                    value={goal}
+                    onChange={(e) => setGoal(e.target.value)}
+                    disabled={!isAdmin}
+                    rows={3}
+                    className="resize-none"
+                    placeholder={
+                      cellCategory === "project" ? "اشرح الهدف الرئيسي من المشروع" : "اشرح الموضوع الرئيسي للحوار"
+                    }
+                  />
                 </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">معلومات الخلية</CardTitle>
+                <CardTitle className="text-lg">صورة الخلية</CardTitle>
+                <CardDescription>اضغط على أيقونة الكاميرا لتغيير صورة الخلية</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    <Avatar className="w-20 h-20">
+                      {avatarUrl ? (
+                        <AvatarImage src={avatarUrl || "/placeholder.svg"} alt={name} />
+                      ) : (
+                        <AvatarFallback className="bg-primary text-primary-foreground text-2xl font-bold">
+                          {name.substring(0, 2)}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                    {isAdmin && (
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploadingAvatar}
+                      >
+                        {isUploadingAvatar ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Camera className="h-4 w-4" />
+                        )}
+                      </Button>
+                    )}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAvatarUpload}
+                      disabled={!isAdmin}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>معلومات الخلية</CardTitle>
+                <CardDescription>إدارة إعدادات خلية خلية تجريبية</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">اسم الخلية</Label>
-                  <Input id="name" value={name} onChange={(e) => setName(e.target.value)} disabled={!isAdmin} />
+                  <Input
+                    id="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    disabled={!isAdmin}
+                    placeholder="اسم الخلية"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="description">الوصف</Label>
@@ -389,155 +451,31 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
                     id="description"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="وصف قصير للخلية..."
                     disabled={!isAdmin}
+                    rows={3}
+                    className="resize-none"
+                    placeholder="وصف الخلية..."
                   />
                 </div>
-                {isAdmin && (
-                  <Button onClick={handleSave} disabled={isSaving}>
-                    {isSaving ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin ml-2" />
-                        جاري الحفظ...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4 ml-2" />
-                        حفظ التغييرات
-                      </>
-                    )}
-                  </Button>
-                )}
               </CardContent>
             </Card>
 
-            {/* Background Selection Card */}
             {isAdmin && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Palette className="w-5 h-5" />
-                    خلفية الخلية
-                  </CardTitle>
-                  <CardDescription>اختر الخلفية الديناميكية للمحادثات</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <RadioGroup
-                    value={backgroundStyle}
-                    onValueChange={(value) => setBackgroundStyle(value as BackgroundStyle)}
-                  >
-                    <div className="space-y-3">
-                      <div className="flex items-center space-x-2 space-x-reverse p-3 rounded-lg border hover:bg-secondary cursor-pointer">
-                        <RadioGroupItem value="neural_network" id="neural_network" />
-                        <Label htmlFor="neural_network" className="flex-1 cursor-pointer">
-                          <div className="font-medium">شبكة عصبية (أزرق/بنفسجي)</div>
-                          <div className="text-xs text-muted-foreground">خلايا عصبية متصلة بإضاءة متوهجة</div>
-                        </Label>
-                      </div>
-
-                      <div className="flex items-center space-x-2 space-x-reverse p-3 rounded-lg border hover:bg-secondary cursor-pointer">
-                        <RadioGroupItem value="matrix_code" id="matrix_code" />
-                        <Label htmlFor="matrix_code" className="flex-1 cursor-pointer">
-                          <div className="font-medium">كود ماتريكس (أخضر)</div>
-                          <div className="text-xs text-muted-foreground">مكعبات ديجتال مع تأثيرات برمجية</div>
-                        </Label>
-                      </div>
-
-                      <div className="flex items-center space-x-2 space-x-reverse p-3 rounded-lg border hover:bg-secondary cursor-pointer">
-                        <RadioGroupItem value="neuron_cell" id="neuron_cell" />
-                        <Label htmlFor="neuron_cell" className="flex-1 cursor-pointer">
-                          <div className="font-medium">خلية عصبية (أزرق سماوي)</div>
-                          <div className="text-xs text-muted-foreground">خلية عصبية مفصلة مع نبضات ضوئية</div>
-                        </Label>
-                      </div>
-
-                      <div className="flex items-center space-x-2 space-x-reverse p-3 rounded-lg border hover:bg-secondary cursor-pointer">
-                        <RadioGroupItem value="none" id="none" />
-                        <Label htmlFor="none" className="flex-1 cursor-pointer">
-                          <div className="font-medium">بدون خلفية</div>
-                          <div className="text-xs text-muted-foreground">خلفية سادة بدون تأثيرات</div>
-                        </Label>
-                      </div>
-                    </div>
-                  </RadioGroup>
-                  <Button onClick={handleSave} disabled={isSaving} className="mt-4">
-                    {isSaving ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin ml-2" />
-                        جاري الحفظ...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4 ml-2" />
-                        حفظ الخلفية
-                      </>
-                    )}
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Export */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">تصدير المحادثة</CardTitle>
-                <CardDescription>تصدير جميع رسائل الخلية</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-2 flex-wrap">
-                  <Button variant="outline" onClick={() => handleExportChat("txt")}>
-                    <Download className="h-4 w-4 ml-2" />
-                    تصدير نص
-                  </Button>
-                  <Button variant="outline" onClick={() => handleExportChat("json")}>
-                    <Download className="h-4 w-4 ml-2" />
-                    تصدير JSON
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Danger Zone */}
-            {isAdmin && (
-              <Card className="border-destructive/50">
-                <CardHeader>
-                  <CardTitle className="text-destructive">منطقة الخطر</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="destructive" disabled={isDeleting}>
-                        {isDeleting ? (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin ml-2" />
-                            جاري الحذف...
-                          </>
-                        ) : (
-                          <>
-                            <Trash2 className="h-4 w-4 ml-2" />
-                            حذف الخلية
-                          </>
-                        )}
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
-                        <AlertDialogDescription>سيتم حذف الخلية وجميع الرسائل نهائياً.</AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={handleDeleteGroup}
-                          className="bg-destructive text-destructive-foreground"
-                        >
-                          نعم، احذف
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </CardContent>
-              </Card>
+              <div className="flex gap-3">
+                <Button onClick={handleSave} disabled={isSaving} className="flex-1">
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                      جاري الحفظ...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 ml-2" />
+                      حفظ التغييرات
+                    </>
+                  )}
+                </Button>
+              </div>
             )}
           </TabsContent>
 
@@ -608,18 +546,6 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
               </CardContent>
             </Card>
           </TabsContent>
-
-          {/* Cells Tab */}
-          {isAdmin && (
-            <TabsContent value="cells" className="mt-4">
-              <CellManagementPanel
-                group={group}
-                members={initialMembers}
-                currentUserId={currentUserId}
-                isAdmin={isAdmin}
-              />
-            </TabsContent>
-          )}
 
           {/* Permissions Tab */}
           <TabsContent value="permissions" className="space-y-4 mt-4">
@@ -706,6 +632,71 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Appearance Tab */}
+          {isAdmin && (
+            <TabsContent value="appearance" className="space-y-4 mt-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">خلفية الخلية</CardTitle>
+                  <CardDescription>اختر الخلفية الديناميكية للمحادثات</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <RadioGroup
+                    value={backgroundStyle}
+                    onValueChange={(value) => setBackgroundStyle(value as BackgroundStyle)}
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2 space-x-reverse p-3 rounded-lg border hover:bg-secondary cursor-pointer">
+                        <RadioGroupItem value="neural_network" id="neural_network" />
+                        <Label htmlFor="neural_network" className="flex-1 cursor-pointer">
+                          <div className="font-medium">شبكة عصبية (أزرق/بنفسجي)</div>
+                          <div className="text-xs text-muted-foreground">خلايا عصبية متصلة بإضاءة متوهجة</div>
+                        </Label>
+                      </div>
+
+                      <div className="flex items-center space-x-2 space-x-reverse p-3 rounded-lg border hover:bg-secondary cursor-pointer">
+                        <RadioGroupItem value="matrix_code" id="matrix_code" />
+                        <Label htmlFor="matrix_code" className="flex-1 cursor-pointer">
+                          <div className="font-medium">كود ماتريكس (أخضر)</div>
+                          <div className="text-xs text-muted-foreground">مكعبات ديجتال مع تأثيرات برمجية</div>
+                        </Label>
+                      </div>
+
+                      <div className="flex items-center space-x-2 space-x-reverse p-3 rounded-lg border hover:bg-secondary cursor-pointer">
+                        <RadioGroupItem value="neuron_cell" id="neuron_cell" />
+                        <Label htmlFor="neuron_cell" className="flex-1 cursor-pointer">
+                          <div className="font-medium">خلية عصبية (أزرق سماوي)</div>
+                          <div className="text-xs text-muted-foreground">خلية عصبية مفصلة مع نبضات ضوئية</div>
+                        </Label>
+                      </div>
+
+                      <div className="flex items-center space-x-2 space-x-reverse p-3 rounded-lg border hover:bg-secondary cursor-pointer">
+                        <RadioGroupItem value="none" id="none" />
+                        <Label htmlFor="none" className="flex-1 cursor-pointer">
+                          <div className="font-medium">بدون خلفية</div>
+                          <div className="text-xs text-muted-foreground">خلفية سادة بدون تأثيرات</div>
+                        </Label>
+                      </div>
+                    </div>
+                  </RadioGroup>
+                  <Button onClick={handleSave} disabled={isSaving} className="mt-4">
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin ml-2" />
+                        جاري الحفظ...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 ml-2" />
+                        حفظ الخلفية
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
 
           {/* Stats Tab */}
           <TabsContent value="stats" className="space-y-4 mt-4">

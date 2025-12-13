@@ -164,7 +164,21 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
 
         {/* Group Info */}
         <div className="min-w-0 flex-1">
-          <h1 className="font-bold text-sm md:text-base truncate">{group.name}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="font-bold text-sm md:text-base truncate">{group.name}</h1>
+            {group.cell_category && (
+              <span
+                className={cn(
+                  "text-[9px] md:text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0",
+                  group.cell_category === "project"
+                    ? "bg-blue-500/20 text-blue-300"
+                    : "bg-purple-500/20 text-purple-300",
+                )}
+              >
+                {group.cell_category === "project" ? "مشروع" : "حوار"}
+              </span>
+            )}
+          </div>
           <p className="text-[10px] md:text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
             <span>{members.length} أعضاء</span>
             <span className="text-muted-foreground/50">•</span>
@@ -172,6 +186,19 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               {onlineCount} متصل
             </span>
+            {group.responsibility_score !== undefined && group.responsibility_score < 75 && (
+              <>
+                <span className="text-muted-foreground/50">•</span>
+                <span
+                  className={cn(
+                    "flex items-center gap-1",
+                    group.responsibility_score < 60 ? "text-red-400" : "text-yellow-400",
+                  )}
+                >
+                  ⚠ {group.responsibility_score}%
+                </span>
+              </>
+            )}
           </p>
         </div>
       </div>

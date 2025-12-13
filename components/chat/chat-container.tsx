@@ -7,6 +7,7 @@ import { MessageList } from "./message-list"
 import { MessageInput } from "./message-input"
 import { LayerFilter } from "./layer-filter"
 import { AnimatedBackground, type BackgroundStyle } from "@/components/background/animated-background"
+import { GroupMetricsDisplay } from "./group-metrics-display"
 import type { Group, GroupMember, Message, MessageLayer, ConversationNode, GroupSettings } from "@/lib/types"
 
 interface ChatContainerProps {
@@ -361,6 +362,8 @@ export function ChatContainer({
           currentUserId={currentUserId}
           onMembersUpdate={fetchMembers}
         />
+
+        <GroupMetricsDisplay group={group} className="mx-3 mt-3" />
 
         <LayerFilter
           activeLayer={activeLayer}

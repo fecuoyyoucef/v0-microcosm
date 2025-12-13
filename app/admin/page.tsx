@@ -26,6 +26,12 @@ import {
   Settings,
   Eye,
   EyeOff,
+  ToggleLeft,
+  ToggleRight,
+  Rocket,
+  Target,
+  Brain,
+  Shield,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -66,6 +72,14 @@ interface RecentItem {
   layer?: string
 }
 
+interface SystemSettings {
+  [key: string]: {
+    value: boolean | string | number
+    description: string
+    updated_at: string
+  }
+}
+
 export default function AdminDashboard() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
@@ -88,6 +102,10 @@ export default function AdminDashboard() {
   const [showPassword, setShowPassword] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
   const [currentAdminEmail, setCurrentAdminEmail] = useState("")
+
+  const [featureSettingsOpen, setFeatureSettingsOpen] = useState(false)
+  const [systemSettings, setSystemSettings] = useState<SystemSettings>({})
+  const [updatingSettings, setUpdatingSettings] = useState<string | null>(null)
 
   const fetchStats = useCallback(async () => {
     try {
@@ -127,10 +145,23 @@ export default function AdminDashboard() {
     }
   }, [])
 
+  const fetchSystemSettings = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/system-settings")
+      if (res.ok) {
+        const data = await res.json()
+        setSystemSettings(data.settings || {})
+      }
+    } catch (error) {
+      console.error("System settings error:", error)
+    }
+  }, [])
+
   useEffect(() => {
     fetchStats()
     fetchDevNotes()
-  }, [fetchStats, fetchDevNotes])
+    fetchSystemSettings()
+  }, [fetchStats, fetchDevNotes, fetchSystemSettings])
 
   const handleLogout = async () => {
     await fetch("/api/admin/logout", { method: "POST" })
@@ -233,7 +264,6 @@ export default function AdminDashboard() {
         alert("تم تحديث بيانات الأدمن بنجاح")
         setSettingsOpen(false)
         setNewAdminPassword("")
-        // If email changed, logout
         if (newAdminEmail !== currentAdminEmail) {
           alert("تم تغيير البريد الإلكتروني. سيتم تسجيل خروجك الآن.")
           handleLogout()
@@ -247,6 +277,34 @@ export default function AdminDashboard() {
       alert("حدث خطأ")
     } finally {
       setSavingSettings(false)
+    }
+  }
+
+  const handleToggleSystemSetting = async (key: string, currentValue: boolean) => {
+    setUpdatingSettings(key)
+    try {
+      const res = await fetch("/api/admin/system-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, value: !currentValue }),
+      })
+
+      if (res.ok) {
+        setSystemSettings((prev) => ({
+          ...prev,
+          [key]: {
+            ...prev[key],
+            value: !currentValue,
+            updated_at: new Date().toISOString(),
+          },
+        }))
+      } else {
+        alert("فشل تحديث الإعداد")
+      }
+    } catch {
+      alert("حدث خطأ")
+    } finally {
+      setUpdatingSettings(null)
     }
   }
 
@@ -272,6 +330,41 @@ export default function AdminDashboard() {
     cancelled: X,
   }
 
+  const featureSettings = [
+    {
+      key: "cell_classification_enabled",
+      label: "نظام تصنيف الخلايا",
+      description: "تقسيم الخلايا إلى: خلية مشروع وخلية حوار",
+      icon: Target,
+      color: "text-cyan-400",
+      bgColor: "bg-cyan-500/20",
+    },
+    {
+      key: "cell_metrics_enabled",
+      label: "معايير المسؤولية والتقدم",
+      description: "حساب وعرض معيار المسؤولية ومعيار التقدم للخلايا",
+      icon: TrendingUp,
+      color: "text-green-400",
+      bgColor: "bg-green-500/20",
+    },
+    {
+      key: "ai_features_enabled",
+      label: "ميزات الذكاء الاصطناعي",
+      description: "الملخصات الذكية، تحليل الرسائل، المساعد الذكي",
+      icon: Brain,
+      color: "text-purple-400",
+      bgColor: "bg-purple-500/20",
+    },
+    {
+      key: "maintenance_mode",
+      label: "وضع الصيانة",
+      description: "إيقاف التطبيق مؤقتاً للصيانة",
+      icon: Shield,
+      color: "text-red-400",
+      bgColor: "bg-red-500/20",
+    },
+  ]
+
   return (
     <div className="min-h-screen bg-slate-900 text-white" dir="rtl">
       {/* Header */}
@@ -288,6 +381,90 @@ export default function AdminDashboard() {
           </div>
 
           <div className="flex items-center gap-2">
+            <Dialog open={featureSettingsOpen} onOpenChange={setFeatureSettingsOpen}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="text-cyan-400 hover:text-cyan-300 relative">
+                  <Rocket className="w-5 h-5" />
+                  {systemSettings.cell_classification_enabled?.value && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full" />
+                  )}
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-lg">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Rocket className="w-5 h-5 text-cyan-400" />
+                    التحكم في الميزات
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 mt-4">
+                  <p className="text-sm text-slate-400">تفعيل أو تعطيل الميزات الجديدة قبل نشرها للمستخدمين</p>
+
+                  <div className="space-y-3">
+                    {featureSettings.map((feature) => {
+                      const Icon = feature.icon
+                      const isEnabled = systemSettings[feature.key]?.value === true
+                      const isUpdating = updatingSettings === feature.key
+
+                      return (
+                        <div
+                          key={feature.key}
+                          className={`p-4 rounded-xl border transition-all ${
+                            isEnabled ? "bg-slate-700/50 border-slate-600" : "bg-slate-800/50 border-slate-700"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex items-start gap-3">
+                              <div
+                                className={`w-10 h-10 rounded-lg ${feature.bgColor} flex items-center justify-center shrink-0`}
+                              >
+                                <Icon className={`w-5 h-5 ${feature.color}`} />
+                              </div>
+                              <div>
+                                <h4 className="font-medium text-white">{feature.label}</h4>
+                                <p className="text-xs text-slate-400 mt-1">{feature.description}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {isUpdating ? (
+                                <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+                              ) : (
+                                <button
+                                  onClick={() => handleToggleSystemSetting(feature.key, isEnabled)}
+                                  className="focus:outline-none"
+                                >
+                                  {isEnabled ? (
+                                    <ToggleRight className="w-10 h-10 text-green-500" />
+                                  ) : (
+                                    <ToggleLeft className="w-10 h-10 text-slate-500" />
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          {isEnabled && (
+                            <div className="mt-2 pt-2 border-t border-slate-600/50">
+                              <span className="text-xs text-green-400 flex items-center gap-1">
+                                <Check className="w-3 h-3" />
+                                مُفعّل
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                    <p className="text-xs text-yellow-400 flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                      تغيير هذه الإعدادات سيؤثر على جميع المستخدمين فوراً. تأكد من اختبار الميزات قبل تفعيلها.
+                    </p>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
             <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
               <DialogTrigger asChild>
                 <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white">
@@ -368,6 +545,30 @@ export default function AdminDashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+        <Card className="bg-gradient-to-r from-cyan-900/30 to-slate-800/50 border-cyan-700/50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-cyan-500/20 flex items-center justify-center">
+                  <Rocket className="w-6 h-6 text-cyan-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white">الميزات الجديدة</h3>
+                  <p className="text-sm text-slate-400">
+                    {systemSettings.cell_classification_enabled?.value
+                      ? "نظام تصنيف الخلايا مُفعّل"
+                      : "نظام تصنيف الخلايا معطّل - جاهز للتحديث القادم"}
+                  </p>
+                </div>
+              </div>
+              <Button onClick={() => setFeatureSettingsOpen(true)} className="bg-cyan-600 hover:bg-cyan-700">
+                <Settings className="w-4 h-4 ml-2" />
+                إدارة الميزات
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="bg-slate-800/50 border-slate-700">
@@ -541,7 +742,7 @@ export default function AdminDashboard() {
                 }
               >
                 <Database className="w-6 h-6 text-green-400" />
-                <span className="text-sm">Supabase</span>
+                <span className="text-sm">قاعدة البيانات</span>
               </Button>
 
               <Button
@@ -549,131 +750,182 @@ export default function AdminDashboard() {
                 className="h-auto py-4 flex flex-col items-center gap-2 bg-slate-700/50 border-slate-600 hover:bg-slate-700"
                 onClick={() => window.open("https://vercel.com/dashboard", "_blank")}
               >
-                <ExternalLink className="w-6 h-6 text-white" />
+                <ExternalLink className="w-6 h-6 text-blue-400" />
                 <span className="text-sm">Vercel</span>
               </Button>
 
               <Button
                 variant="outline"
-                className="h-auto py-4 flex flex-col items-center gap-2 bg-slate-700/50 border-slate-600 hover:bg-red-900/50"
+                className="h-auto py-4 flex flex-col items-center gap-2 bg-slate-700/50 border-slate-600 hover:bg-slate-700"
                 onClick={() => {
-                  if (confirm("هل أنت متأكد من مسح جميع البيانات؟")) {
-                    alert("هذه الميزة غير مفعلة للأمان")
-                  }
+                  fetchStats()
+                  fetchDevNotes()
+                  fetchSystemSettings()
                 }}
               >
-                <Trash2 className="w-6 h-6 text-red-400" />
-                <span className="text-sm">مسح الكل</span>
+                <RefreshCw className="w-6 h-6 text-cyan-400" />
+                <span className="text-sm">تحديث البيانات</span>
               </Button>
             </div>
           </CardContent>
         </Card>
 
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* Recent Activity */}
+        {/* Dev Notes */}
+        <Card className="bg-slate-800/50 border-slate-700">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-cyan-400" />
+              ملاحظات التطوير
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="أضف ملاحظة جديدة..."
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAddNote()}
+                className="bg-slate-700 border-slate-600"
+              />
+              <Button onClick={handleAddNote} disabled={!newNote.trim()} className="bg-cyan-600 hover:bg-cyan-700">
+                <Plus className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {devNotes.map((note) => {
+                const StatusIcon = statusIcons[note.status]
+                return (
+                  <div key={note.id} className="p-3 rounded-lg bg-slate-700/50 flex items-start gap-3">
+                    <div className={`p-1.5 rounded-lg ${statusColors[note.status]}`}>
+                      <StatusIcon className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white">{note.content}</p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {new Date(note.created_at).toLocaleDateString("ar-SA")}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Select value={note.status} onValueChange={(v) => handleUpdateNoteStatus(note.id, v)}>
+                        <SelectTrigger className="w-28 h-8 text-xs bg-slate-600 border-slate-500">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-700 border-slate-600">
+                          <SelectItem value="pending">قيد الانتظار</SelectItem>
+                          <SelectItem value="in_progress">جاري</SelectItem>
+                          <SelectItem value="done">منجز</SelectItem>
+                          <SelectItem value="cancelled">ملغي</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-slate-400 hover:text-red-400"
+                        onClick={() => handleDeleteNote(note.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )
+              })}
+
+              {devNotes.length === 0 && (
+                <div className="text-center py-8 text-slate-400">
+                  <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p>لا توجد ملاحظات</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Recent Activity */}
+        <div className="grid md:grid-cols-3 gap-4">
           <Card className="bg-slate-800/50 border-slate-700">
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg">النشاط الأخير</CardTitle>
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Users className="w-4 h-4 text-blue-400" />
+                آخر المستخدمين
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Recent Users */}
-              <div>
-                <p className="text-sm text-slate-400 mb-2">آخر المستخدمين</p>
-                <div className="space-y-2">
-                  {recentUsers.map((user) => (
-                    <div key={user.id} className="flex items-center gap-3 p-2 rounded-lg bg-slate-700/30">
-                      <div className="w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center text-sm">
-                        {user.display_name?.[0] || "?"}
+            <CardContent>
+              <div className="space-y-2">
+                {recentUsers.slice(0, 5).map((user) => (
+                  <div key={user.id} className="flex items-center gap-2 p-2 rounded-lg bg-slate-700/30">
+                    {user.avatar_url ? (
+                      <Image
+                        src={user.avatar_url || "/placeholder.svg"}
+                        alt={user.display_name || "User"}
+                        width={32}
+                        height={32}
+                        className="rounded-full"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center">
+                        <Users className="w-4 h-4 text-slate-400" />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm truncate">{user.display_name || "بدون اسم"}</p>
-                        <p className="text-xs text-slate-500">{new Date(user.created_at).toLocaleDateString("ar")}</p>
-                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white truncate">{user.display_name || "مستخدم"}</p>
+                      <p className="text-xs text-slate-400">{new Date(user.created_at).toLocaleDateString("ar-SA")}</p>
                     </div>
-                  ))}
-                  {recentUsers.length === 0 && <p className="text-slate-500 text-sm">لا يوجد مستخدمين</p>}
-                </div>
-              </div>
-
-              {/* Recent Groups */}
-              <div>
-                <p className="text-sm text-slate-400 mb-2">آخر الخلايا</p>
-                <div className="space-y-2">
-                  {recentGroups.map((group) => (
-                    <div key={group.id} className="flex items-center gap-3 p-2 rounded-lg bg-slate-700/30">
-                      <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center">
-                        <FolderOpen className="w-4 h-4 text-purple-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm truncate">{group.name}</p>
-                        <p className="text-xs text-slate-500">{new Date(group.created_at).toLocaleDateString("ar")}</p>
-                      </div>
-                    </div>
-                  ))}
-                  {recentGroups.length === 0 && <p className="text-slate-500 text-sm">لا يوجد خلايا</p>}
-                </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
 
-          {/* Dev Notes */}
           <Card className="bg-slate-800/50 border-slate-700">
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-yellow-400" />
-                ملاحظات التطوير
+              <CardTitle className="text-sm flex items-center gap-2">
+                <FolderOpen className="w-4 h-4 text-purple-400" />
+                آخر الخلايا
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex gap-2 mb-4">
-                <Input
-                  placeholder="أضف ملاحظة جديدة..."
-                  value={newNote}
-                  onChange={(e) => setNewNote(e.target.value)}
-                  className="bg-slate-700 border-slate-600"
-                  onKeyDown={(e) => e.key === "Enter" && handleAddNote()}
-                />
-                <Button onClick={handleAddNote} size="icon" className="bg-cyan-600 hover:bg-cyan-700">
-                  <Plus className="w-4 h-4" />
-                </Button>
+              <div className="space-y-2">
+                {recentGroups.slice(0, 5).map((group) => (
+                  <div key={group.id} className="p-2 rounded-lg bg-slate-700/30">
+                    <p className="text-sm text-white truncate">{group.name}</p>
+                    <p className="text-xs text-slate-400">{new Date(group.created_at).toLocaleDateString("ar-SA")}</p>
+                  </div>
+                ))}
               </div>
+            </CardContent>
+          </Card>
 
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {devNotes.map((note) => {
-                  const StatusIcon = statusIcons[note.status]
-                  return (
-                    <div key={note.id} className="p-3 rounded-lg bg-slate-700/30 group">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm flex-1">{note.content}</p>
-                        <button
-                          onClick={() => handleDeleteNote(note.id)}
-                          className="text-red-400 hover:text-red-300 transition-colors p-1 rounded hover:bg-red-500/20"
-                          title="حذف الملاحظة"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-2 mt-2">
-                        <Select value={note.status} onValueChange={(v) => handleUpdateNoteStatus(note.id, v)}>
-                          <SelectTrigger className={`h-7 text-xs w-auto px-2 border-0 ${statusColors[note.status]}`}>
-                            <StatusIcon className="w-3 h-3 ml-1" />
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="bg-slate-700 border-slate-600">
-                            <SelectItem value="pending">قيد الانتظار</SelectItem>
-                            <SelectItem value="in_progress">قيد التنفيذ</SelectItem>
-                            <SelectItem value="done">مكتمل</SelectItem>
-                            <SelectItem value="cancelled">ملغي</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <span className="text-xs text-slate-500">
-                          {new Date(note.created_at).toLocaleDateString("ar")}
-                        </span>
-                      </div>
+          <Card className="bg-slate-800/50 border-slate-700">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-green-400" />
+                آخر الرسائل
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {recentMessages.slice(0, 5).map((msg) => (
+                  <div key={msg.id} className="p-2 rounded-lg bg-slate-700/30">
+                    <p className="text-sm text-white truncate">{msg.content}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span
+                        className={`text-xs px-1.5 py-0.5 rounded ${
+                          msg.layer === "social"
+                            ? "bg-green-500/20 text-green-400"
+                            : msg.layer === "coordination"
+                              ? "bg-blue-500/20 text-blue-400"
+                              : "bg-purple-500/20 text-purple-400"
+                        }`}
+                      >
+                        {msg.layer === "social" ? "اجتماعية" : msg.layer === "coordination" ? "تنسيقية" : "معرفية"}
+                      </span>
+                      <span className="text-xs text-slate-400">
+                        {new Date(msg.created_at).toLocaleDateString("ar-SA")}
+                      </span>
                     </div>
-                  )
-                })}
-                {devNotes.length === 0 && <p className="text-slate-500 text-sm text-center py-4">لا توجد ملاحظات</p>}
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
