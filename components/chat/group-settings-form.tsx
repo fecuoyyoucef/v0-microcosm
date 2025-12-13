@@ -67,6 +67,7 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
   const [removingMember, setRemovingMember] = useState<string | null>(null)
   const [statistics, setStatistics] = useState<GroupStatistics | null>(null)
   const [isLoadingStats, setIsLoadingStats] = useState(false)
+  const [metricsEnabled, setMetricsEnabled] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const supabase = createClient()
@@ -74,6 +75,7 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
   useEffect(() => {
     import("@/lib/system-settings").then((mod) => {
       mod.getSystemSetting("cell_classification_enabled").then(setClassificationEnabled)
+      mod.getSystemSetting("metrics_enabled").then(setMetricsEnabled)
     })
   }, [])
 
@@ -721,6 +723,27 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
               </div>
             ) : statistics ? (
               <>
+                {/* Metrics Section */}
+                {metricsEnabled && (
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    <Card className="p-4">
+                      <div className="text-center space-y-2">
+                        <div className="text-3xl font-bold">{group.responsibility_score ?? 100}%</div>
+                        <p className="text-sm font-medium">معيار المسؤولية</p>
+                      </div>
+                    </Card>
+                    {group.cell_category === "project" && (
+                      <Card className="p-4">
+                        <div className="text-center space-y-2">
+                          <div className="text-3xl font-bold">{group.progress_score ?? 0}%</div>
+                          <p className="text-sm font-medium">معيار التقدم</p>
+                        </div>
+                      </Card>
+                    )}
+                  </div>
+                )}
+
+                {/* Existing Statistics Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <Card>
                     <CardContent className="pt-6">
@@ -748,6 +771,7 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
                   </Card>
                 </div>
 
+                {/* Member Activity */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg">نشاط الأعضاء</CardTitle>
@@ -767,6 +791,7 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
                   </CardContent>
                 </Card>
 
+                {/* Last Activity */}
                 {statistics.lastActivity && (
                   <Card>
                     <CardContent className="pt-6">

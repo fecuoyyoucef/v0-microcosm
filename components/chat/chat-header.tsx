@@ -28,7 +28,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import type { Group, GroupMember } from "@/lib/types"
 import { cn } from "@/lib/utils"
-import { GroupMetricsDisplay } from "./group-metrics-display"
+import { MetricCard } from "./metric-card"
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -190,6 +190,14 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
                   {group.cell_category === "project" ? "مشروع" : "حوار"}
                 </span>
               )}
+              {metricsEnabled && (
+                <div className="flex gap-1.5 ml-2">
+                  <MetricCard label="المسؤولية" value={group.responsibility_score ?? 100} size="sm" />
+                  {group.cell_category === "project" && (
+                    <MetricCard label="التقدم" value={group.progress_score ?? 0} size="sm" />
+                  )}
+                </div>
+              )}
             </div>
             <p className="text-[10px] md:text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
               <span>{members.length} أعضاء</span>
@@ -344,12 +352,6 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
           </DropdownMenu>
         </div>
       </div>
-
-      {metricsEnabled && (
-        <div className="px-3 md:px-4 pb-3">
-          <GroupMetricsDisplay group={group} />
-        </div>
-      )}
     </div>
   )
 }
