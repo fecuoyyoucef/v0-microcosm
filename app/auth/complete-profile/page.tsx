@@ -33,7 +33,6 @@ export default function CompleteProfilePage() {
   ]
   const allUsernameRequirementsMet = usernameRequirements.every((r) => r.met)
 
-  // Check if user is authenticated and if profile exists
   useEffect(() => {
     const checkAuth = async () => {
       const {
@@ -45,7 +44,6 @@ export default function CompleteProfilePage() {
         return
       }
 
-      // Check if profile already exists
       const { data: profile } = await supabase
         .from("profiles")
         .select("id, display_name, username")
@@ -53,12 +51,10 @@ export default function CompleteProfilePage() {
         .single()
 
       if (profile?.username) {
-        // Profile already complete, redirect to chat
-        router.push("/chat")
+        router.push("/auth/survey")
         return
       }
 
-      // Pre-fill display name from Google account if available
       const googleName = user.user_metadata?.full_name || user.user_metadata?.name
       if (googleName) {
         setDisplayName(googleName)
@@ -157,7 +153,6 @@ export default function CompleteProfilePage() {
     }
 
     try {
-      // Update or insert profile
       const { error: profileError } = await supabase.from("profiles").upsert({
         id: user.id,
         display_name: displayName.trim(),
@@ -167,7 +162,7 @@ export default function CompleteProfilePage() {
 
       if (profileError) throw profileError
 
-      router.push("/chat")
+      router.push("/auth/survey")
       router.refresh()
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "حدث خطأ")
