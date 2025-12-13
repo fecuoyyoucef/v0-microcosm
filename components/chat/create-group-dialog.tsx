@@ -20,12 +20,14 @@ import { Textarea } from "@/components/ui/textarea"
 import { Plus } from "lucide-react"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import type { CellCategory } from "@/lib/types"
+import { getSystemSetting } from "@/lib/system-settings"
 
 export function CreateGroupDialog() {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [step, setStep] = useState(1)
+  const [classificationEnabled, setClassificationEnabled] = useState(false)
 
   // Form data
   const [cellCategory, setCellCategory] = useState<CellCategory>("discussion")
@@ -33,11 +35,16 @@ export function CreateGroupDialog() {
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
 
+  useState(() => {
+    getSystemSetting("cell_classification_enabled").then((enabled) => {
+      setClassificationEnabled(enabled)
+    })
+  })
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (step === 1) {
-      // Validate first step
+    if (step === 1 && classificationEnabled) {
       if (!cellCategory || !goal.trim()) {
         return
       }
@@ -45,7 +52,6 @@ export function CreateGroupDialog() {
       return
     }
 
-    // Final submission
     if (!name.trim()) {
       return
     }
@@ -61,8 +67,10 @@ export function CreateGroupDialog() {
         body: JSON.stringify({
           name: name.trim(),
           description: description.trim() || null,
-          cell_category: cellCategory,
-          goal: goal.trim(),
+          ...(classificationEnabled && {
+            cell_category: cellCategory,
+            goal: goal.trim(),
+          }),
         }),
       })
 
@@ -108,7 +116,7 @@ export function CreateGroupDialog() {
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <form onSubmit={handleSubmit}>
-          {step === 1 ? (
+          {step === 1 && classificationEnabled ? (
             <>
               <DialogHeader>
                 <DialogTitle>إنشاء خلية جديدة</DialogTitle>
@@ -173,8 +181,10 @@ export function CreateGroupDialog() {
           ) : (
             <>
               <DialogHeader>
-                <DialogTitle>معلومات الخلية</DialogTitle>
-                <DialogDescription>أدخل اسم ووصف الخلية</DialogDescription>
+                <DialogTitle>{classificationEnabled && step === 2 ? "معلومات الخلية" : "إنشاء خلية جديدة"}</DialogTitle>
+                <DialogDescription>
+                  {classificationEnabled && step === 2 ? "أدخل اسم ووصف الخلية" : "أدخل تفاصيل الخلية الجديدة"}
+                </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="space-y-2">
@@ -201,9 +211,16 @@ export function CreateGroupDialog() {
                 </div>
               </div>
               <DialogFooter className="gap-2">
-                <Button type="button" variant="outline" onClick={handleBack}>
-                  رجوع
-                </Button>
+                {classificationEnabled && step === 2 && (
+                  <Button type="button" variant="outline" onClick={handleBack}>
+                    رجوع
+                  </Button>
+                )}
+                {!classificationEnabled && (
+                  <Button type="button" variant="outline" onClick={handleCancel}>
+                    إلغاء
+                  </Button>
+                )}
                 <Button type="submit" disabled={loading || !name.trim()}>
                   {loading ? "جارٍ الإنشاء..." : "إنشاء الخلية"}
                 </Button>

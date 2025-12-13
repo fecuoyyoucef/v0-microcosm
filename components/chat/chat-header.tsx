@@ -28,6 +28,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import type { Group, GroupMember } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { GroupMetricsDisplay } from "./group-metrics-display"
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -51,6 +52,7 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
   const [canInstall, setCanInstall] = useState(false)
   const router = useRouter()
   const supabase = createClient()
+  const [metricsEnabled, setMetricsEnabled] = useState(false)
 
   useEffect(() => {
     // Check if already in standalone mode (installed)
@@ -81,6 +83,12 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
       window.removeEventListener("appinstalled", handleAppInstalled)
     }
+  }, [])
+
+  useEffect(() => {
+    import("@/lib/system-settings").then((mod) => {
+      mod.getSystemSetting("metrics_enabled").then(setMetricsEnabled)
+    })
   }, [])
 
   const handleInstall = async () => {
@@ -144,193 +152,201 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
   const onlineCount = Math.min(members.length, Math.ceil(members.length * 0.6))
 
   return (
-    <div className="shrink-0 h-14 md:h-16 border-b border-border/30 px-3 md:px-4 flex items-center justify-between bg-black/30 backdrop-blur-xl">
-      <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
-        {/* Group Avatar */}
-        <Avatar className="w-9 h-9 md:w-10 md:h-10 rounded-xl ring-2 ring-background shadow-md shrink-0">
-          {group.avatar_url ? (
-            <AvatarImage
-              src={group.avatar_url || "/placeholder.svg"}
-              alt={group.name}
-              className="rounded-xl object-cover"
-            />
-          ) : null}
-          <AvatarFallback
-            className={cn("rounded-xl bg-gradient-to-br text-white font-bold text-sm md:text-base", getGroupColor())}
-          >
-            {getGroupInitials()}
-          </AvatarFallback>
-        </Avatar>
+    <div className="shrink-0 border-b border-border/30 bg-black/30 backdrop-blur-xl">
+      <div className="h-14 md:h-16 px-3 md:px-4 flex items-center justify-between">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+          {/* Group Avatar */}
+          <Avatar className="w-9 h-9 md:w-10 md:h-10 rounded-xl ring-2 ring-background shadow-md shrink-0">
+            {group.avatar_url ? (
+              <AvatarImage
+                src={group.avatar_url || "/placeholder.svg"}
+                alt={group.name}
+                className="rounded-xl object-cover"
+              />
+            ) : null}
+            <AvatarFallback
+              className={cn("rounded-xl bg-gradient-to-br text-white font-bold text-sm md:text-base", getGroupColor())}
+            >
+              {getGroupInitials()}
+            </AvatarFallback>
+          </Avatar>
 
-        {/* Group Info */}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h1 className="font-bold text-sm md:text-base truncate">{group.name}</h1>
-            {group.cell_category && (
-              <span
-                className={cn(
-                  "text-[9px] md:text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0",
-                  group.cell_category === "project"
-                    ? "bg-blue-500/20 text-blue-300"
-                    : "bg-purple-500/20 text-purple-300",
-                )}
-              >
-                {group.cell_category === "project" ? "مشروع" : "حوار"}
-              </span>
-            )}
-          </div>
-          <p className="text-[10px] md:text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
-            <span>{members.length} أعضاء</span>
-            <span className="text-muted-foreground/50">•</span>
-            <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              {onlineCount} متصل
-            </span>
-            {group.responsibility_score !== undefined && group.responsibility_score < 75 && (
-              <>
-                <span className="text-muted-foreground/50">•</span>
+          {/* Group Info */}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h1 className="font-bold text-sm md:text-base truncate">{group.name}</h1>
+              {group.cell_category && (
                 <span
                   className={cn(
-                    "flex items-center gap-1",
-                    group.responsibility_score < 60 ? "text-red-400" : "text-yellow-400",
+                    "text-[9px] md:text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0",
+                    group.cell_category === "project"
+                      ? "bg-blue-500/20 text-blue-300"
+                      : "bg-purple-500/20 text-purple-300",
                   )}
                 >
-                  ⚠ {group.responsibility_score}%
+                  {group.cell_category === "project" ? "مشروع" : "حوار"}
                 </span>
-              </>
-            )}
-          </p>
+              )}
+            </div>
+            <p className="text-[10px] md:text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+              <span>{members.length} أعضاء</span>
+              <span className="text-muted-foreground/50">•</span>
+              <span className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                {onlineCount} متصل
+              </span>
+              {group.responsibility_score !== undefined && group.responsibility_score < 75 && (
+                <>
+                  <span className="text-muted-foreground/50">•</span>
+                  <span
+                    className={cn(
+                      "flex items-center gap-1",
+                      group.responsibility_score < 60 ? "text-red-400" : "text-yellow-400",
+                    )}
+                  >
+                    ⚠ {group.responsibility_score}%
+                  </span>
+                </>
+              )}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0">
+          {canInstall && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 rounded-xl"
+              onClick={handleInstall}
+              title="تثبيت التطبيق"
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+          )}
+
+          {/* Members Sheet */}
+          <Sheet open={isMembersOpen} onOpenChange={setIsMembersOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" title="الأعضاء">
+                <Users className="h-4 w-4" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-[85vw] max-w-sm p-0">
+              <SheetHeader className="p-4 border-b">
+                <SheetTitle>أعضاء المجموعة</SheetTitle>
+                <SheetDescription>
+                  {members.length} من {group.max_members} عضو
+                </SheetDescription>
+              </SheetHeader>
+              <ScrollArea className="h-[calc(100dvh-180px)]">
+                <div className="p-3 space-y-1">
+                  {members.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">لا يوجد أعضاء</p>
+                  ) : (
+                    members.map((member) => (
+                      <div
+                        key={member.id}
+                        className="flex items-center gap-3 p-3 rounded-xl hover:bg-secondary transition-colors"
+                      >
+                        <Avatar className="h-10 w-10 ring-2 ring-background">
+                          {member.profile?.avatar_url && (
+                            <AvatarImage src={member.profile.avatar_url || "/placeholder.svg"} />
+                          )}
+                          <AvatarFallback className="bg-primary/20 text-primary font-semibold">
+                            {member.profile?.display_name?.charAt(0) || "؟"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{member.profile?.display_name || "مستخدم"}</p>
+                          <p className="text-xs text-muted-foreground">{member.role === "admin" ? "مسؤول" : "عضو"}</p>
+                        </div>
+                        {member.user_id === currentUserId && (
+                          <span className="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full shrink-0">
+                            أنت
+                          </span>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+
+              {members.length < group.max_members && (
+                <div className="p-4 border-t">
+                  <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="w-full rounded-xl h-11">
+                        <UserPlus className="w-4 h-4 ml-2" />
+                        دعوة أعضاء جدد
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>دعوة أعضاء جدد</DialogTitle>
+                        <DialogDescription>شارك رابط الدعوة مع أصدقائك للانضمام للمجموعة</DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 mt-4">
+                        <div className="space-y-2">
+                          <Label>رابط الدعوة</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              value={inviteLink}
+                              readOnly
+                              className="bg-background text-xs md:text-sm rounded-xl flex-1"
+                              dir="ltr"
+                            />
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={copyInviteLink}
+                              className="rounded-xl bg-transparent shrink-0"
+                            >
+                              {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              )}
+            </SheetContent>
+          </Sheet>
+
+          {/* More Options */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" title="المزيد">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48">
+              <DropdownMenuItem asChild>
+                <Link href={`/chat/${group.id}/settings`} className="flex items-center cursor-pointer">
+                  <Settings className="h-4 w-4 ml-2" />
+                  إعدادات المجموعة
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive cursor-pointer"
+                onClick={handleLeaveGroup}
+                disabled={isLeaving}
+              >
+                <LogOut className="h-4 w-4 ml-2" />
+                {isLeaving ? "جاري المغادرة..." : "مغادرة المجموعة"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      <div className="flex items-center gap-1 shrink-0">
-        {canInstall && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 rounded-xl"
-            onClick={handleInstall}
-            title="تثبيت التطبيق"
-          >
-            <Download className="h-4 w-4" />
-          </Button>
-        )}
-
-        {/* Members Sheet */}
-        <Sheet open={isMembersOpen} onOpenChange={setIsMembersOpen}>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" title="الأعضاء">
-              <Users className="h-4 w-4" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-[85vw] max-w-sm p-0">
-            <SheetHeader className="p-4 border-b">
-              <SheetTitle>أعضاء المجموعة</SheetTitle>
-              <SheetDescription>
-                {members.length} من {group.max_members} عضو
-              </SheetDescription>
-            </SheetHeader>
-            <ScrollArea className="h-[calc(100dvh-180px)]">
-              <div className="p-3 space-y-1">
-                {members.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">لا يوجد أعضاء</p>
-                ) : (
-                  members.map((member) => (
-                    <div
-                      key={member.id}
-                      className="flex items-center gap-3 p-3 rounded-xl hover:bg-secondary transition-colors"
-                    >
-                      <Avatar className="h-10 w-10 ring-2 ring-background">
-                        {member.profile?.avatar_url && (
-                          <AvatarImage src={member.profile.avatar_url || "/placeholder.svg"} />
-                        )}
-                        <AvatarFallback className="bg-primary/20 text-primary font-semibold">
-                          {member.profile?.display_name?.charAt(0) || "؟"}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{member.profile?.display_name || "مستخدم"}</p>
-                        <p className="text-xs text-muted-foreground">{member.role === "admin" ? "مسؤول" : "عضو"}</p>
-                      </div>
-                      {member.user_id === currentUserId && (
-                        <span className="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full shrink-0">
-                          أنت
-                        </span>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </ScrollArea>
-
-            {members.length < group.max_members && (
-              <div className="p-4 border-t">
-                <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="w-full rounded-xl h-11">
-                      <UserPlus className="w-4 h-4 ml-2" />
-                      دعوة أعضاء جدد
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>دعوة أعضاء جدد</DialogTitle>
-                      <DialogDescription>شارك رابط الدعوة مع أصدقائك للانضمام للمجموعة</DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 mt-4">
-                      <div className="space-y-2">
-                        <Label>رابط الدعوة</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            value={inviteLink}
-                            readOnly
-                            className="bg-background text-xs md:text-sm rounded-xl flex-1"
-                            dir="ltr"
-                          />
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={copyInviteLink}
-                            className="rounded-xl bg-transparent shrink-0"
-                          >
-                            {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            )}
-          </SheetContent>
-        </Sheet>
-
-        {/* More Options */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" title="المزيد">
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-48">
-            <DropdownMenuItem asChild>
-              <Link href={`/chat/${group.id}/settings`} className="flex items-center cursor-pointer">
-                <Settings className="h-4 w-4 ml-2" />
-                إعدادات المجموعة
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive cursor-pointer"
-              onClick={handleLeaveGroup}
-              disabled={isLeaving}
-            >
-              <LogOut className="h-4 w-4 ml-2" />
-              {isLeaving ? "جاري المغادرة..." : "مغادرة المجموعة"}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      {metricsEnabled && (
+        <div className="px-3 md:px-4 pb-3">
+          <GroupMetricsDisplay group={group} />
+        </div>
+      )}
     </div>
   )
 }

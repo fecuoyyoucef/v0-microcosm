@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -37,7 +37,6 @@ import type {
   BackgroundStyle,
   CellCategory,
 } from "@/lib/types"
-import { GroupMetricsDisplay } from "./group-metrics-display"
 
 interface GroupSettingsFormProps {
   group: Group
@@ -53,6 +52,7 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
   const [backgroundStyle, setBackgroundStyle] = useState<BackgroundStyle>(group.background_style || "neural_mesh")
   const [cellCategory, setCellCategory] = useState<CellCategory>(group.cell_category || "discussion")
   const [goal, setGoal] = useState(group.goal || "")
+  const [classificationEnabled, setClassificationEnabled] = useState(false)
   const [settings, setSettings] = useState<GroupSettings>(
     group.settings || {
       upper_layer_permission: "admin_only",
@@ -70,6 +70,12 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
   const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    import("@/lib/system-settings").then((mod) => {
+      mod.getSystemSetting("cell_classification_enabled").then(setClassificationEnabled)
+    })
+  }, [])
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -293,7 +299,7 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
 
   return (
     <div className="flex-1 bg-background/95 backdrop-blur-sm overflow-auto">
-      <div className="max-w-3xl mx-auto p-4 md:p-6 space-y-6 pb-20">
+      <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6 pb-20">
         {/* Header */}
         <div className="flex items-center gap-4">
           <Link href={`/chat/${group.id}`}>
@@ -307,10 +313,8 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
           </div>
         </div>
 
-        {isAdmin && <GroupMetricsDisplay group={group} />}
-
-        <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 h-auto">
+        <Tabs defaultValue="general" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-5 h-auto p-1">
             <TabsTrigger value="general" className="text-xs md:text-sm py-2">
               <Settings className="w-4 h-4 md:ml-2" />
               <span className="hidden md:inline">عام</span>
@@ -334,55 +338,66 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
           </TabsList>
 
           {/* General Tab */}
-          <TabsContent value="general" className="space-y-4 mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="w-5 h-5" />
-                  تصنيف الخلية
-                </CardTitle>
-                <CardDescription>نوع وهدف الخلية</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>نوع الخلية</Label>
-                  <RadioGroup
-                    value={cellCategory}
-                    onValueChange={(value) => setCellCategory(value as CellCategory)}
-                    disabled={!isAdmin}
-                    className="space-y-3"
-                  >
-                    <div className="flex items-center space-x-2 space-x-reverse">
-                      <RadioGroupItem value="project" id="project-cat" />
-                      <Label htmlFor="project-cat" className="font-normal cursor-pointer">
-                        خلية مشروع (يتم قياس معيار التقدم)
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2 space-x-reverse">
-                      <RadioGroupItem value="discussion" id="discussion-cat" />
-                      <Label htmlFor="discussion-cat" className="font-normal cursor-pointer">
-                        خلية حوار (معيار المسؤولية فقط)
-                      </Label>
-                    </div>
-                  </RadioGroup>
-                </div>
+          <TabsContent value="general" className="space-y-6">
+            {classificationEnabled && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Activity className="h-5 w-5" />
+                    <CardTitle>تصنيف الخلية</CardTitle>
+                  </div>
+                  <CardDescription>نوع وهدف الخلية</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>نوع الخلية</Label>
+                    <RadioGroup
+                      value={cellCategory}
+                      onValueChange={(value) => setCellCategory(value as CellCategory)}
+                      disabled={!isAdmin}
+                      className="space-y-3"
+                    >
+                      <div className="flex items-start space-x-2 space-x-reverse border rounded-lg p-3">
+                        <RadioGroupItem value="project" id="edit-project" className="mt-1" />
+                        <div className="flex-1 space-y-1">
+                          <Label htmlFor="edit-project" className="font-semibold cursor-pointer">
+                            خلية مشروع
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            للعمل على مشروع محدد بأهداف واضحة وقابلة للقياس
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-start space-x-2 space-x-reverse border rounded-lg p-3">
+                        <RadioGroupItem value="discussion" id="edit-discussion" className="mt-1" />
+                        <div className="flex-1 space-y-1">
+                          <Label htmlFor="edit-discussion" className="font-semibold cursor-pointer">
+                            خلية حوار
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            لتبادل الأفكار والخبرات والنقاش حول موضوع معين
+                          </p>
+                        </div>
+                      </div>
+                    </RadioGroup>
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="goal">{cellCategory === "project" ? "هدف المشروع" : "موضوع الحوار"}</Label>
-                  <Textarea
-                    id="goal"
-                    value={goal}
-                    onChange={(e) => setGoal(e.target.value)}
-                    disabled={!isAdmin}
-                    rows={3}
-                    className="resize-none"
-                    placeholder={
-                      cellCategory === "project" ? "اشرح الهدف الرئيسي من المشروع" : "اشرح الموضوع الرئيسي للحوار"
-                    }
-                  />
-                </div>
-              </CardContent>
-            </Card>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-goal">
+                      {cellCategory === "project" ? "ما هو المشروع؟" : "ما هو موضوع الحوار؟"}
+                    </Label>
+                    <Textarea
+                      id="edit-goal"
+                      value={goal}
+                      onChange={(e) => setGoal(e.target.value)}
+                      disabled={!isAdmin}
+                      rows={3}
+                      className="resize-none"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardHeader>

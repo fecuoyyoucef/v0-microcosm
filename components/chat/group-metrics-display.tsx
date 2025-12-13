@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { AlertCircle, TrendingUp, Activity } from "lucide-react"
@@ -13,9 +13,17 @@ interface GroupMetricsDisplayProps {
 }
 
 export function GroupMetricsDisplay({ group, className }: GroupMetricsDisplayProps) {
+  const [metricsEnabled, setMetricsEnabled] = useState(false)
+
   const isProject = group.cell_category === "project"
   const responsibilityScore = group.responsibility_score ?? 100
   const progressScore = group.progress_score ?? 0
+
+  useEffect(() => {
+    import("@/lib/system-settings").then((mod) => {
+      mod.getSystemSetting("metrics_enabled").then(setMetricsEnabled)
+    })
+  }, [])
 
   const responsibilityStatus = useMemo(() => {
     if (responsibilityScore >= 75) return { label: "ممتاز", color: "text-green-500", bg: "bg-green-500/10" }
@@ -30,6 +38,10 @@ export function GroupMetricsDisplay({ group, className }: GroupMetricsDisplayPro
     if (progressScore >= 25) return { label: "بطيء", color: "text-yellow-500" }
     return { label: "راكد", color: "text-red-500" }
   }, [progressScore])
+
+  if (!metricsEnabled) {
+    return null
+  }
 
   if (!isProject && responsibilityScore >= 75) {
     // Don't show metrics for discussion cells with good responsibility
