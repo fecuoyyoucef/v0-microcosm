@@ -50,6 +50,7 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
   const [isMembersOpen, setIsMembersOpen] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [canInstall, setCanInstall] = useState(false)
+  const [selectedMetric, setSelectedMetric] = useState<"responsibility" | "progress" | null>(null)
   const router = useRouter()
   const supabase = createClient()
   const [metricsEnabled, setMetricsEnabled] = useState(false)
@@ -154,6 +155,14 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
 
   const onlineCount = Math.min(members.length, Math.ceil(members.length * 0.6))
 
+  const getMetricColor = (val: number) => {
+    if (val > 90) return "bg-blue-500/20 border-blue-500/30"
+    if (val >= 75) return "bg-green-500/20 border-green-500/30"
+    if (val >= 50) return "bg-yellow-500/20 border-yellow-500/30"
+    if (val >= 25) return "bg-orange-500/20 border-orange-500/30"
+    return "bg-red-500/20 border-red-500/30"
+  }
+
   return (
     <div className="shrink-0 border-b border-border/30 bg-black/30 backdrop-blur-xl">
       <div className="h-14 md:h-16 px-3 md:px-4 flex items-center justify-between">
@@ -176,7 +185,7 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
 
           {/* Group Info */}
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h1 className="font-bold text-sm md:text-base truncate">{group.name}</h1>
               {group.cell_category && (
                 <span
@@ -191,10 +200,20 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
                 </span>
               )}
               {metricsEnabled && (
-                <div className="flex gap-1 ml-2">
-                  <MetricCard label="المسؤولية" value={group.responsibility_score ?? 100} size="sm" />
+                <div className="flex gap-1">
+                  <MetricCard
+                    label="المسؤولية"
+                    value={group.responsibility_score ?? 100}
+                    size="sm"
+                    onClick={() => setSelectedMetric("responsibility")}
+                  />
                   {group.cell_category === "project" && (
-                    <MetricCard label="التقدم" value={group.progress_score ?? 0} size="sm" />
+                    <MetricCard
+                      label="التقدم"
+                      value={group.progress_score ?? 0}
+                      size="sm"
+                      onClick={() => setSelectedMetric("progress")}
+                    />
                   )}
                 </div>
               )}
@@ -222,6 +241,52 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
             </p>
           </div>
         </div>
+
+        {/* Metric Details Modal */}
+        {selectedMetric && (
+          <Dialog open={!!selectedMetric} onOpenChange={(open) => !open && setSelectedMetric(null)}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>{selectedMetric === "responsibility" ? "معيار المسؤولية" : "معيار التقدم"}</DialogTitle>
+              </DialogHeader>
+              <div
+                className={cn(
+                  "p-6 rounded-xl border space-y-4",
+                  getMetricColor(
+                    selectedMetric === "responsibility"
+                      ? (group.responsibility_score ?? 100)
+                      : (group.progress_score ?? 0),
+                  ),
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">النسبة المئوية</span>
+                  <span className="text-3xl font-bold">
+                    {selectedMetric === "responsibility"
+                      ? (group.responsibility_score ?? 100)
+                      : (group.progress_score ?? 0)}
+                    %
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <div className="w-full bg-black/30 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 transition-all"
+                      style={{
+                        width: `${selectedMetric === "responsibility" ? (group.responsibility_score ?? 100) : (group.progress_score ?? 0)}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {selectedMetric === "responsibility"
+                    ? "يحسب بناءً على النشاط والعقود والقرارات المتخذة"
+                    : "يحسب بناءً على القرارات المتخذة والعقود المكتملة والمهام المنجزة"}
+                </p>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
 
         <div className="flex items-center gap-1 shrink-0">
           {canInstall && (

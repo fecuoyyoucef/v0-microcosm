@@ -6,9 +6,10 @@ interface MetricCardProps {
   label: string
   value: number
   size?: "sm" | "md"
+  onClick?: () => void
 }
 
-export function MetricCard({ label, value, size = "sm" }: MetricCardProps) {
+export function MetricCard({ label, value, size = "sm", onClick }: MetricCardProps) {
   const getMetricColor = (val: number) => {
     if (val > 90) return "bg-blue-500/30 border-blue-500/50 text-blue-300"
     if (val >= 75) return "bg-green-500/30 border-green-500/50 text-green-300"
@@ -19,14 +20,23 @@ export function MetricCard({ label, value, size = "sm" }: MetricCardProps) {
 
   return (
     <div
+      onClick={onClick}
       className={cn(
-        "border rounded-lg backdrop-blur-sm flex flex-col items-center justify-center font-medium",
+        "border rounded-lg backdrop-blur-sm flex flex-col items-center justify-center font-medium transition-all",
         getMetricColor(value),
-        size === "sm" ? "px-2.5 py-1.5 text-[10px] gap-0.5" : "px-4 py-3 text-sm gap-1",
+        size === "sm"
+          ? "px-3 py-2 text-[11px] gap-0.5 min-w-[60px] cursor-pointer hover:opacity-80"
+          : "px-4 py-3 text-sm gap-1",
       )}
     >
-      <div className={cn("font-bold", size === "sm" ? "text-sm" : "text-2xl")}>{value}%</div>
-      <div className={cn(size === "sm" ? "text-[9px]" : "text-xs")}>{label}</div>
+      {size === "sm" ? (
+        <div className="text-[11px] font-semibold">{label}</div>
+      ) : (
+        <>
+          <div className={cn("font-bold", size === "md" ? "text-2xl" : "text-lg")}>{value}%</div>
+          <div className="text-xs">{label}</div>
+        </>
+      )}
     </div>
   )
 }
