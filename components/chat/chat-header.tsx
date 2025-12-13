@@ -252,11 +252,9 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
               <div
                 className={cn(
                   "p-6 rounded-xl border space-y-4",
-                  getMetricColor(
-                    selectedMetric === "responsibility"
-                      ? (group.responsibility_score ?? 100)
-                      : (group.progress_score ?? 0),
-                  ),
+                  selectedMetric === "responsibility"
+                    ? "bg-blue-500/20 border-blue-500/30"
+                    : "bg-green-500/20 border-green-500/30",
                 )}
               >
                 <div className="flex items-center justify-between">

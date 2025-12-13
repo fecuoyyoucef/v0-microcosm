@@ -22,15 +22,13 @@ export function MetricCard({ label, value, size = "sm", onClick }: MetricCardPro
     <div
       onClick={onClick}
       className={cn(
-        "border rounded-lg backdrop-blur-sm flex flex-col items-center justify-center font-medium transition-all",
+        "border rounded-lg backdrop-blur-sm flex items-center justify-center font-medium transition-all",
         getMetricColor(value),
-        size === "sm"
-          ? "px-3 py-2 text-[11px] gap-0.5 min-w-[60px] cursor-pointer hover:opacity-80"
-          : "px-4 py-3 text-sm gap-1",
+        size === "sm" ? "px-2 py-1 text-[9px] min-w-fit cursor-pointer hover:opacity-80" : "px-4 py-3 text-sm gap-1",
       )}
     >
       {size === "sm" ? (
-        <div className="text-[11px] font-semibold">{label}</div>
+        <div className="text-[9px] font-semibold whitespace-nowrap">{label}</div>
       ) : (
         <>
           <div className={cn("font-bold", size === "md" ? "text-2xl" : "text-lg")}>{value}%</div>
