@@ -46,7 +46,7 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex flex-col items-center gap-3 mb-4">
             <Image
-              src="/icons/icon-96x96.png"
+              src="/icons/app-logo.jpg"
               alt="Synaptic Space"
               width={72}
               height={72}

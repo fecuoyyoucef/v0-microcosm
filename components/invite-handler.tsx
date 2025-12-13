@@ -5,8 +5,9 @@ import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { MessageSquare, Users, Loader2 } from "lucide-react"
+import { Users, Loader2 } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 import type { Group } from "@/lib/types"
 
 interface InviteHandlerProps {
@@ -74,8 +75,14 @@ export function InviteHandler({ group, isLoggedIn }: InviteHandlerProps) {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2 mb-4">
-            <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
-              <MessageSquare className="w-6 h-6 text-primary-foreground" />
+            <div className="w-12 h-12 rounded-xl overflow-hidden">
+              <Image
+                src="/icons/app-logo.jpg"
+                alt="Synaptic Space"
+                width={48}
+                height={48}
+                className="w-full h-full object-cover"
+              />
             </div>
           </Link>
         </div>

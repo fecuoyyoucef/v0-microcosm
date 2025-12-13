@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { MessageSquare, Map, BookOpen, Brain, Users, Layers, Sparkles } from "lucide-react"
+import { Map, BookOpen, Brain, Layers, Sparkles } from "lucide-react"
+import Image from "next/image"
 
 export default function HomePage() {
   return (
@@ -10,8 +11,14 @@ export default function HomePage() {
         <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-transparent to-transparent" />
         <nav className="relative z-10 flex items-center justify-between px-6 py-4 max-w-7xl mx-auto">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-              <MessageSquare className="w-5 h-5 text-primary-foreground" />
+            <div className="w-10 h-10 rounded-xl overflow-hidden">
+              <Image
+                src="/icons/app-logo.jpg"
+                alt="Synaptic Space Logo"
+                width={40}
+                height={40}
+                className="w-full h-full object-cover"
+              />
             </div>
             <span className="text-xl font-bold">محادثات</span>
           </div>
@@ -138,8 +145,14 @@ export default function HomePage() {
       {/* Groups Section */}
       <section className="py-24 px-6 bg-card/50">
         <div className="max-w-7xl mx-auto text-center">
-          <div className="w-20 h-20 rounded-2xl bg-primary/20 flex items-center justify-center mx-auto mb-8">
-            <Users className="w-10 h-10 text-primary" />
+          <div className="w-20 h-20 rounded-2xl overflow-hidden mx-auto mb-8">
+            <Image
+              src="/icons/app-logo.jpg"
+              alt="Synaptic Space Logo"
+              width={80}
+              height={80}
+              className="w-full h-full object-cover"
+            />
           </div>
           <h2 className="text-3xl md:text-4xl font-bold mb-4">مصمم للمجموعات الصغيرة</h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-10">
@@ -157,8 +170,14 @@ export default function HomePage() {
       <footer className="py-8 px-6 border-t border-border">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <MessageSquare className="w-4 h-4 text-primary-foreground" />
+            <div className="w-8 h-8 rounded-lg overflow-hidden">
+              <Image
+                src="/icons/app-logo.jpg"
+                alt="Synaptic Space Logo"
+                width={32}
+                height={32}
+                className="w-full h-full object-cover"
+              />
             </div>
             <span className="font-bold">محادثات</span>
           </div>
