@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
@@ -35,11 +34,12 @@ export function CreateGroupDialog() {
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
 
-  useState(() => {
+  useEffect(() => {
     getSystemSetting("cell_classification_enabled").then((enabled) => {
       setClassificationEnabled(enabled)
+      console.log("[v0] Cell classification enabled:", enabled)
     })
-  })
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

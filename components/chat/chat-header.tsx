@@ -87,7 +87,10 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
 
   useEffect(() => {
     import("@/lib/system-settings").then((mod) => {
-      mod.getSystemSetting("metrics_enabled").then(setMetricsEnabled)
+      mod.getSystemSetting("cell_metrics_enabled").then((enabled) => {
+        setMetricsEnabled(enabled)
+        console.log("[v0] Cell metrics enabled:", enabled)
+      })
     })
   }, [])
 

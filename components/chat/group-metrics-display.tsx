@@ -21,7 +21,10 @@ export function GroupMetricsDisplay({ group, className }: GroupMetricsDisplayPro
 
   useEffect(() => {
     import("@/lib/system-settings").then((mod) => {
-      mod.getSystemSetting("metrics_enabled").then(setMetricsEnabled)
+      mod.getSystemSetting("cell_metrics_enabled").then((enabled) => {
+        setMetricsEnabled(enabled)
+        console.log("[v0] Metrics enabled in display:", enabled)
+      })
     })
   }, [])
 
