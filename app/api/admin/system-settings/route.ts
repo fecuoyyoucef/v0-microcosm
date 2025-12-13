@@ -1,17 +1,25 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
-import { getAllSystemSettings, setSystemSetting } from "@/lib/system-settings"
+import { getAllSystemSettings, setSystemSetting, getSystemSetting } from "@/lib/system-settings-server"
 
-// GET - جلب جميع الإعدادات
-export async function GET() {
+// GET - جلب الإعدادات (جميعها أو إعداد واحد)
+export async function GET(request: NextRequest) {
   const cookieStore = await cookies()
   const adminToken = cookieStore.get("admin_session")
 
-  if (!adminToken) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const { searchParams } = new URL(request.url)
+  const key = searchParams.get("key")
 
   try {
+    if (key) {
+      const value = await getSystemSetting(key as any)
+      return NextResponse.json({ value })
+    }
+
+    if (!adminToken) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const settings = await getAllSystemSettings()
     return NextResponse.json({ settings })
   } catch {
