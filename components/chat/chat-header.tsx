@@ -54,6 +54,7 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
   const router = useRouter()
   const supabase = createClient()
   const [metricsEnabled, setMetricsEnabled] = useState(false)
+  const [classificationEnabled, setClassificationEnabled] = useState(false)
 
   useEffect(() => {
     // Check if already in standalone mode (installed)
@@ -91,6 +92,10 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
       mod.getSystemSetting("cell_metrics_enabled").then((enabled) => {
         setMetricsEnabled(enabled)
         console.log("[v0] Cell metrics enabled:", enabled)
+      })
+      mod.getSystemSetting("cell_classification_enabled").then((enabled) => {
+        setClassificationEnabled(enabled)
+        console.log("[v0] Cell classification enabled:", enabled)
       })
     })
   }, [])
@@ -187,7 +192,7 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="font-bold text-sm md:text-base truncate">{group.name}</h1>
-              {group.cell_category && (
+              {classificationEnabled && group.cell_category && (
                 <span
                   className={cn(
                     "text-[9px] md:text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0",
