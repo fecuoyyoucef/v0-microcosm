@@ -283,6 +283,8 @@ export default function AdminDashboard() {
   const handleToggleSystemSetting = async (key: string, currentValue: boolean) => {
     setUpdatingSettings(key)
     try {
+      console.log("[v0] Toggling setting:", key, "from", currentValue, "to", !currentValue)
+
       const res = await fetch("/api/admin/system-settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -290,6 +292,9 @@ export default function AdminDashboard() {
       })
 
       if (res.ok) {
+        const result = await res.json()
+        console.log("[v0] Update result:", result)
+
         setSystemSettings((prev) => ({
           ...prev,
           [key]: {
@@ -298,10 +303,15 @@ export default function AdminDashboard() {
             updated_at: new Date().toISOString(),
           },
         }))
+
+        alert("تم تحديث الإعداد بنجاح")
       } else {
+        const error = await res.text()
+        console.error("[v0] Update failed:", error)
         alert("فشل تحديث الإعداد")
       }
-    } catch {
+    } catch (err) {
+      console.error("[v0] Error:", err)
       alert("حدث خطأ")
     } finally {
       setUpdatingSettings(null)
@@ -899,7 +909,7 @@ export default function AdminDashboard() {
           <Card className="bg-slate-800/50 border-slate-700">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-green-400" />
+                <MessageSquare className="w-6 h-6 text-green-400" />
                 آخر الرسائل
               </CardTitle>
             </CardHeader>

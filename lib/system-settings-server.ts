@@ -65,7 +65,7 @@ export async function setSystemSetting(key: SystemSettingKey, value: any, adminI
     const { error } = await supabase.from("system_settings").upsert(
       {
         key,
-        value: JSON.stringify(value),
+        value: value, // تخزين مباشر
         updated_by: adminId,
         updated_at: new Date().toISOString(),
       },
