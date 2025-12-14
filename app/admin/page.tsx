@@ -7,8 +7,8 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { WeeklyInsightsPanel } from "@/components/admin/weekly-insights-panel"
-import { getAllFeatures, updateFeatureStatus } from "@/lib/feature-registry"
 import { WeeklySuggestionsPanel } from "@/components/admin/weekly-suggestions-panel"
+import { toast } from "react-toastify"
 import {
   Users,
   MessageSquare,
@@ -39,6 +39,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { AIAssistantPanel } from "@/components/admin/ai-assistant-panel"
+import type { Feature } from "@/lib/feature-registry"
 
 interface Stats {
   users: number
@@ -106,7 +107,7 @@ export default function AdminDashboard() {
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({})
   const [updatingSettings, setUpdatingSettings] = useState<string | null>(null)
 
-  const [features, setFeatures] = useState<any[]>([])
+  const [features, setFeatures] = useState<Feature[]>([])
   const [syncingFeatures, setSyncingFeatures] = useState(false)
 
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -161,14 +162,17 @@ export default function AdminDashboard() {
     }
   }, [])
 
-  const fetchFeatures = useCallback(async () => {
+  const fetchFeatures = async () => {
     try {
-      const allFeatures = await getAllFeatures()
-      setFeatures(allFeatures)
+      const response = await fetch("/api/admin/features")
+      if (response.ok) {
+        const data = await response.json()
+        setFeatures(data.features || [])
+      }
     } catch (error) {
-      console.error("Features fetch error:", error)
+      console.error("Error fetching features:", error)
     }
-  }, [])
+  }
 
   const handleLogout = async () => {
     await fetch("/api/admin/logout", { method: "POST" })
@@ -333,31 +337,42 @@ export default function AdminDashboard() {
   const handleSyncFeatures = async () => {
     setSyncingFeatures(true)
     try {
-      const res = await fetch("/api/admin/features/sync", {
-        method: "POST",
+      const response = await fetch("/api/admin/features", {
+        method: "PUT",
       })
-      if (res.ok) {
-        const data = await res.json()
-        alert(data.message)
+
+      if (response.ok) {
+        const data = await response.json()
         await fetchFeatures()
+        toast.success(`تمت المزامنة: ${data.added} ميزة جديدة، ${data.updated} محدثة`)
       } else {
-        alert("فشلت المزامنة")
+        toast.error("فشلت المزامنة")
       }
     } catch (error) {
-      console.error("Sync error:", error)
-      alert("حدث خطأ")
+      console.error("Error syncing features:", error)
+      toast.error("حدث خطأ أثناء المزامنة")
     } finally {
       setSyncingFeatures(false)
     }
   }
 
   const handleToggleFeature = async (featureKey: string, currentValue: boolean) => {
-    const success = await updateFeatureStatus(featureKey, !currentValue)
-    if (success) {
-      await fetchFeatures()
-      alert("تم تحديث الميزة بنجاح")
-    } else {
-      alert("فشل تحديث الميزة")
+    try {
+      const response = await fetch("/api/admin/features", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ feature_key: featureKey, is_enabled: !currentValue }),
+      })
+
+      if (response.ok) {
+        await fetchFeatures() // إعادة جلب الميزات بعد التحديث
+        toast.success(!currentValue ? "تم تفعيل الميزة" : "تم تعطيل الميزة")
+      } else {
+        toast.error("فشل تحديث الميزة")
+      }
+    } catch (error) {
+      console.error("Error updating feature:", error)
+      toast.error("حدث خطأ أثناء التحديث")
     }
   }
 
@@ -366,7 +381,7 @@ export default function AdminDashboard() {
     fetchDevNotes()
     fetchSystemSettings()
     fetchFeatures()
-  }, [fetchStats, fetchDevNotes, fetchSystemSettings, fetchFeatures])
+  }, [fetchStats, fetchDevNotes, fetchSystemSettings])
 
   const statusColors = {
     pending: "bg-yellow-500/20 text-yellow-400",

@@ -1,0 +1,83 @@
+import { createClient } from "@/lib/supabase/server"
+import { FEATURE_DEFINITIONS, type Feature } from "./feature-registry"
+
+export async function getAllFeatures(): Promise<Feature[]> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from("feature_registry")
+    .select("*")
+    .order("category", { ascending: true })
+    .order("feature_name", { ascending: true })
+
+  if (error) {
+    console.error("[Feature Registry] Error fetching features:", error)
+    return []
+  }
+
+  return data || []
+}
+
+export async function syncFeatures(): Promise<{ added: number; updated: number }> {
+  const supabase = await createClient()
+  let added = 0
+  let updated = 0
+
+  for (const feature of FEATURE_DEFINITIONS) {
+    const { data: existing } = await supabase
+      .from("feature_registry")
+      .select("*")
+      .eq("feature_key", feature.feature_key)
+      .single()
+
+    if (!existing) {
+      const { error } = await supabase.from("feature_registry").insert(feature)
+
+      if (!error) {
+        added++
+        console.log(`[Feature Registry] Added new feature: ${feature.feature_key}`)
+      }
+    } else {
+      if (existing.version !== feature.version || existing.description !== feature.description) {
+        const { error } = await supabase
+          .from("feature_registry")
+          .update({
+            version: feature.version,
+            description: feature.description,
+            description_ar: feature.description_ar,
+          })
+          .eq("feature_key", feature.feature_key)
+
+        if (!error) {
+          updated++
+          console.log(`[Feature Registry] Updated feature: ${feature.feature_key}`)
+        }
+      }
+    }
+  }
+
+  return { added, updated }
+}
+
+export async function updateFeatureStatus(featureKey: string, isEnabled: boolean): Promise<boolean> {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from("feature_registry")
+    .update({ is_enabled: isEnabled, updated_at: new Date().toISOString() })
+    .eq("feature_key", featureKey)
+
+  if (error) {
+    console.error(`[Feature Registry] Error updating ${featureKey}:`, error)
+    return false
+  }
+
+  await supabase.from("system_settings").upsert({
+    key: featureKey,
+    value: { value: isEnabled },
+    description: `Auto-synced from feature registry`,
+    updated_at: new Date().toISOString(),
+  })
+
+  return true
+}
