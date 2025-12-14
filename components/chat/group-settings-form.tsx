@@ -27,6 +27,7 @@ import {
   Palette,
   Activity,
   Trash2,
+  GitBranch,
 } from "lucide-react"
 import Link from "next/link"
 import type {
@@ -38,7 +39,8 @@ import type {
   BackgroundStyle,
   CellCategory,
 } from "@/lib/types"
-import { MetricCard } from "@/components/ui/metric-card" // Assuming MetricCard is imported from this path
+import { MetricCard } from "@/components/ui/metric-card"
+import { CellManagementPanel } from "@/components/chat/cell-management-panel"
 
 interface GroupSettingsFormProps {
   group: Group
@@ -318,7 +320,7 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
         </div>
 
         <Tabs defaultValue="general" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 h-auto p-1">
+          <TabsList className={`grid w-full ${isPrimaryCell && isAdmin ? "grid-cols-6" : "grid-cols-5"} h-auto p-1`}>
             <TabsTrigger value="general" className="text-xs md:text-sm py-2">
               <Settings className="w-4 h-4 md:ml-2" />
               <span className="hidden md:inline">عام</span>
@@ -335,6 +337,12 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
               <Palette className="w-4 h-4 md:ml-2" />
               المظهر
             </TabsTrigger>
+            {isPrimaryCell && isAdmin && (
+              <TabsTrigger value="cells" className="text-xs md:text-sm py-2">
+                <GitBranch className="w-4 h-4 md:ml-2" />
+                <span className="hidden md:inline">الخلايا</span>
+              </TabsTrigger>
+            )}
             <TabsTrigger value="stats" className="text-xs md:text-sm py-2" onClick={loadStatistics}>
               <BarChart3 className="w-4 h-4 md:ml-2" />
               <span className="hidden md:inline">الإحصائيات</span>
@@ -717,7 +725,19 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
             </TabsContent>
           )}
 
-          {/* Stats Tab */}
+          {/* Cells Tab */}
+          {isPrimaryCell && isAdmin && (
+            <TabsContent value="cells">
+              <CellManagementPanel
+                group={group}
+                members={initialMembers}
+                currentUserId={currentUserId}
+                isAdmin={isAdmin}
+              />
+            </TabsContent>
+          )}
+
+          {/* Statistics Tab */}
           <TabsContent value="stats" className="space-y-4 mt-4">
             {isLoadingStats ? (
               <div className="flex items-center justify-center p-12">
