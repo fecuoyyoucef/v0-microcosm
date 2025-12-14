@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Switch } from "@/components/ui/switch"
 import {
   Users,
   MessageSquare,
@@ -24,16 +26,7 @@ import {
   Layers,
   X,
   Settings,
-  Eye,
-  EyeOff,
-  ToggleLeft,
-  ToggleRight,
-  Rocket,
-  Target,
-  Brain,
-  Shield,
   Bug,
-  Sparkles,
   Activity,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -42,7 +35,6 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Label } from "@/components/ui/label"
 import { AIAssistantPanel } from "@/components/admin/ai-assistant-panel"
 
 interface Stats {
@@ -322,6 +314,11 @@ export default function AdminDashboard() {
     }
   }
 
+  const toggleFeature = (key: string) => {
+    const currentValue = systemSettings[key]?.value
+    handleToggleSystemSetting(key, currentValue)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -344,81 +341,6 @@ export default function AdminDashboard() {
     cancelled: X,
   }
 
-  const allFeatureSettings = [
-    {
-      key: "cell_classification_enabled",
-      label: "نظام تصنيف الخلايا",
-      description: "تقسيم الخلايا إلى: خلية مشروع وخلية حوار",
-      icon: Target,
-      color: "text-cyan-400",
-      bgColor: "bg-cyan-500/20",
-      category: "core",
-    },
-    {
-      key: "cell_metrics_enabled",
-      label: "معايير المسؤولية والتقدم",
-      description: "حساب وعرض معيار المسؤولية ومعيار التقدم للخلايا",
-      icon: TrendingUp,
-      color: "text-green-400",
-      bgColor: "bg-green-500/20",
-      category: "core",
-    },
-    {
-      key: "synaptic_matching_enabled",
-      label: "المطابقة المشبكية الذكية",
-      description: "اقتراح خلايا للمستخدمين بناءً على اهتماماتهم",
-      icon: Sparkles,
-      color: "text-amber-400",
-      bgColor: "bg-amber-500/20",
-      category: "ai",
-    },
-    {
-      key: "ai_features_enabled",
-      label: "ميزات الذكاء الاصطناعي",
-      description: "الملخصات الذكية، تحليل الرسائل، المساعد الذكي",
-      icon: Brain,
-      color: "text-purple-400",
-      bgColor: "bg-purple-500/20",
-      category: "ai",
-    },
-    {
-      key: "content_moderation_enabled",
-      label: "فحص المحتوى التلقائي",
-      description: "كشف المحتوى غير اللائق تلقائياً",
-      icon: Shield,
-      color: "text-red-400",
-      bgColor: "bg-red-500/20",
-      category: "safety",
-    },
-    {
-      key: "push_notifications_enabled",
-      label: "الإشعارات الفورية",
-      description: "إرسال إشعارات فورية للمستخدمين",
-      icon: Bell,
-      color: "text-yellow-400",
-      bgColor: "bg-yellow-500/20",
-      category: "notifications",
-    },
-    {
-      key: "user_invites_enabled",
-      label: "دعوات المستخدمين",
-      description: "السماح للمستخدمين بدعوة آخرين",
-      icon: Users,
-      color: "text-blue-400",
-      bgColor: "bg-blue-500/20",
-      category: "social",
-    },
-    {
-      key: "maintenance_mode",
-      label: "وضع الصيانة",
-      description: "إيقاف التطبيق مؤقتاً للصيانة",
-      icon: AlertCircle,
-      color: "text-orange-400",
-      bgColor: "bg-orange-500/20",
-      category: "system",
-    },
-  ]
-
   return (
     <div className="min-h-screen bg-slate-900 text-white" dir="rtl">
       {/* Header */}
@@ -435,159 +357,6 @@ export default function AdminDashboard() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Dialog open={featureSettingsOpen} onOpenChange={setFeatureSettingsOpen}>
-              <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-cyan-400 hover:text-cyan-300 relative">
-                  <Rocket className="w-5 h-5" />
-                  {systemSettings.cell_classification_enabled?.value && (
-                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full" />
-                  )}
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-lg">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <Rocket className="w-5 h-5 text-cyan-400" />
-                    التحكم في الميزات
-                  </DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 mt-4">
-                  <p className="text-sm text-slate-400">تفعيل أو تعطيل الميزات الجديدة قبل نشرها للمستخدمين</p>
-
-                  <div className="space-y-3">
-                    {allFeatureSettings.map((feature) => {
-                      const Icon = feature.icon
-                      const isEnabled = systemSettings[feature.key]?.value === true
-                      const isUpdating = updatingSettings === feature.key
-
-                      return (
-                        <div
-                          key={feature.key}
-                          className={`p-4 rounded-xl border transition-all ${
-                            isEnabled ? "bg-slate-700/50 border-slate-600" : "bg-slate-800/50 border-slate-700"
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex items-start gap-3">
-                              <div
-                                className={`w-10 h-10 rounded-lg ${feature.bgColor} flex items-center justify-center shrink-0`}
-                              >
-                                <Icon className={`w-5 h-5 ${feature.color}`} />
-                              </div>
-                              <div>
-                                <h4 className="font-medium text-white">{feature.label}</h4>
-                                <p className="text-xs text-slate-400 mt-1">{feature.description}</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {isUpdating ? (
-                                <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
-                              ) : (
-                                <button
-                                  onClick={() => handleToggleSystemSetting(feature.key, isEnabled)}
-                                  className="focus:outline-none"
-                                >
-                                  {isEnabled ? (
-                                    <ToggleRight className="w-10 h-10 text-green-500" />
-                                  ) : (
-                                    <ToggleLeft className="w-10 h-10 text-slate-500" />
-                                  )}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                          {isEnabled && (
-                            <div className="mt-2 pt-2 border-t border-slate-600/50">
-                              <span className="text-xs text-green-400 flex items-center gap-1">
-                                <Check className="w-3 h-3" />
-                                مُفعّل
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                    <p className="text-xs text-yellow-400 flex items-start gap-2">
-                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                      تغيير هذه الإعدادات سيؤثر على جميع المستخدمين فوراً. تأكد من اختبار الميزات قبل تفعيلها.
-                    </p>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-              <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white">
-                  <Settings className="w-5 h-5" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="bg-slate-800 border-slate-700 text-white">
-                <DialogHeader>
-                  <DialogTitle>إعدادات الأدمن</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 mt-4">
-                  <div className="space-y-2">
-                    <Label>البريد الإلكتروني للأدمن</Label>
-                    <Input
-                      type="email"
-                      value={newAdminEmail}
-                      onChange={(e) => setNewAdminEmail(e.target.value)}
-                      placeholder="admin@example.com"
-                      className="bg-slate-700 border-slate-600"
-                      dir="ltr"
-                    />
-                    <p className="text-xs text-slate-400">
-                      تغيير البريد سيغير الأدمن ولن يعود الأدمن القديم قادراً على الدخول
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>كلمة المرور الجديدة (اختياري)</Label>
-                    <div className="relative">
-                      <Input
-                        type={showPassword ? "text" : "password"}
-                        value={newAdminPassword}
-                        onChange={(e) => setNewAdminPassword(e.target.value)}
-                        placeholder="اتركها فارغة للإبقاء على الحالية"
-                        className="bg-slate-700 border-slate-600 pl-10"
-                        dir="ltr"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                    <p className="text-xs text-yellow-400">
-                      تحذير: تغيير البريد الإلكتروني سينقل صلاحيات الأدمن للبريد الجديد فقط.
-                    </p>
-                  </div>
-
-                  <Button
-                    onClick={handleUpdateAdminCredentials}
-                    disabled={savingSettings || !newAdminEmail}
-                    className="w-full bg-cyan-600 hover:bg-cyan-700"
-                  >
-                    {savingSettings ? (
-                      <Loader2 className="w-4 h-4 animate-spin ml-2" />
-                    ) : (
-                      <Check className="w-4 h-4 ml-2" />
-                    )}
-                    حفظ التغييرات
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-
             <Button variant="ghost" size="icon" onClick={fetchStats} className="text-slate-400 hover:text-white">
               <RefreshCw className="w-5 h-5" />
             </Button>
@@ -599,27 +368,106 @@ export default function AdminDashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
-        <Card className="bg-gradient-to-r from-cyan-900/30 to-slate-800/50 border-cyan-700/50">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-cyan-500/20 flex items-center justify-center">
-                  <Rocket className="w-6 h-6 text-cyan-400" />
+        {/* Feature Toggles */}
+        <Card className="bg-slate-800/50 border-slate-700">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="w-5 h-5 text-cyan-400" />
+              التحكم في الميزات
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[400px] pr-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-slate-700/50">
+                  <div>
+                    <h4 className="font-medium text-white">تصنيف الخلايا</h4>
+                    <p className="text-xs text-slate-400">تمكين نظام تصنيف الخلايا</p>
+                  </div>
+                  <Switch
+                    checked={systemSettings.cell_classification_enabled?.value}
+                    onCheckedChange={() => toggleFeature("cell_classification_enabled")}
+                  />
                 </div>
-                <div>
-                  <h3 className="font-bold text-white">الميزات الجديدة</h3>
-                  <p className="text-sm text-slate-400">
-                    {systemSettings.cell_classification_enabled?.value
-                      ? "نظام تصنيف الخلايا مُفعّل"
-                      : "نظام تصنيف الخلايا معطّل - جاهز للتحديث القادم"}
-                  </p>
+
+                <div className="flex items-center justify-between p-3 rounded-lg bg-slate-700/50">
+                  <div>
+                    <h4 className="font-medium text-white">معايير الخلايا</h4>
+                    <p className="text-xs text-slate-400">تمكين نظام معايير الانضمام</p>
+                  </div>
+                  <Switch
+                    checked={systemSettings.cell_criteria_enabled?.value}
+                    onCheckedChange={() => toggleFeature("cell_criteria_enabled")}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg bg-slate-700/50">
+                  <div>
+                    <h4 className="font-medium text-white">المطابقة المشبكية</h4>
+                    <p className="text-xs text-slate-400">نظام اقتراح الخلايا الذكي</p>
+                  </div>
+                  <Switch
+                    checked={systemSettings.synaptic_matching_enabled?.value}
+                    onCheckedChange={() => toggleFeature("synaptic_matching_enabled")}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg bg-slate-700/50">
+                  <div>
+                    <h4 className="font-medium text-white">ميزات الذكاء الاصطناعي</h4>
+                    <p className="text-xs text-slate-400">تفعيل جميع خدمات AI</p>
+                  </div>
+                  <Switch
+                    checked={systemSettings.ai_features_enabled?.value}
+                    onCheckedChange={() => toggleFeature("ai_features_enabled")}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg bg-slate-700/50">
+                  <div>
+                    <h4 className="font-medium text-white">فحص المحتوى التلقائي</h4>
+                    <p className="text-xs text-slate-400">فحص الرسائل قبل الإرسال</p>
+                  </div>
+                  <Switch
+                    checked={systemSettings.content_moderation_enabled?.value}
+                    onCheckedChange={() => toggleFeature("content_moderation_enabled")}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg bg-slate-700/50">
+                  <div>
+                    <h4 className="font-medium text-white">البحث الدلالي</h4>
+                    <p className="text-xs text-slate-400">بحث متقدم بالذكاء الاصطناعي</p>
+                  </div>
+                  <Switch
+                    checked={systemSettings.semantic_search_enabled?.value}
+                    onCheckedChange={() => toggleFeature("semantic_search_enabled")}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg bg-slate-700/50">
+                  <div>
+                    <h4 className="font-medium text-white">الإشعارات الفورية</h4>
+                    <p className="text-xs text-slate-400">Web Push Notifications</p>
+                  </div>
+                  <Switch
+                    checked={systemSettings.push_notifications_enabled?.value}
+                    onCheckedChange={() => toggleFeature("push_notifications_enabled")}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg bg-slate-700/50">
+                  <div>
+                    <h4 className="font-medium text-white">الخلفيات المتحركة</h4>
+                    <p className="text-xs text-slate-400">Neural Mesh Background</p>
+                  </div>
+                  <Switch
+                    checked={systemSettings.animated_backgrounds_enabled?.value}
+                    onCheckedChange={() => toggleFeature("animated_backgrounds_enabled")}
+                  />
                 </div>
               </div>
-              <Button onClick={() => setFeatureSettingsOpen(true)} className="bg-cyan-600 hover:bg-cyan-700">
-                <Settings className="w-4 h-4 ml-2" />
-                إدارة الميزات
-              </Button>
-            </div>
+            </ScrollArea>
           </CardContent>
         </Card>
 
