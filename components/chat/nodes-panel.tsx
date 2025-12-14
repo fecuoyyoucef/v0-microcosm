@@ -78,6 +78,7 @@ export function NodesPanel({
   const [isCreating, setIsCreating] = useState(false)
   const [summaries, setSummaries] = useState<Record<string, NodeSummary>>({})
   const [loadingSummary, setLoadingSummary] = useState<string | null>(null)
+  const [generatingQuestions, setGeneratingQuestions] = useState<string | null>(null)
 
   // Organize nodes into hierarchy
   const { primaryNodes, childrenMap } = useMemo(() => {
@@ -170,6 +171,31 @@ export function NodesPanel({
     setLoadingSummary(null)
   }
 
+  const generateQuestions = async (node: ConversationNode) => {
+    setGeneratingQuestions(node.id)
+
+    try {
+      const response = await fetch("/api/ai/generate-discussion-questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nodeTitle: node.title,
+          groupId,
+          nodeId: node.id,
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        alert(`أسئلة مقترحة لتحفيز النقاش:\n\n${data.questions.join("\n\n")}`)
+      }
+    } catch (error) {
+      console.error("Error generating questions:", error)
+    }
+
+    setGeneratingQuestions(null)
+  }
+
   const getNodeIcon = (node: ConversationNode) => {
     const IconComponent = ICON_MAP[node.icon] || Folder
     return <IconComponent className="w-4 h-4" />
@@ -236,8 +262,29 @@ export function NodesPanel({
 
           {/* Actions */}
           <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1">
+            {/* Generate questions button for primary nodes */}
+            {isPrimary && node.messages_count === 0 && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  generateQuestions(node)
+                }}
+                disabled={generatingQuestions === node.id}
+                title="توليد أسئلة نقاش"
+              >
+                {generatingQuestions === node.id ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <HelpCircle className="w-3.5 h-3.5 text-blue-500" />
+                )}
+              </Button>
+            )}
+
             {/* AI Summary for primary nodes only */}
-            {isPrimary && (
+            {isPrimary && node.messages_count > 0 && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -247,6 +294,7 @@ export function NodesPanel({
                   generateSummary(node)
                 }}
                 disabled={loadingSummary === node.id}
+                title="تحليل بالذكاء الاصطناعي"
               >
                 {loadingSummary === node.id ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />

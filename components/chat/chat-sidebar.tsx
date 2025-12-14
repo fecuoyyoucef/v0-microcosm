@@ -34,6 +34,7 @@ import {
   Home,
   Info,
   Bell,
+  Sparkles,
 } from "lucide-react"
 import type { Profile } from "@/lib/types"
 import { useTheme } from "next-themes"
@@ -77,6 +78,7 @@ const translations = {
     errorMember: "خطأ في إضافة العضو",
     unexpectedError: "حدث خطأ غير متوقع",
     user: "مستخدم",
+    assistant: "المساعد الذكي",
   },
   en: {
     profile: "My Profile",
@@ -103,6 +105,7 @@ const translations = {
     errorMember: "Error adding member",
     unexpectedError: "An unexpected error occurred",
     user: "User",
+    assistant: "AI Assistant",
   },
   fr: {
     profile: "Mon Profil",
@@ -129,6 +132,7 @@ const translations = {
     errorMember: "Erreur lors de l'ajout du membre",
     unexpectedError: "Une erreur inattendue s'est produite",
     user: "Utilisateur",
+    assistant: "Assistant IA",
   },
 }
 
@@ -393,6 +397,13 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
                   {unreadNotifications}
                 </span>
               )}
+            </div>
+          </Link>
+
+          <Link href="/chat/assistant" onClick={closeSidebar}>
+            <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
+              <Sparkles className="w-5 h-5 text-amber-500" />
+              <span className="text-sm font-medium">{t.assistant}</span>
             </div>
           </Link>
 

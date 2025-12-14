@@ -1,6 +1,9 @@
 "use client"
 
 import type React from "react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
+import { Sparkles } from "lucide-react"
 
 import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
@@ -22,6 +25,7 @@ export function SearchView({ groupId }: SearchViewProps) {
   const [results, setResults] = useState<DailySummary[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
+  const [useSemanticSearch, setUseSemanticSearch] = useState(false)
   const supabase = createClient()
 
   const handleSearch = async () => {
@@ -31,7 +35,21 @@ export function SearchView({ groupId }: SearchViewProps) {
     setHasSearched(true)
 
     try {
-      // بحث في الملخصات
+      if (useSemanticSearch) {
+        const semanticResponse = await fetch("/api/ai/semantic-search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: query.trim(), groupId, limit: 20 }),
+        })
+
+        if (semanticResponse.ok) {
+          const data = await semanticResponse.json()
+          setResults(data.results || [])
+          setIsSearching(false)
+          return
+        }
+      }
+
       const { data } = await supabase
         .from("daily_summaries")
         .select("*")
@@ -82,7 +100,7 @@ export function SearchView({ groupId }: SearchViewProps) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="ابحث في الذاكرة... (مثال: متى قررنا موعد الرحلة؟)"
+              placeholder={useSemanticSearch ? "ابحث بالمعنى... (مثال: متى قررنا موعد الرحلة؟)" : "ابحث في الذاكرة..."}
               className="pr-10 bg-background"
             />
           </div>
@@ -90,8 +108,21 @@ export function SearchView({ groupId }: SearchViewProps) {
             {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : "بحث"}
           </Button>
         </div>
+        <div className="flex items-center justify-center gap-2 mt-3">
+          <Checkbox
+            id="semantic-search"
+            checked={useSemanticSearch}
+            onCheckedChange={(checked) => setUseSemanticSearch(!!checked)}
+          />
+          <Label htmlFor="semantic-search" className="text-xs cursor-pointer flex items-center gap-1">
+            <Sparkles className="w-3 h-3 text-amber-500" />
+            بحث ذكي بالمعنى (AI)
+          </Label>
+        </div>
         <p className="text-xs text-muted-foreground text-center mt-2">
-          ابحث عن القرارات، الأفكار، المواضيع، أو أي محتوى في الملخصات السابقة
+          {useSemanticSearch
+            ? "البحث الذكي يفهم السياق والمعنى بدلاً من الكلمات فقط"
+            : "ابحث عن القرارات، الأفكار، المواضيع، أو أي محتوى في الملخصات السابقة"}
         </p>
       </div>
 

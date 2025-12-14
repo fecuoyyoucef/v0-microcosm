@@ -62,6 +62,7 @@ export function MessageInput({
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const [isCheckingContent, setIsCheckingContent] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const supabase = createClient()
@@ -99,6 +100,30 @@ export function MessageInput({
 
   const handleSend = async () => {
     if ((!content.trim() && !selectedImage) || isSending) return
+
+    // Check content for inappropriate material
+    if (content.trim()) {
+      setIsCheckingContent(true)
+      try {
+        const moderationResponse = await fetch("/api/ai/content-moderation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: content.trim() }),
+        })
+
+        if (moderationResponse.ok) {
+          const { isAppropriate, reason } = await moderationResponse.json()
+          if (!isAppropriate) {
+            alert(`تنبيه: ${reason}\n\nيرجى مراجعة محتوى رسالتك.`)
+            setIsCheckingContent(false)
+            return
+          }
+        }
+      } catch (error) {
+        console.error("Content moderation error:", error)
+      }
+      setIsCheckingContent(false)
+    }
 
     setIsSending(true)
     try {
@@ -300,12 +325,16 @@ export function MessageInput({
               {/* Send button */}
               <Button
                 onClick={handleSend}
-                disabled={(!content.trim() && !selectedImage) || isSending}
+                disabled={(!content.trim() && !selectedImage) || isSending || isCheckingContent}
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 rounded-full p-0 text-primary hover:text-primary"
               >
-                {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                {isSending || isCheckingContent ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
               </Button>
             </div>
           </div>

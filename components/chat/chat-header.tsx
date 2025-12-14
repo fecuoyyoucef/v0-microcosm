@@ -23,7 +23,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Users, MoreVertical, UserPlus, Settings, Copy, Check, LogOut, Download } from "lucide-react"
+import { Users, MoreVertical, UserPlus, Settings, Copy, Check, LogOut, Download, Sparkles } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import type { Group, GroupMember } from "@/lib/types"
@@ -292,6 +292,12 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
         )}
 
         <div className="flex items-center gap-1 shrink-0">
+          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" asChild title="المساعد الذكي">
+            <Link href="/chat/assistant">
+              <Sparkles className="h-4 w-4 text-amber-500" />
+            </Link>
+          </Button>
+
           {canInstall && (
             <Button
               variant="ghost"
