@@ -174,11 +174,15 @@ export function MessageInput({
         if (classifyResponse.ok) {
           const { category, tasks } = await classifyResponse.json()
 
-          // Store classification
           console.log("[v0] Message classified as:", category)
+
+          // Save extracted tasks to database
           if (tasks && tasks.length > 0) {
             console.log("[v0] Extracted tasks:", tasks)
-            // TODO: Display tasks to user or save to database
+
+            // We'll send the message first, then save tasks with the message_id
+            // Store tasks temporarily to save after message is sent
+            ;(window as any).__pendingTasks = { tasks, category }
           }
         }
       } catch (error) {
@@ -208,14 +212,44 @@ export function MessageInput({
         setIsUploadingImage(false)
       }
 
+      const messageContent = content.trim() || (attachmentUrl ? "📷 صورة" : "")
+
       await onSend(
-        content.trim() || (attachmentUrl ? "📷 صورة" : ""),
+        messageContent,
         selectedLayer,
         messageNodeId,
         selectedLayer === "shadow" && visibleTo.length > 0 ? visibleTo : undefined,
         attachmentUrl,
         replyingTo?.id || null,
       )
+
+      const pendingTasks = (window as any).__pendingTasks
+      if (pendingTasks?.tasks && pendingTasks.tasks.length > 0) {
+        // Get the last message ID from the group
+        const { data: lastMessage } = await supabase
+          .from("messages")
+          .select("id")
+          .eq("group_id", groupId)
+          .eq("sender_id", currentUserId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single()
+
+        if (lastMessage) {
+          for (const task of pendingTasks.tasks) {
+            await supabase.from("extracted_tasks").insert({
+              message_id: lastMessage.id,
+              group_id: groupId,
+              task_content: task,
+              created_by: currentUserId,
+              status: "pending",
+            })
+          }
+        }
+
+        delete (window as any).__pendingTasks
+      }
+
       setContent("")
       setVisibleTo([])
       clearImage()

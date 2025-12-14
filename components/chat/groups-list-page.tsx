@@ -35,16 +35,13 @@ import { useTheme } from "next-themes"
 import { useSettings } from "@/components/settings-provider"
 import { SuggestedCells } from "@/components/groups/suggested-cells"
 import { CellSurveyDialog } from "@/components/groups/cell-survey-dialog"
+import type { UnreadCount } from "@/lib/types" // Added import for UnreadCount
 
 interface GroupsListPageProps {
   groups: Group[]
   userId: string
   profile: Profile | null
-}
-
-interface UnreadCount {
-  group_id: string
-  unread_count: number
+  hasCompletedSurvey?: boolean // Added hasCompletedSurvey prop
 }
 
 const translations = {
@@ -149,7 +146,7 @@ const translations = {
   },
 }
 
-export function GroupsListPage({ groups: initialGroups, userId, profile }: GroupsListPageProps) {
+export function GroupsListPage({ groups: initialGroups, userId, profile, hasCompletedSurvey }: GroupsListPageProps) {
   const [groups, setGroups] = useState<Group[]>(initialGroups)
   const [searchQuery, setSearchQuery] = useState("")
   const [isCreating, setIsCreating] = useState(false)
@@ -585,7 +582,7 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
                   ) : (
                     <Moon className="w-5 h-5 text-muted-foreground" />
                   )}
-                  <span className="text-sm font-medium">{theme === "dark" ? "الوضع الفاتح" : "الوضع الداكن"}</span>
+                  <span className="text-sm font-medium">{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
                 </div>
 
                 <Separator className="my-2" />
@@ -683,7 +680,7 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
         </DialogContent>
       </Dialog>
 
-      {newGroupId && (
+      {newGroupId && !hasCompletedSurvey && (
         <CellSurveyDialog
           open={showCellSurvey}
           onOpenChange={setShowCellSurvey}

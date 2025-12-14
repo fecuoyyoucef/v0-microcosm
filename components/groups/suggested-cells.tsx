@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { getSuggestedCells } from "@/lib/synaptic-matching"
+import { getSuggestedCells, getEnhancedCompatibility } from "@/lib/synaptic-matching"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -31,6 +31,7 @@ export function SuggestedCells({ userId }: SuggestedCellsProps) {
   const [cells, setCells] = useState<MatchResult[]>([])
   const [loading, setLoading] = useState(true)
   const [enabled, setEnabled] = useState(false)
+  const [enhancedMode, setEnhancedMode] = useState(false)
   const [requestingJoin, setRequestingJoin] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
@@ -53,7 +54,21 @@ export function SuggestedCells({ userId }: SuggestedCellsProps) {
       }
 
       // جلب الخلايا المقترحة
-      const suggested = await getSuggestedCells(userId, 10)
+      let suggested = await getSuggestedCells(userId, 10)
+
+      // تجربة تحسين التوافق باستخدام الذكاء الاصطناعي
+      if (suggested.length > 0) {
+        try {
+          const enhanced = await getEnhancedCompatibility(userId, suggested)
+          if (enhanced && enhanced.length > 0) {
+            suggested = enhanced
+            setEnhancedMode(true)
+          }
+        } catch (error) {
+          console.log("[v0] AI enhancement not available, using basic matching")
+        }
+      }
+
       setCells(suggested)
       setLoading(false)
     }
@@ -125,8 +140,13 @@ export function SuggestedCells({ userId }: SuggestedCellsProps) {
     <div className="p-4 border-b border-border">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-primary" />
+          <Sparkles className={cn("w-4 h-4", enhancedMode ? "text-amber-500" : "text-primary")} />
           <span className="text-sm font-medium">خلايا مقترحة لك</span>
+          {enhancedMode && (
+            <Badge variant="secondary" className="text-[9px] px-1.5 py-0">
+              مدعوم بـ AI
+            </Badge>
+          )}
         </div>
         <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => router.push("/chat/explore")}>
           عرض الكل

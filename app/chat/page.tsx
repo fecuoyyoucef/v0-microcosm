@@ -20,5 +20,7 @@ export default async function ChatPage() {
   // Fetch profile
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
-  return <GroupsListPage groups={groups} userId={user.id} profile={profile} />
+  const { data: survey } = await supabase.from("user_surveys").select("*").eq("user_id", user.id).single()
+
+  return <GroupsListPage groups={groups} userId={user.id} profile={profile} hasCompletedSurvey={!!survey} />
 }
