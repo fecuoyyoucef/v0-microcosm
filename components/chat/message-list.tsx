@@ -1,14 +1,13 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
-import { CheckCheck, Reply, Trash2 } from "lucide-react"
+import { CheckCheck, Reply, Trash2, Languages, Loader2, Check } from "lucide-react"
 import { format } from "date-fns"
 import { ar } from "date-fns/locale"
 import type { Message, GroupMember, ConversationNode } from "@/lib/types"
@@ -102,9 +101,12 @@ export function MessageList({
   const [lightboxImage, setLightboxImage] = useState<string | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null)
+  const [translatedMessages, setTranslatedMessages] = useState<Record<string, string>>({})
+  const [translatingMessages, setTranslatingMessages] = useState<Set<string>>(new Set())
   const supabase = createClient()
   const longPressTimer = useRef<NodeJS.Timeout | null>(null)
   const reactionPickerRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -236,6 +238,44 @@ export function MessageList({
     }
   }
 
+  const handleTranslate = async (messageId: string, content: string) => {
+    if (translatedMessages[messageId]) {
+      // Toggle off translation
+      setTranslatedMessages((prev) => {
+        const updated = { ...prev }
+        delete updated[messageId]
+        return updated
+      })
+      return
+    }
+
+    setTranslatingMessages((prev) => new Set([...prev, messageId]))
+
+    try {
+      const response = await fetch("/api/ai/translate-message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content,
+          targetLang: content.match(/[a-zA-Z]/) ? "ar" : "en", // Auto-detect
+        }),
+      })
+
+      if (response.ok) {
+        const { translation } = await response.json()
+        setTranslatedMessages((prev) => ({ ...prev, [messageId]: translation }))
+      }
+    } catch (error) {
+      console.error("Translation error:", error)
+    } finally {
+      setTranslatingMessages((prev) => {
+        const updated = new Set(prev)
+        updated.delete(messageId)
+        return updated
+      })
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex-1 p-3 space-y-3">
@@ -265,259 +305,302 @@ export function MessageList({
     )
   }
 
+  const groupedMessages = messages.reduce(
+    (acc, message) => {
+      const date = format(new Date(message.created_at), "yyyy-MM-dd")
+      if (!acc[date]) {
+        acc[date] = { date, messages: [] }
+      }
+      acc[date].messages.push(message)
+      return acc
+    },
+    {} as Record<string, { date: string; messages: Message[] }>,
+  )
+
   return (
     <TooltipProvider>
-      <div className="h-full overflow-y-auto overflow-x-hidden px-3 py-2">
+      <div className="flex-1 overflow-auto bg-background" ref={containerRef}>
         <div className="space-y-0.5">
-          {messages.map((message, index) => {
-            const isOwn = message.sender_id === currentUserId
-            const senderName = message.sender?.display_name || "مستخدم"
-            const prevMessage = index > 0 ? messages[index - 1] : null
-            const nextMessage = index < messages.length - 1 ? messages[index + 1] : null
-            const isSameSenderAsPrev = prevMessage?.sender_id === message.sender_id
-            const isSameSenderAsNext = nextMessage?.sender_id === message.sender_id
+          {Object.values(groupedMessages).map(({ date, messages: dayMessages }) => (
+            <div key={date} className="space-y-2">
+              {dayMessages.map((message, index) => {
+                const isOwn = message.sender_id === currentUserId
+                const senderName = message.sender?.display_name || "مستخدم"
+                const prevMessage = index > 0 ? dayMessages[index - 1] : null
+                const nextMessage = index < dayMessages.length - 1 ? dayMessages[index + 1] : null
+                const isSameSenderAsPrev = prevMessage?.sender_id === message.sender_id
+                const isSameSenderAsNext = nextMessage?.sender_id === message.sender_id
+                const isDeleted = message.deleted_at !== null
 
-            const style = layerStyles[message.layer] || layerStyles.standard
-            const node = nodes.find((n) => n.id === message.node_id)
+                const style = layerStyles[message.layer] || layerStyles.standard
+                const node = nodes.find((n) => n.id === message.node_id)
 
-            const showAvatar = !isOwn && !isSameSenderAsPrev
-            const showName = !isOwn && !isSameSenderAsPrev
+                const showAvatar = !isOwn && !isSameSenderAsPrev
+                const showName = !isOwn && !isSameSenderAsPrev
 
-            const hasImage = message.attachment_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i)
-            const isActive = activeMessageId === message.id
-            const replyPreview = message.reply_to ? getReplyPreview(message.reply_to) : null
+                const hasImage = message.attachment_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i)
+                const isActive = activeMessageId === message.id
+                const replyPreview = message.reply_to ? getReplyPreview(message.reply_to) : null
 
-            const groupedReactions = getGroupedReactions(message.id)
-            const hasReactions = Object.keys(groupedReactions).length > 0
+                const groupedReactions = getGroupedReactions(message.id)
+                const hasReactions = Object.keys(groupedReactions).length > 0
 
-            return (
-              <div
-                key={message.id}
-                className={cn(
-                  "group relative flex items-end gap-2",
-                  isOwn ? "flex-row-reverse" : "flex-row",
-                  !isSameSenderAsPrev && "mt-3",
-                )}
-                onMouseEnter={() => setActiveMessageId(message.id)}
-                onMouseLeave={() => setActiveMessageId(null)}
-                onTouchStart={() => handleTouchStart(message.id)}
-                onTouchEnd={handleTouchEnd}
-              >
-                {!isOwn && (
-                  <div className="w-7 shrink-0">
-                    {showAvatar ? (
-                      <Avatar className="w-7 h-7 ring-2 ring-background">
-                        {message.sender?.avatar_url && (
-                          <AvatarImage src={message.sender.avatar_url || "/placeholder.svg"} />
-                        )}
-                        <AvatarFallback
-                          className={cn(getAvatarColor(message.sender_id), "text-white font-bold text-[10px]")}
-                        >
-                          {senderName.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                    ) : null}
-                  </div>
-                )}
-
-                <div className={cn("max-w-[70%] flex flex-col", isOwn && "items-end")}>
-                  {showName && (
-                    <span className="text-[11px] font-medium text-muted-foreground mb-0.5 px-1">{senderName}</span>
-                  )}
-
-                  {replyPreview && (
-                    <div
-                      className={cn(
-                        "flex items-center gap-1.5 mb-0.5 text-[11px] text-muted-foreground",
-                        isOwn && "flex-row-reverse",
-                      )}
-                    >
-                      <div className={cn("w-0.5 h-4 rounded-full", isOwn ? "bg-white/50" : "bg-primary/50")} />
-                      <span className="opacity-70">رد على {replyPreview.senderName}</span>
-                    </div>
-                  )}
-
+                return (
                   <div
+                    key={message.id}
                     className={cn(
-                      "relative px-3 py-1.5 transition-all",
-                      isOwn
-                        ? [
-                            style.ownBg,
-                            "text-white",
-                            "rounded-2xl",
-                            isSameSenderAsPrev && !isSameSenderAsNext && "rounded-tr-md",
-                            !isSameSenderAsPrev && isSameSenderAsNext && "rounded-br-md",
-                            isSameSenderAsPrev && isSameSenderAsNext && "rounded-r-md",
-                          ]
-                        : [
-                            style.bg,
-                            "rounded-2xl",
-                            isSameSenderAsPrev && !isSameSenderAsNext && "rounded-tl-md",
-                            !isSameSenderAsPrev && isSameSenderAsNext && "rounded-bl-md",
-                            isSameSenderAsPrev && isSameSenderAsNext && "rounded-l-md",
-                          ],
-                      message.layer === "shadow" && "italic opacity-80",
+                      "group relative flex items-end gap-2",
+                      isOwn ? "flex-row-reverse" : "flex-row",
+                      !isSameSenderAsPrev && "mt-3",
                     )}
+                    onMouseEnter={() => setActiveMessageId(message.id)}
+                    onMouseLeave={() => setActiveMessageId(null)}
+                    onTouchStart={() => handleTouchStart(message.id)}
+                    onTouchEnd={handleTouchEnd}
                   >
-                    {hasImage && (
-                      <div className="mb-1.5 -mx-1 -mt-0.5">
-                        <img
-                          src={message.attachment_url || "/placeholder.svg"}
-                          alt="مرفق"
-                          className="max-w-full max-h-56 rounded-xl cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => setLightboxImage(message.attachment_url || null)}
-                        />
+                    {!isOwn && (
+                      <div className="w-7 shrink-0">
+                        {showAvatar ? (
+                          <Avatar className="w-7 h-7 ring-2 ring-background">
+                            {message.sender?.avatar_url && (
+                              <AvatarImage src={message.sender.avatar_url || "/placeholder.svg"} />
+                            )}
+                            <AvatarFallback
+                              className={cn(getAvatarColor(message.sender_id), "text-white font-bold text-[10px]")}
+                            >
+                              {senderName.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                        ) : null}
                       </div>
                     )}
 
-                    {message.content && message.content !== "📷 صورة" && (
-                      <p className="text-[14px] whitespace-pre-wrap break-words leading-snug">{message.content}</p>
-                    )}
-
-                    <div className={cn("flex items-center gap-1 mt-0.5", isOwn ? "justify-start" : "justify-end")}>
-                      <span className={cn("text-[10px]", isOwn ? "text-white/60" : "text-muted-foreground/70")}>
-                        {format(new Date(message.created_at), "p", { locale: ar })}
-                      </span>
-                      {isOwn && <CheckCheck className="w-3 h-3 text-white/60" />}
-                      {style.icon && <span className="text-[9px] opacity-50">{style.icon}</span>}
-                    </div>
-
-                    {node && (
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "absolute -bottom-2 text-[8px] px-1 py-0 h-3.5 gap-0.5 bg-background shadow-sm",
-                          isOwn ? "right-2" : "left-2",
-                        )}
-                        style={{ borderColor: node.color, color: node.color }}
-                      >
-                        <span className="w-1 h-1 rounded-full" style={{ backgroundColor: node.color }} />
-                        {node.title}
-                      </Badge>
-                    )}
-                  </div>
-
-                  {hasReactions && (
-                    <div
-                      className={cn(
-                        "flex items-center gap-0.5 mt-0.5 flex-wrap",
-                        isOwn ? "justify-end" : "justify-start",
+                    <div className={cn("max-w-[70%] flex flex-col", isOwn && "items-end")}>
+                      {showName && (
+                        <span className="text-[11px] font-medium text-muted-foreground mb-0.5 px-1">{senderName}</span>
                       )}
-                    >
-                      {Object.entries(groupedReactions).map(([reactionId, data]) => {
-                        const reaction = quickReactions.find((r) => r.id === reactionId)
-                        if (!reaction) return null
-                        return (
-                          <Tooltip key={reactionId}>
-                            <TooltipTrigger asChild>
-                              <button
-                                className={cn(
-                                  "flex items-center gap-0.5 px-1 py-0.5 rounded-full text-[10px] transition-all",
-                                  data.hasCurrentUser
-                                    ? "bg-primary/20 ring-1 ring-primary/50"
-                                    : "bg-muted/80 hover:bg-muted",
-                                )}
-                                onClick={() => toggleReaction(message.id, reactionId)}
-                              >
-                                <img
-                                  src={reaction.image || "/placeholder.svg"}
-                                  alt={reaction.name}
-                                  className="w-3.5 h-3.5"
-                                />
-                                {data.count > 1 && <span className="text-[9px]">{data.count}</span>}
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="text-xs">
-                              {data.users.join("، ")}
-                            </TooltipContent>
-                          </Tooltip>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
 
-                {isActive && (
-                  <div
-                    className={cn(
-                      "absolute top-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity animate-in fade-in duration-150",
-                      isOwn ? "left-0 -translate-x-full pr-1" : "right-0 translate-x-full pl-1",
-                    )}
-                  >
-                    <div className="relative" ref={reactionPickerRef}>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 rounded-full hover:bg-muted"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setShowReactionsFor(showReactionsFor === message.id ? null : message.id)
-                        }}
-                      >
-                        <span className="text-xs">😊</span>
-                      </Button>
-
-                      {showReactionsFor === message.id && (
+                      {replyPreview && (
                         <div
                           className={cn(
-                            "absolute z-50 flex items-center gap-0.5 p-1.5 bg-card rounded-full shadow-lg border animate-in fade-in zoom-in-95 duration-150",
-                            "bottom-full mb-1",
-                            isOwn ? "right-0" : "left-0",
+                            "flex items-center gap-1.5 mb-0.5 text-[11px] text-muted-foreground",
+                            isOwn && "flex-row-reverse",
                           )}
-                          onClick={(e) => e.stopPropagation()}
                         >
-                          {quickReactions.map((reaction) => {
-                            const hasReacted = reactions[message.id]?.some(
-                              (r) => r.user_id === currentUserId && r.reaction === reaction.id,
-                            )
+                          <div className={cn("w-0.5 h-4 rounded-full", isOwn ? "bg-white/50" : "bg-primary/50")} />
+                          <span className="opacity-70">رد على {replyPreview.senderName}</span>
+                        </div>
+                      )}
+
+                      <div
+                        className={cn(
+                          "relative px-3 py-1.5 transition-all",
+                          isOwn
+                            ? [
+                                style.ownBg,
+                                "text-white",
+                                "rounded-2xl",
+                                isSameSenderAsPrev && !isSameSenderAsNext && "rounded-tr-md",
+                                !isSameSenderAsPrev && isSameSenderAsNext && "rounded-br-md",
+                                isSameSenderAsPrev && isSameSenderAsNext && "rounded-r-md",
+                              ]
+                            : [
+                                style.bg,
+                                "rounded-2xl",
+                                isSameSenderAsPrev && !isSameSenderAsNext && "rounded-tl-md",
+                                !isSameSenderAsPrev && isSameSenderAsNext && "rounded-bl-md",
+                                isSameSenderAsPrev && isSameSenderAsNext && "rounded-l-md",
+                              ],
+                          message.layer === "shadow" && "italic opacity-80",
+                        )}
+                      >
+                        {hasImage && (
+                          <div className="mb-1.5 -mx-1 -mt-0.5">
+                            <img
+                              src={message.attachment_url || "/placeholder.svg"}
+                              alt="مرفق"
+                              className="max-w-full max-h-56 rounded-xl cursor-pointer hover:opacity-90 transition-opacity"
+                              onClick={() => setLightboxImage(message.attachment_url || null)}
+                            />
+                          </div>
+                        )}
+
+                        {message.content && message.content !== "📷 صورة" && (
+                          <p className="text-[14px] whitespace-pre-wrap break-words leading-snug">{message.content}</p>
+                        )}
+
+                        {translatedMessages[message.id] && (
+                          <div className="mt-1 p-2 bg-muted/50 rounded-lg border border-border/50 text-sm">
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+                              <Languages className="w-3 h-3" />
+                              <span>ترجمة</span>
+                            </div>
+                            {translatedMessages[message.id]}
+                          </div>
+                        )}
+
+                        <div className={cn("flex items-center gap-1 mt-0.5", isOwn ? "justify-start" : "justify-end")}>
+                          <span className={cn("text-[10px]", isOwn ? "text-white/60" : "text-muted-foreground/70")}>
+                            {format(new Date(message.created_at), "p", { locale: ar })}
+                          </span>
+                          {isOwn && <CheckCheck className="w-3 h-3 text-white/60" />}
+                          {style.icon && <span className="text-[9px] opacity-50">{style.icon}</span>}
+                        </div>
+
+                        {node && (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "absolute -bottom-2 text-[8px] px-1 py-0 h-3.5 gap-0.5 bg-background shadow-sm",
+                              isOwn ? "right-2" : "left-2",
+                            )}
+                            style={{ borderColor: node.color, color: node.color }}
+                          >
+                            <span className="w-1 h-1 rounded-full" style={{ backgroundColor: node.color }} />
+                            {node.title}
+                          </Badge>
+                        )}
+                      </div>
+
+                      {hasReactions && (
+                        <div
+                          className={cn(
+                            "flex items-center gap-0.5 mt-0.5 flex-wrap",
+                            isOwn ? "justify-end" : "justify-start",
+                          )}
+                        >
+                          {Object.entries(groupedReactions).map(([reactionId, data]) => {
+                            const reaction = quickReactions.find((r) => r.id === reactionId)
+                            if (!reaction) return null
                             return (
-                              <button
-                                key={reaction.id}
-                                title={reaction.name}
-                                className={cn(
-                                  "w-8 h-8 flex items-center justify-center rounded-full transition-all hover:scale-110 p-0.5",
-                                  hasReacted ? "bg-primary/20 ring-1 ring-primary" : "hover:bg-muted",
-                                )}
-                                onClick={() => toggleReaction(message.id, reaction.id)}
-                              >
-                                <img
-                                  src={reaction.image || "/placeholder.svg"}
-                                  alt={reaction.name}
-                                  className="w-full h-full object-contain"
-                                />
-                              </button>
+                              <Tooltip key={reactionId}>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    className={cn(
+                                      "flex items-center gap-0.5 px-1 py-0.5 rounded-full text-[10px] transition-all",
+                                      data.hasCurrentUser
+                                        ? "bg-primary/20 ring-1 ring-primary/50"
+                                        : "bg-muted/80 hover:bg-muted",
+                                    )}
+                                    onClick={() => toggleReaction(message.id, reactionId)}
+                                  >
+                                    <img
+                                      src={reaction.image || "/placeholder.svg"}
+                                      alt={reaction.name}
+                                      className="w-3.5 h-3.5"
+                                    />
+                                    {data.count > 1 && <span className="text-[9px]">{data.count}</span>}
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="text-xs">
+                                  {data.users.join("، ")}
+                                </TooltipContent>
+                              </Tooltip>
                             )
                           })}
                         </div>
                       )}
                     </div>
 
-                    {onReply && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 rounded-full hover:bg-muted"
-                        onClick={() => onReply(message)}
+                    {isActive && !isDeleted && (
+                      <div
+                        className={cn(
+                          "absolute top-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity animate-in fade-in duration-150",
+                          isOwn ? "left-0 -translate-x-full pr-1" : "right-0 translate-x-full pl-1",
+                        )}
                       >
-                        <Reply className="w-3 h-3" />
-                      </Button>
-                    )}
+                        <div className="relative" ref={reactionPickerRef}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 rounded-full hover:bg-muted"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setShowReactionsFor(showReactionsFor === message.id ? null : message.id)
+                            }}
+                          >
+                            <span className="text-xs">😊</span>
+                          </Button>
 
-                    {isOwn && onDelete && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 rounded-full hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() => handleDeleteClick(message.id)}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
+                          {showReactionsFor === message.id && (
+                            <div
+                              className={cn(
+                                "absolute z-50 flex items-center gap-0.5 p-1.5 bg-card rounded-full shadow-lg border animate-in fade-in zoom-in-95 duration-150",
+                                "bottom-full mb-1",
+                                isOwn ? "right-0" : "left-0",
+                              )}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {quickReactions.map((reaction) => {
+                                const hasReacted = reactions[message.id]?.some(
+                                  (r) => r.user_id === currentUserId && r.reaction === reaction.id,
+                                )
+                                return (
+                                  <button
+                                    key={reaction.id}
+                                    title={reaction.name}
+                                    className={cn(
+                                      "w-8 h-8 flex items-center justify-center rounded-full transition-all hover:scale-110 p-0.5",
+                                      hasReacted ? "bg-primary/20 ring-1 ring-primary" : "hover:bg-muted",
+                                    )}
+                                    onClick={() => toggleReaction(message.id, reaction.id)}
+                                  >
+                                    <img
+                                      src={reaction.image || "/placeholder.svg"}
+                                      alt={reaction.name}
+                                      className="w-full h-full object-contain"
+                                    />
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        {onReply && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 rounded-full hover:bg-muted"
+                            onClick={() => onReply(message)}
+                          >
+                            <Reply className="w-3 h-3" />
+                          </Button>
+                        )}
+
+                        {isOwn && onDelete && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 rounded-full hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => handleDeleteClick(message.id)}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        )}
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 rounded-full hover:bg-muted"
+                          onClick={() => handleTranslate(message.id, message.content)}
+                          disabled={translatingMessages.has(message.id)}
+                        >
+                          {translatingMessages.has(message.id) ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : translatedMessages[message.id] ? (
+                            <Check className="w-3 h-3 text-primary" />
+                          ) : (
+                            <Languages className="w-3 h-3" />
+                          )}
+                        </Button>
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
-            )
-          })}
+                )
+              })}
+            </div>
+          ))}
         </div>
 
         <div ref={messagesEndRef} className="h-1" />

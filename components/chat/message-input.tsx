@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select"
-import { Send, Eye, GitBranch, X, Loader2, Reply, Camera } from "lucide-react"
+import { Send, Eye, GitBranch, X, Loader2, Reply, Camera, Sparkles } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import type { MessageLayer, GroupMember, ConversationNode, GroupSettings, Message } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -63,6 +63,8 @@ export function MessageInput({
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
   const [isCheckingContent, setIsCheckingContent] = useState(false)
+  const [isCorrectingText, setIsCorrectingText] = useState(false)
+  const [showCorrectionHint, setShowCorrectionHint] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const supabase = createClient()
@@ -98,6 +100,42 @@ export function MessageInput({
     if (fileInputRef.current) fileInputRef.current.value = ""
   }
 
+  useEffect(() => {
+    if (content.length > 20) {
+      const hasCommonErrors =
+        content.includes("اللذي") || content.includes("التى") || content.match(/\b(في|من|على)\s+(ال[أ-ي]+)\b/)
+
+      setShowCorrectionHint(hasCommonErrors)
+    } else {
+      setShowCorrectionHint(false)
+    }
+  }, [content])
+
+  const handleCorrectArabic = async () => {
+    if (!content.trim()) return
+
+    setIsCorrectingText(true)
+    try {
+      const response = await fetch("/api/ai/correct-arabic", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: content }),
+      })
+
+      if (response.ok) {
+        const { corrected } = await response.json()
+        if (corrected && corrected !== content) {
+          setContent(corrected)
+        }
+      }
+    } catch (error) {
+      console.error("Correction error:", error)
+    } finally {
+      setIsCorrectingText(false)
+      setShowCorrectionHint(false)
+    }
+  }
+
   const handleSend = async () => {
     if ((!content.trim() && !selectedImage) || isSending) return
 
@@ -123,6 +161,29 @@ export function MessageInput({
         console.error("Content moderation error:", error)
       }
       setIsCheckingContent(false)
+    }
+
+    if (content.trim()) {
+      try {
+        const classifyResponse = await fetch("/api/ai/classify-message", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: content.trim() }),
+        })
+
+        if (classifyResponse.ok) {
+          const { category, tasks } = await classifyResponse.json()
+
+          // Store classification
+          console.log("[v0] Message classified as:", category)
+          if (tasks && tasks.length > 0) {
+            console.log("[v0] Extracted tasks:", tasks)
+            // TODO: Display tasks to user or save to database
+          }
+        }
+      } catch (error) {
+        console.error("Classification error:", error)
+      }
     }
 
     setIsSending(true)
@@ -194,6 +255,23 @@ export function MessageInput({
           </div>
           <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 rounded-full" onClick={onCancelReply}>
             <X className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      )}
+
+      {showCorrectionHint && !isCorrectingText && (
+        <div className="px-3 py-1 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 flex items-center justify-between animate-in slide-in-from-top-2 duration-200">
+          <p className="text-[11px] text-amber-700 dark:text-amber-300 flex items-center gap-1">
+            <Sparkles className="w-3 h-3" />
+            <span>هل تريد تصحيح النص بالذكاء الاصطناعي؟</span>
+          </p>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 text-[11px] text-amber-700 hover:text-amber-900 dark:text-amber-300"
+            onClick={handleCorrectArabic}
+          >
+            تصحيح
           </Button>
         </div>
       )}

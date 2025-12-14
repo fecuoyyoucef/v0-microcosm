@@ -294,3 +294,51 @@ export async function getUserCellCompatibility(
     },
   }
 }
+
+export async function getEnhancedCompatibility(
+  userId: string,
+  groupId: string,
+): Promise<{
+  basicScore: number
+  aiScore: number
+  finalScore: number
+  explanation: string
+} | null> {
+  const supabase = createClient()
+
+  // Get basic compatibility
+  const basic = await getUserCellCompatibility(userId, groupId)
+  if (!basic) return null
+
+  try {
+    // Get AI-enhanced score
+    const response = await fetch("/api/ai/enhance-matching", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, groupId }),
+    })
+
+    if (response.ok) {
+      const { aiScore, explanation } = await response.json()
+
+      // Combine basic (60%) and AI (40%) scores
+      const finalScore = Math.round(basic.score * 0.6 + aiScore * 0.4)
+
+      return {
+        basicScore: basic.score,
+        aiScore,
+        finalScore,
+        explanation,
+      }
+    }
+  } catch (error) {
+    console.error("AI matching error:", error)
+  }
+
+  return {
+    basicScore: basic.score,
+    aiScore: basic.score,
+    finalScore: basic.score,
+    explanation: "تحليل تقليدي فقط",
+  }
+}

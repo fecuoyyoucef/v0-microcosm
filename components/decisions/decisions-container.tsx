@@ -29,6 +29,7 @@ import {
   Sparkles,
   Loader2,
   AlertCircle,
+  TrendingUp,
 } from "lucide-react"
 import Link from "next/link"
 import type { Group, Decision, DecisionVote, DecisionResults } from "@/lib/types"
@@ -59,6 +60,8 @@ export function DecisionsContainer({
   const [aiError, setAiError] = useState<string | null>(null)
   const [votes, setVotes] = useState<Record<string, DecisionVote[]>>({})
   const [userVotes, setUserVotes] = useState<Record<string, string>>({})
+  const [discussionQuality, setDiscussionQuality] = useState<any>(null)
+  const [isAssessingQuality, setIsAssessingQuality] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -189,6 +192,26 @@ export function DecisionsContainer({
     return formatDistanceToNow(end, { locale: ar, addSuffix: true })
   }
 
+  const assessQuality = async () => {
+    setIsAssessingQuality(true)
+    try {
+      const response = await fetch("/api/ai/assess-discussion-quality", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupId }),
+      })
+
+      if (response.ok) {
+        const { quality } = await response.json()
+        setDiscussionQuality(quality)
+      }
+    } catch (error) {
+      console.error("Quality assessment error:", error)
+    } finally {
+      setIsAssessingQuality(false)
+    }
+  }
+
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Header */}
@@ -262,7 +285,36 @@ export function DecisionsContainer({
             </div>
           </DialogContent>
         </Dialog>
+
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={assessQuality} disabled={isAssessingQuality}>
+            {isAssessingQuality ? (
+              <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+            ) : (
+              <TrendingUp className="w-4 h-4 ml-2" />
+            )}
+            تقييم الجودة
+          </Button>
+
+          {/* Create button */}
+          <Button size="sm">
+            <Plus className="w-4 h-4 ml-2" />
+            قرار جديد
+          </Button>
+        </div>
       </div>
+
+      {discussionQuality && (
+        <div className="mx-4 mt-4 p-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg border">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium">جودة النقاش</span>
+            <Badge variant={discussionQuality.score >= 70 ? "default" : "secondary"}>
+              {discussionQuality.level} ({discussionQuality.score}/100)
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground">{discussionQuality.feedback}</p>
+        </div>
+      )}
 
       {/* Decisions List */}
       <div className="flex-1 overflow-auto p-4 space-y-4">
