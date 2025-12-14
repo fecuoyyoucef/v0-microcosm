@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -31,36 +31,58 @@ interface ConversationMapProps {
 
 const NODE_COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#06B6D4"]
 
-const calculateNodePositions = (nodes: ConversationNode[]): ConversationNode[] => {
+const calculateNodePositions = (
+  nodes: ConversationNode[],
+  containerWidth: number,
+  containerHeight: number,
+): ConversationNode[] => {
   const primaryNodes = nodes.filter((n) => !n.parent_id)
   const childNodes = nodes.filter((n) => n.parent_id)
 
   const positioned: ConversationNode[] = []
 
+  // Calculate grid based on container size
+  const nodeWidth = 180
+  const nodeHeight = 100
+  const horizontalGap = 60
+  const verticalGap = 40
+
+  const cols = Math.max(2, Math.floor((containerWidth - 100) / (nodeWidth + horizontalGap)))
+
   // Position primary nodes in a grid
   primaryNodes.forEach((node, index) => {
-    const col = index % 3
-    const row = Math.floor(index / 3)
+    const col = index % cols
+    const row = Math.floor(index / cols)
     positioned.push({
       ...node,
-      position_x: 50 + col * 220,
-      position_y: 50 + row * 150,
+      position_x: 50 + col * (nodeWidth + horizontalGap),
+      position_y: 50 + row * (nodeHeight + verticalGap + 80),
     })
   })
 
   // Position child nodes relative to their parents
+  const childrenByParent: Record<string, ConversationNode[]> = {}
   childNodes.forEach((node) => {
-    const parent = positioned.find((n) => n.id === node.parent_id)
+    if (node.parent_id) {
+      if (!childrenByParent[node.parent_id]) {
+        childrenByParent[node.parent_id] = []
+      }
+      childrenByParent[node.parent_id].push(node)
+    }
+  })
+
+  Object.entries(childrenByParent).forEach(([parentId, children]) => {
+    const parent = positioned.find((n) => n.id === parentId)
     if (parent) {
-      const siblings = childNodes.filter((n) => n.parent_id === parent.id)
-      const siblingIndex = siblings.indexOf(node)
-      positioned.push({
-        ...node,
-        position_x: parent.position_x + 250,
-        position_y: parent.position_y + siblingIndex * 80,
+      children.forEach((node, siblingIndex) => {
+        positioned.push({
+          ...node,
+          position_x: parent.position_x + nodeWidth + horizontalGap,
+          position_y: parent.position_y + siblingIndex * (nodeHeight + verticalGap / 2),
+        })
       })
     } else {
-      positioned.push(node)
+      children.forEach((node) => positioned.push(node))
     }
   })
 
@@ -68,7 +90,14 @@ const calculateNodePositions = (nodes: ConversationNode[]): ConversationNode[] =
 }
 
 export function ConversationMap({ groupId, group, nodes: initialNodes, currentUserId }: ConversationMapProps) {
-  const [nodes, setNodes] = useState<ConversationNode[]>(() => calculateNodePositions(initialNodes))
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [containerSize, setContainerSize] = useState({ width: 800, height: 600 })
+
+  const nodes = useMemo(
+    () => calculateNodePositions(initialNodes, containerSize.width, containerSize.height),
+    [initialNodes, containerSize.width, containerSize.height],
+  )
+
   const [selectedNode, setSelectedNode] = useState<ConversationNode | null>(null)
   const [nodeMessages, setNodeMessages] = useState<Message[]>([])
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
@@ -83,8 +112,27 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
   const [newNodeColor, setNewNodeColor] = useState(NODE_COLORS[0])
   const [isCreating, setIsCreating] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
-  const containerRef = useRef<HTMLDivElement>(null)
+  const [localNodes, setLocalNodes] = useState<ConversationNode[]>(nodes)
   const supabase = createClient()
+
+  useEffect(() => {
+    const updateSize = () => {
+      if (containerRef.current) {
+        setContainerSize({
+          width: containerRef.current.clientWidth,
+          height: containerRef.current.clientHeight,
+        })
+      }
+    }
+
+    updateSize()
+    window.addEventListener("resize", updateSize)
+    return () => window.removeEventListener("resize", updateSize)
+  }, [])
+
+  useEffect(() => {
+    setLocalNodes(nodes)
+  }, [nodes])
 
   useEffect(() => {
     const channel = supabase
@@ -105,7 +153,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
             .order("created_at", { ascending: true })
 
           if (data) {
-            setNodes(calculateNodePositions(data))
+            setLocalNodes(calculateNodePositions(data, containerSize.width, containerSize.height))
           }
         },
       )
@@ -114,7 +162,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [groupId, supabase])
+  }, [groupId, supabase, containerSize])
 
   const handleNodeClick = async (node: ConversationNode) => {
     setSelectedNode(node)
@@ -157,7 +205,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
       let posY = 100 + Math.random() * 200
 
       if (newNodeParent) {
-        const parentNode = nodes.find((n) => n.id === newNodeParent)
+        const parentNode = localNodes.find((n) => n.id === newNodeParent)
         if (parentNode) {
           posX = parentNode.position_x + 250
           posY = parentNode.position_y + Math.random() * 100 - 50
@@ -218,12 +266,12 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
   }
 
   const filteredNodes = searchQuery
-    ? nodes.filter(
+    ? localNodes.filter(
         (n) =>
           n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
           n.description?.toLowerCase().includes(searchQuery.toLowerCase()),
       )
-    : nodes
+    : localNodes
 
   return (
     <div className="flex flex-col h-[100dvh] bg-background overflow-hidden">
@@ -320,7 +368,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
                     className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
                   >
                     <option value="">بدون (عقدة رئيسية)</option>
-                    {nodes.map((node) => (
+                    {localNodes.map((node) => (
                       <option key={node.id} value={node.id}>
                         {node.title}
                       </option>
@@ -359,7 +407,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* Main Content - Fixed layout */}
       <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Map Canvas */}
         <div
@@ -383,9 +431,9 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
           >
             {/* SVG for connections */}
             <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ overflow: "visible" }}>
-              {nodes.map((node) => {
+              {localNodes.map((node) => {
                 if (!node.parent_id) return null
-                const parent = nodes.find((n) => n.id === node.parent_id)
+                const parent = localNodes.find((n) => n.id === node.parent_id)
                 if (!parent) return null
 
                 return (
@@ -414,7 +462,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
             ))}
 
             {/* Empty State */}
-            {nodes.length === 0 && (
+            {localNodes.length === 0 && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center p-4">
                   <p className="text-muted-foreground mb-4">لا توجد عقد بعد. أنشئ عقدتك الأولى!</p>
@@ -428,9 +476,9 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
           </div>
         </div>
 
-        {/* Node Details Panel */}
+        {/* Node Details Panel - Fixed height */}
         {selectedNode && (
-          <div className="w-72 md:w-80 border-r border-border bg-card flex flex-col shrink-0 max-h-full overflow-hidden">
+          <div className="w-72 md:w-80 border-r border-border bg-card flex flex-col shrink-0 h-full overflow-hidden">
             <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2 min-w-0">
                 <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: selectedNode.color }} />
@@ -468,7 +516,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
                       <div key={message.id} className="p-3 rounded-lg bg-secondary">
                         <div className="flex items-center gap-2 mb-2">
                           <Avatar className="h-6 w-6">
-                            <AvatarImage src={message.sender?.avatar_url || undefined} />
+                            <AvatarImage src={message.sender?.avatar_url || undefined} className="object-cover" />
                             <AvatarFallback className="text-xs">
                               {message.sender?.display_name?.charAt(0) || "؟"}
                             </AvatarFallback>

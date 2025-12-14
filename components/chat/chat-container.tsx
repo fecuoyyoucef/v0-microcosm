@@ -36,6 +36,21 @@ export function ChatContainer({
   const isMounted = useRef(true)
   const pendingMessageIds = useRef<Set<string>>(new Set())
 
+  const resetUnreadCount = useCallback(async () => {
+    try {
+      await supabase.from("group_unread_counts").upsert(
+        {
+          group_id: groupId,
+          user_id: currentUserId,
+          unread_count: 0,
+        },
+        { onConflict: "group_id,user_id" },
+      )
+    } catch (error) {
+      console.error("Error resetting unread count:", error)
+    }
+  }, [groupId, currentUserId, supabase])
+
   const fetchMembers = useCallback(async () => {
     const { data: membersData } = await supabase.from("group_members").select("*").eq("group_id", groupId)
 
@@ -129,6 +144,7 @@ export function ChatContainer({
     fetchMessages()
     fetchMembers()
     fetchNodes()
+    resetUnreadCount()
 
     const channelId = `chat-${groupId}-${Date.now()}`
 
@@ -252,13 +268,21 @@ export function ChatContainer({
       )
       .subscribe()
 
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && isMounted.current) {
+        resetUnreadCount()
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+
     return () => {
       isMounted.current = false
       supabase.removeChannel(channel)
       supabase.removeChannel(membersChannel)
       supabase.removeChannel(nodesChannel)
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
-  }, [groupId, fetchMessages, fetchMembers, fetchNodes, supabase, currentUserId])
+  }, [groupId, fetchMessages, fetchMembers, fetchNodes, supabase, currentUserId, resetUnreadCount])
 
   const filteredMessages =
     activeLayer === "all"

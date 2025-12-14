@@ -162,6 +162,7 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
   const [showCellSurvey, setShowCellSurvey] = useState(false)
   const [newGroupId, setNewGroupId] = useState<string | null>(null)
+  const [memberCounts, setMemberCounts] = useState<Record<string, number>>({})
   const router = useRouter()
   const supabase = createClient()
   const { theme, setTheme } = useTheme()
@@ -176,8 +177,8 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
   useEffect(() => {
     fetchUnreadNotifications()
     fetchUnreadCounts()
+    fetchMemberCounts()
 
-    // Subscribe to notifications
     const channel = supabase
       .channel("home-notifications")
       .on(
@@ -236,6 +237,21 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
       supabase.removeChannel(unreadChannel)
     }
   }, [userId])
+
+  const fetchMemberCounts = async () => {
+    const groupIds = initialGroups.map((g) => g.id)
+    if (groupIds.length === 0) return
+
+    const { data } = await supabase.from("group_members").select("group_id").in("group_id", groupIds)
+
+    if (data) {
+      const counts: Record<string, number> = {}
+      data.forEach((item) => {
+        counts[item.group_id] = (counts[item.group_id] || 0) + 1
+      })
+      setMemberCounts(counts)
+    }
+  }
 
   const handleTouchStart = (e: TouchEvent) => {
     touchStartX.current = e.touches[0].clientX
@@ -393,12 +409,7 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
   }
 
   return (
-    <div
-      className="flex flex-col h-screen bg-background"
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-    >
+    <div className="flex flex-col h-screen bg-background">
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border/50">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
@@ -410,7 +421,7 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
             >
               <div className="w-8 h-8 relative">
                 <Avatar className="w-8 h-8">
-                  <AvatarImage src={profile?.avatar_url || undefined} />
+                  <AvatarImage src={profile?.avatar_url || undefined} className="object-cover" />
                   <AvatarFallback className="bg-primary/10 text-primary">
                     {profile?.full_name?.charAt(0) || <User className="w-4 h-4" />}
                   </AvatarFallback>
@@ -478,7 +489,7 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
                 <div className="flex items-center gap-3 p-4 hover:bg-secondary/50 transition-colors">
                   <Avatar className={cn("h-12 w-12", getGroupColor(group.name))}>
                     {group.avatar_url ? (
-                      <AvatarImage src={group.avatar_url || "/placeholder.svg"} />
+                      <AvatarImage src={group.avatar_url || "/placeholder.svg"} className="object-cover" />
                     ) : (
                       <AvatarFallback className="bg-transparent text-white font-bold">
                         {group.name.substring(0, 2)}
@@ -489,13 +500,13 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
                     <div className="flex items-center justify-between">
                       <h3 className="font-semibold truncate">{group.name}</h3>
                       {unreadCounts[group.id] > 0 && (
-                        <span className="h-5 min-w-5 px-1.5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium">
+                        <span className="h-5 min-w-5 px-1.5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center font-medium">
                           {unreadCounts[group.id] > 99 ? "99+" : unreadCounts[group.id]}
                         </span>
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground truncate">
-                      {group.description || `${group.member_count || 0} ${t.members}`}
+                      {group.description || `${memberCounts[group.id] || 1} ${t.members}`}
                     </p>
                   </div>
                 </div>
@@ -511,7 +522,7 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
             <div className="p-6 bg-gradient-to-br from-primary/20 to-primary/5">
               <div className="flex items-center gap-4">
                 <Avatar className="w-16 h-16 border-2 border-background shadow-lg">
-                  <AvatarImage src={profile?.avatar_url || undefined} />
+                  <AvatarImage src={profile?.avatar_url || undefined} className="object-cover" />
                   <AvatarFallback className="bg-primary text-primary-foreground text-xl">
                     {profile?.full_name?.charAt(0) || <User className="w-8 h-8" />}
                   </AvatarFallback>
@@ -525,7 +536,7 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
 
             <ScrollArea className="flex-1">
               <div className="py-2">
-                <Link href="/chat/profile" onClick={() => setIsSidebarOpen(false)}>
+                <Link href="/chat/settings/account" onClick={() => setIsSidebarOpen(false)}>
                   <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
                     <User className="w-5 h-5 text-muted-foreground" />
                     <span className="text-sm font-medium">{t.profile}</span>
@@ -540,12 +551,11 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
                   <span className="text-sm font-medium">{t.newGroup}</span>
                 </div>
 
-                <Link href="/chat/saved" onClick={() => setIsSidebarOpen(false)}>
-                  <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
-                    <Bookmark className="w-5 h-5 text-muted-foreground" />
-                    <span className="text-sm font-medium">{t.savedMessages}</span>
-                  </div>
-                </Link>
+                <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer opacity-50">
+                  <Bookmark className="w-5 h-5 text-muted-foreground" />
+                  <span className="text-sm font-medium">{t.savedMessages}</span>
+                  <span className="text-xs text-muted-foreground mr-auto">{t.comingSoon}</span>
+                </div>
 
                 <Link href="/chat/notifications" onClick={() => setIsSidebarOpen(false)}>
                   <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer relative">

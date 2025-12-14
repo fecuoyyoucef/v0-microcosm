@@ -26,6 +26,7 @@ import {
   ShieldCheck,
   Palette,
   Activity,
+  Trash2,
 } from "lucide-react"
 import Link from "next/link"
 import type {
@@ -802,6 +803,29 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
           </TabsContent>
         </Tabs>
       </div>
+      {isAdmin && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardHeader>
+            <CardTitle className="text-lg text-destructive">منطقة الخطر</CardTitle>
+            <CardDescription>الإجراءات التالية لا يمكن التراجع عنها</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button variant="destructive" onClick={handleDeleteGroup} disabled={isDeleting} className="w-full">
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                  جاري الحذف...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 ml-2" />
+                  حذف الخلية نهائياً
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

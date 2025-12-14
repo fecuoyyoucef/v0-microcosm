@@ -70,6 +70,13 @@ export function InviteHandler({ group, isLoggedIn }: InviteHandlerProps) {
     }
   }
 
+  const getInviteRedirectUrl = () => {
+    if (typeof window !== "undefined") {
+      return `${window.location.origin}/invite/${group.id}`
+    }
+    return `/invite/${group.id}`
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-background">
       <div className="w-full max-w-md">
@@ -116,10 +123,10 @@ export function InviteHandler({ group, isLoggedIn }: InviteHandlerProps) {
               </Button>
             ) : (
               <div className="space-y-3">
-                <Link href={`/auth/login?redirect=/invite/${group.id}`}>
+                <Link href={`/auth/login?redirect=${encodeURIComponent(getInviteRedirectUrl())}`}>
                   <Button className="w-full">تسجيل الدخول للانضمام</Button>
                 </Link>
-                <Link href={`/auth/sign-up?redirect=/invite/${group.id}`}>
+                <Link href={`/auth/sign-up?redirect=${encodeURIComponent(getInviteRedirectUrl())}`}>
                   <Button variant="outline" className="w-full bg-transparent">
                     إنشاء حساب جديد
                   </Button>

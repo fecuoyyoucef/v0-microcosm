@@ -171,15 +171,26 @@ export function MessageList({
     const messageReactions = reactions[messageId] || []
     const grouped: Record<string, { count: number; users: string[]; hasCurrentUser: boolean }> = {}
 
+    // Track unique users per reaction
+    const usersByReaction: Record<string, Set<string>> = {}
+
     messageReactions.forEach((r) => {
-      if (!grouped[r.reaction]) {
-        grouped[r.reaction] = { count: 0, users: [], hasCurrentUser: false }
+      if (!usersByReaction[r.reaction]) {
+        usersByReaction[r.reaction] = new Set()
       }
-      grouped[r.reaction].count++
-      const member = members.find((m) => m.user_id === r.user_id)
-      grouped[r.reaction].users.push(member?.profile?.display_name || "مستخدم")
-      if (r.user_id === currentUserId) {
-        grouped[r.reaction].hasCurrentUser = true
+      // Only count if user hasn't already reacted with this emoji
+      if (!usersByReaction[r.reaction].has(r.user_id)) {
+        usersByReaction[r.reaction].add(r.user_id)
+
+        if (!grouped[r.reaction]) {
+          grouped[r.reaction] = { count: 0, users: [], hasCurrentUser: false }
+        }
+        grouped[r.reaction].count++
+        const member = members.find((m) => m.user_id === r.user_id)
+        grouped[r.reaction].users.push(member?.profile?.display_name || "مستخدم")
+        if (r.user_id === currentUserId) {
+          grouped[r.reaction].hasCurrentUser = true
+        }
       }
     })
 
