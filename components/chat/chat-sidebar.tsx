@@ -508,6 +508,32 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
           {t.signOut}
         </Button>
       </div>
+    </div>
+  )
+
+  if (mobileOnly) {
+    return (
+      <>
+        <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+          <SheetContent side="right" className="w-80 p-0">
+            <SidebarContent />
+          </SheetContent>
+        </Sheet>
+        {newGroupId && (
+          <CellSurveyDialog
+            open={showCellSurvey}
+            onOpenChange={setShowCellSurvey}
+            groupId={newGroupId}
+            onComplete={handleSurveyComplete}
+          />
+        )}
+      </>
+    )
+  }
+
+  return (
+    <>
+      <SidebarContent />
       {newGroupId && (
         <CellSurveyDialog
           open={showCellSurvey}
@@ -516,18 +542,6 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
           onComplete={handleSurveyComplete}
         />
       )}
-    </div>
+    </>
   )
-
-  if (mobileOnly) {
-    return (
-      <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-        <SheetContent side="right" className="w-80 p-0">
-          <SidebarContent />
-        </SheetContent>
-      </Sheet>
-    )
-  }
-
-  return <SidebarContent />
 }

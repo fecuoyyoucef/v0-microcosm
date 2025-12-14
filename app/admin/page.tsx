@@ -33,6 +33,7 @@ import {
   Brain,
   Shield,
   Bug,
+  Sparkles,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -357,6 +358,14 @@ export default function AdminDashboard() {
       icon: TrendingUp,
       color: "text-green-400",
       bgColor: "bg-green-500/20",
+    },
+    {
+      key: "synaptic_matching_enabled",
+      label: "المطابقة المشبكية الذكية",
+      description: "اقتراح خلايا للمستخدمين بناءً على اهتماماتهم وملفهم الشخصي",
+      icon: Sparkles,
+      color: "text-amber-400",
+      bgColor: "bg-amber-500/20",
     },
     {
       key: "ai_features_enabled",

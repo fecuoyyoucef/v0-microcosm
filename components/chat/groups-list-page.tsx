@@ -33,6 +33,8 @@ import type { Group, Profile } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { useTheme } from "next-themes"
 import { useSettings } from "@/components/settings-provider"
+import { SuggestedCells } from "@/components/groups/suggested-cells"
+import { CellSurveyDialog } from "@/components/groups/cell-survey-dialog"
 
 interface GroupsListPageProps {
   groups: Group[]
@@ -158,6 +160,8 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
+  const [showCellSurvey, setShowCellSurvey] = useState(false)
+  const [newGroupId, setNewGroupId] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
   const { theme, setTheme } = useTheme()
@@ -345,7 +349,8 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
       setIsCreateDialogOpen(false)
       setIsSidebarOpen(false)
       setGroups((prev) => [...prev, group])
-      router.push(`/chat/${group.id}`)
+      setNewGroupId(group.id)
+      setShowCellSurvey(true)
     } catch {
       setError(t.unexpectedError)
     } finally {
@@ -378,6 +383,13 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
     setTimeout(() => {
       setIsCreateDialogOpen(true)
     }, 150)
+  }
+
+  const handleSurveyComplete = () => {
+    if (newGroupId) {
+      router.push(`/chat/${newGroupId}`)
+      setNewGroupId(null)
+    }
   }
 
   return (
@@ -442,6 +454,7 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
       </header>
 
       <ScrollArea className="flex-1">
+        <SuggestedCells userId={userId} />
         {filteredGroups.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full p-8 text-center">
             <div className="w-20 h-20 rounded-2xl bg-secondary flex items-center justify-center mb-4">
@@ -659,6 +672,15 @@ export function GroupsListPage({ groups: initialGroups, userId, profile }: Group
           </div>
         </DialogContent>
       </Dialog>
+
+      {newGroupId && (
+        <CellSurveyDialog
+          open={showCellSurvey}
+          onOpenChange={setShowCellSurvey}
+          groupId={newGroupId}
+          onComplete={handleSurveyComplete}
+        />
+      )}
     </div>
   )
 }
