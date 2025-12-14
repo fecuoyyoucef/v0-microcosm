@@ -38,6 +38,7 @@ import {
 import type { Profile } from "@/lib/types"
 import { useTheme } from "next-themes"
 import { useSettings } from "@/components/settings-provider"
+import { CellSurveyDialog } from "@/components/groups/cell-survey-dialog"
 
 interface ChatSidebarProps {
   userId: string
@@ -138,6 +139,8 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [newGroupName, setNewGroupName] = useState("")
   const [newGroupDescription, setNewGroupDescription] = useState("")
+  const [showCellSurvey, setShowCellSurvey] = useState(false)
+  const [newGroupId, setNewGroupId] = useState<string | null>(null)
   const [internalOpen, setInternalOpen] = useState(false)
   const isMobileMenuOpen = isOpen !== undefined ? isOpen : internalOpen
   const setIsMobileMenuOpen = onOpenChange || setInternalOpen
@@ -311,8 +314,8 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
       setNewGroupName("")
       setNewGroupDescription("")
       setIsDialogOpen(false)
-      setIsMobileMenuOpen(false)
-      router.push(`/chat/${group.id}`)
+      setNewGroupId(group.id)
+      setShowCellSurvey(true)
     } catch (error: any) {
       console.error("Error creating group:", error)
       setError(error.message || t.unexpectedError)
@@ -329,6 +332,14 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
 
   const closeSidebar = () => {
     setIsMobileMenuOpen(false)
+  }
+
+  const handleSurveyComplete = () => {
+    if (newGroupId) {
+      setIsMobileMenuOpen(false)
+      router.push(`/chat/${newGroupId}`)
+      setNewGroupId(null)
+    }
   }
 
   const SidebarContent = () => (
@@ -497,6 +508,14 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
           {t.signOut}
         </Button>
       </div>
+      {newGroupId && (
+        <CellSurveyDialog
+          open={showCellSurvey}
+          onOpenChange={setShowCellSurvey}
+          groupId={newGroupId}
+          onComplete={handleSurveyComplete}
+        />
+      )}
     </div>
   )
 

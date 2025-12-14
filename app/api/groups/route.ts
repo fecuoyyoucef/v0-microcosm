@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       console.error("Error creating default node:", nodeError)
     }
 
-    return NextResponse.json(group)
+    return NextResponse.json({ ...group, needsSurvey: true })
   } catch (error) {
     console.error("Error in POST /api/groups:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
