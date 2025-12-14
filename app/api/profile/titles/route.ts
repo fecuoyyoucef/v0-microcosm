@@ -1,44 +1,65 @@
 // API لإدارة الألقاب
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { getUserTitles, getUserStats, setActiveTitle } from "@/lib/activity-tracker"
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  try {
+    const { searchParams } = req.nextUrl
+    const userId = searchParams.get("userId")
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!userId) {
+      return NextResponse.json({ error: "User ID required" }, { status: 400 })
+    }
+
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from("user_titles")
+      .select(
+        `
+        *,
+        title:titles(*)
+      `,
+      )
+      .eq("user_id", userId)
+      .eq("is_visible", true)
+      .order("earned_at", { ascending: false })
+
+    if (error) {
+      console.error("Error fetching user titles:", error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json(data || [])
+  } catch (error: any) {
+    console.error("Error in titles API:", error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
-
-  const searchParams = req.nextUrl.searchParams
-  const userId = searchParams.get("userId") || user.id
-
-  const titles = await getUserTitles(userId)
-  const stats = await getUserStats(userId)
-
-  return NextResponse.json({ titles, stats })
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
-  const { titleId } = await req.json()
+    const { titleId } = await req.json()
 
-  const success = await setActiveTitle(user.id, titleId)
+    const { error } = await supabase.from("profiles").update({ active_title_id: titleId }).eq("id", user.id)
 
-  if (success) {
+    if (error) {
+      console.error("Error setting active title:", error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
     return NextResponse.json({ success: true })
+  } catch (error: any) {
+    console.error("Error in set active title API:", error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
-
-  return NextResponse.json({ error: "Failed to set active title" }, { status: 500 })
 }

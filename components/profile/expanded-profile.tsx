@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { Crown, Star, Trophy, TrendingUp, MessageSquare, Lightbulb, Target } from "lucide-react"
-import { getUserTitles, getUserStats } from "@/lib/activity-tracker"
 import { createClient } from "@/lib/supabase/client"
 
 interface Title {
@@ -61,12 +60,14 @@ export function ExpandedProfile({ userId }: { userId: string }) {
     setProfile(profileData)
     setActiveTitle(profileData?.active_title_id)
 
-    // جلب الألقاب
-    const titlesData = await getUserTitles(userId)
-    setTitles(titlesData as any)
+    // جلب الألقاب عبر API
+    const titlesResponse = await fetch(`/api/profile/titles?userId=${userId}`)
+    const titlesData = await titlesResponse.json()
+    setTitles(titlesData)
 
-    // جلب الإحصائيات
-    const statsData = await getUserStats(userId)
+    // جلب الإحصائيات عبر API
+    const statsResponse = await fetch(`/api/profile/stats?userId=${userId}`)
+    const statsData = await statsResponse.json()
     setStats(statsData)
 
     setLoading(false)
