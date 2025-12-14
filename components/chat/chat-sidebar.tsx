@@ -407,7 +407,7 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
             </div>
           </Link>
 
-          <Link href="/chat/settings/account" onClick={closeSidebar}>
+          <Link href="/chat/profile" onClick={closeSidebar}>
             <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
               <User className="w-5 h-5 text-muted-foreground" />
               <span className="text-sm font-medium">{t.profile}</span>

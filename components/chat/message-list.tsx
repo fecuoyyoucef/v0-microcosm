@@ -12,6 +12,7 @@ import { format } from "date-fns"
 import { ar } from "date-fns/locale"
 import type { Message, GroupMember, ConversationNode } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { Link } from "next/link"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -378,7 +379,11 @@ export function MessageList({
                     <div className={cn("max-w-[70%] flex flex-col", isOwn && "items-end")}>
                       {showName && (
                         <div className="flex items-center gap-2 mb-0.5 px-1">
-                          <span className="text-[11px] font-medium text-muted-foreground">{senderName}</span>
+                          <Link href={`/chat/profile/${message.sender_id}`} className="hover:underline">
+                            <span className="text-[11px] font-medium text-muted-foreground cursor-pointer">
+                              {senderName}
+                            </span>
+                          </Link>
                           {message.sender?.active_title && (
                             <Badge
                               variant="secondary"

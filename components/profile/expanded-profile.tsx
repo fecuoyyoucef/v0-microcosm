@@ -35,12 +35,14 @@ interface UserStats {
   messages_sent: number
 }
 
-export function ExpandedProfile({ userId }: { userId: string }) {
+export function ExpandedProfile({ userId, viewerId }: { userId: string; viewerId?: string }) {
   const [titles, setTitles] = useState<Title[]>([])
   const [stats, setStats] = useState<UserStats | null>(null)
   const [activeTitle, setActiveTitle] = useState<string | null>(null)
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+
+  const isOwnProfile = viewerId ? userId === viewerId : true
 
   useEffect(() => {
     loadProfileData()
@@ -74,6 +76,8 @@ export function ExpandedProfile({ userId }: { userId: string }) {
   }
 
   async function handleSetActiveTitle(titleId: string) {
+    if (!isOwnProfile) return
+
     const supabase = createClient()
     const { error } = await supabase.from("profiles").update({ active_title_id: titleId }).eq("id", userId)
 
@@ -125,6 +129,12 @@ export function ExpandedProfile({ userId }: { userId: string }) {
       {/* Header Section */}
       <Card>
         <CardContent className="pt-6">
+          {!isOwnProfile && (
+            <div className="mb-4 p-3 bg-muted/50 rounded-lg">
+              <p className="text-sm text-muted-foreground">تشاهد الملف الشخصي لـ {profile?.display_name}</p>
+            </div>
+          )}
+
           <div className="flex items-start gap-6">
             <Avatar className="w-24 h-24 ring-4 ring-primary/20">
               <AvatarImage src={profile?.avatar_url || "/placeholder.svg"} />
@@ -173,18 +183,20 @@ export function ExpandedProfile({ userId }: { userId: string }) {
         <TabsContent value="titles" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>ألقابي ({titles.length})</CardTitle>
-              <CardDescription>اختر اللقب الذي تريد عرضه في ملفك الشخصي</CardDescription>
+              <CardTitle>
+                {isOwnProfile ? "ألقابي" : "ألقاب " + profile?.display_name} ({titles.length})
+              </CardTitle>
+              {isOwnProfile && <CardDescription>اختر اللقب الذي تريد عرضه في ملفك الشخصي</CardDescription>}
             </CardHeader>
             <CardContent>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {titles.map((title: any) => (
                   <Card
                     key={title.id}
-                    className={`cursor-pointer transition-all hover:ring-2 hover:ring-primary ${
-                      activeTitle === title.title_id ? "ring-2 ring-primary" : ""
-                    }`}
-                    onClick={() => handleSetActiveTitle(title.title_id)}
+                    className={`transition-all ${
+                      isOwnProfile ? "cursor-pointer hover:ring-2 hover:ring-primary" : "cursor-default"
+                    } ${activeTitle === title.title_id ? "ring-2 ring-primary" : ""}`}
+                    onClick={() => isOwnProfile && handleSetActiveTitle(title.title_id)}
                   >
                     <CardContent className="p-4">
                       <div className="flex items-start gap-3">
@@ -215,8 +227,8 @@ export function ExpandedProfile({ userId }: { userId: string }) {
               {titles.length === 0 && (
                 <div className="text-center py-12 text-muted-foreground">
                   <Trophy className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p>لم تحصل على أي ألقاب بعد</p>
-                  <p className="text-sm">ابدأ بالمساهمة في المجتمع لكسب الألقاب!</p>
+                  <p>{isOwnProfile ? "لم تحصل على أي ألقاب بعد" : `${profile?.display_name} لم يحصل على ألقاب بعد`}</p>
+                  {isOwnProfile && <p className="text-sm">ابدأ بالمساهمة في المجتمع لكسب الألقاب!</p>}
                 </div>
               )}
             </CardContent>
