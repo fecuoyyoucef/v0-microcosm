@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { ChatSidebar } from "@/components/chat/chat-sidebar"
 import { InstallPromptNotification } from "@/components/pwa/install-button"
+import { OnboardingTour } from "@/components/onboarding/onboarding-tour"
+import { SupportAgentChat } from "@/components/support/support-agent-chat"
 
 export default async function ChatLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -18,6 +20,10 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
   return (
     <div className="h-dvh flex bg-background relative">
       <InstallPromptNotification />
+
+      <OnboardingTour />
+
+      <SupportAgentChat />
 
       {/* Sidebar - hidden on mobile, visible on desktop */}
       <aside className="hidden md:flex md:w-72 lg:w-80 border-l border-border bg-card flex-col shrink-0">
