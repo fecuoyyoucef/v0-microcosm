@@ -68,15 +68,29 @@ export function OnboardingTour() {
   }, [])
 
   const checkOnboardingStatus = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) return
 
-    const { data } = await supabase.from("user_onboarding_progress").select("*").eq("user_id", user.id).single()
+      const { data, error } = await supabase
+        .from("user_onboarding_progress")
+        .select("*")
+        .eq("user_id", user.id)
+        .single()
 
-    if (!data || (!data.completed_at && !data.skipped)) {
-      setIsOpen(true)
+      if (error) {
+        console.log("[v0] Onboarding table not ready yet")
+        return
+      }
+
+      if (!data || (!data.completed_at && !data.skipped)) {
+        setIsOpen(true)
+      }
+    } catch (error) {
+      console.error("[v0] Onboarding check error:", error)
+      // Fail silently - don't crash the app
     }
   }
 
@@ -103,56 +117,69 @@ export function OnboardingTour() {
   }
 
   const handleSkip = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) return
 
-    await supabase.from("user_onboarding_progress").upsert({
-      user_id: user.id,
-      current_step: ONBOARDING_STEPS[currentStep].id,
-      skipped: true,
-    })
+      await supabase.from("user_onboarding_progress").upsert({
+        user_id: user.id,
+        current_step: ONBOARDING_STEPS[currentStep].id,
+        skipped: true,
+      })
+    } catch (error) {
+      console.error("[v0] Skip onboarding error:", error)
+    }
 
     setIsOpen(false)
     toast.info("يمكنك إعادة الجولة من الإعدادات في أي وقت")
   }
 
   const updateProgress = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) return
 
-    const { data } = await supabase
-      .from("user_onboarding_progress")
-      .select("completed_steps")
-      .eq("user_id", user.id)
-      .single()
+      const { data } = await supabase
+        .from("user_onboarding_progress")
+        .select("completed_steps")
+        .eq("user_id", user.id)
+        .single()
 
-    const completedSteps = data?.completed_steps || []
-    completedSteps.push(ONBOARDING_STEPS[currentStep].id)
+      const completedSteps = data?.completed_steps || []
+      completedSteps.push(ONBOARDING_STEPS[currentStep].id)
 
-    await supabase.from("user_onboarding_progress").upsert({
-      user_id: user.id,
-      current_step: ONBOARDING_STEPS[currentStep + 1]?.id || "completed",
-      completed_steps: completedSteps,
-    })
+      await supabase.from("user_onboarding_progress").upsert({
+        user_id: user.id,
+        current_step: ONBOARDING_STEPS[currentStep + 1]?.id || "completed",
+        completed_steps: completedSteps,
+      })
+    } catch (error) {
+      console.error("[v0] Update progress error:", error)
+    }
   }
 
   const completeOnboarding = async () => {
     setLoading(true)
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return
 
-    await supabase.from("user_onboarding_progress").upsert({
-      user_id: user.id,
-      current_step: "completed",
-      completed_at: new Date().toISOString(),
-      completed_steps: ONBOARDING_STEPS.map((s) => s.id),
-    })
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) return
+
+      await supabase.from("user_onboarding_progress").upsert({
+        user_id: user.id,
+        current_step: "completed",
+        completed_at: new Date().toISOString(),
+        completed_steps: ONBOARDING_STEPS.map((s) => s.id),
+      })
+    } catch (error) {
+      console.error("[v0] Complete onboarding error:", error)
+    }
 
     setIsOpen(false)
     setLoading(false)

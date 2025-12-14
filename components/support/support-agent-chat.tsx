@@ -66,7 +66,10 @@ export function SupportAgentChat() {
         }),
       })
 
-      if (!response.ok) throw new Error("Failed to get response")
+      if (!response.ok) {
+        console.error("[v0] Support chat API error:", response.status)
+        throw new Error("Failed to get response")
+      }
 
       const data = await response.json()
 
@@ -88,7 +91,14 @@ export function SupportAgentChat() {
         })
       }
     } catch (error) {
-      console.error("Support chat error:", error)
+      console.error("[v0] Support chat error:", error)
+
+      const fallbackMessage: Message = {
+        role: "assistant",
+        content: "عذراً، لا يمكنني الإجابة الآن. يرجى المحاولة لاحقاً أو الإبلاغ عن المشكلة.",
+        timestamp: new Date(),
+      }
+      setMessages((prev) => [...prev, fallbackMessage])
       toast.error("عذراً، حدث خطأ. حاول مرة أخرى")
     } finally {
       setLoading(false)
