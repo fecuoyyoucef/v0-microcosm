@@ -377,7 +377,23 @@ export function MessageList({
 
                     <div className={cn("max-w-[70%] flex flex-col", isOwn && "items-end")}>
                       {showName && (
-                        <span className="text-[11px] font-medium text-muted-foreground mb-0.5 px-1">{senderName}</span>
+                        <div className="flex items-center gap-2 mb-0.5 px-1">
+                          <span className="text-[11px] font-medium text-muted-foreground">{senderName}</span>
+                          {message.sender?.active_title && (
+                            <Badge
+                              variant="secondary"
+                              className="text-[9px] h-4 px-1.5 gap-0.5"
+                              style={{
+                                backgroundColor: `${message.sender.active_title.color}20`,
+                                borderColor: message.sender.active_title.color,
+                                color: message.sender.active_title.color,
+                              }}
+                            >
+                              <span>{message.sender.active_title.icon}</span>
+                              <span>{message.sender.active_title.name_ar}</span>
+                            </Badge>
+                          )}
+                        </div>
                       )}
 
                       {replyPreview && (

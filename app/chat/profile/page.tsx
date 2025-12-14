@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
-import { ProfileManager } from "@/components/profile/profile-manager"
+import { ExpandedProfile } from "@/components/profile/expanded-profile"
 
 export default async function ProfilePage() {
   const supabase = await createClient()
@@ -12,11 +12,9 @@ export default async function ProfilePage() {
     redirect("/auth/login")
   }
 
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
-
   return (
     <div className="flex-1 overflow-auto">
-      <ProfileManager user={user} profile={profile} />
+      <ExpandedProfile userId={user.id} />
     </div>
   )
 }
