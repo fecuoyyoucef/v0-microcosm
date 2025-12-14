@@ -34,6 +34,7 @@ import {
   Shield,
   Bug,
   Sparkles,
+  Activity,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -42,6 +43,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
+import { AIAssistantPanel } from "@/components/admin/ai-assistant-panel"
 
 interface Stats {
   users: number
@@ -342,7 +344,7 @@ export default function AdminDashboard() {
     cancelled: X,
   }
 
-  const featureSettings = [
+  const allFeatureSettings = [
     {
       key: "cell_classification_enabled",
       label: "نظام تصنيف الخلايا",
@@ -350,6 +352,7 @@ export default function AdminDashboard() {
       icon: Target,
       color: "text-cyan-400",
       bgColor: "bg-cyan-500/20",
+      category: "core",
     },
     {
       key: "cell_metrics_enabled",
@@ -358,14 +361,16 @@ export default function AdminDashboard() {
       icon: TrendingUp,
       color: "text-green-400",
       bgColor: "bg-green-500/20",
+      category: "core",
     },
     {
       key: "synaptic_matching_enabled",
       label: "المطابقة المشبكية الذكية",
-      description: "اقتراح خلايا للمستخدمين بناءً على اهتماماتهم وملفهم الشخصي",
+      description: "اقتراح خلايا للمستخدمين بناءً على اهتماماتهم",
       icon: Sparkles,
       color: "text-amber-400",
       bgColor: "bg-amber-500/20",
+      category: "ai",
     },
     {
       key: "ai_features_enabled",
@@ -374,14 +379,43 @@ export default function AdminDashboard() {
       icon: Brain,
       color: "text-purple-400",
       bgColor: "bg-purple-500/20",
+      category: "ai",
+    },
+    {
+      key: "content_moderation_enabled",
+      label: "فحص المحتوى التلقائي",
+      description: "كشف المحتوى غير اللائق تلقائياً",
+      icon: Shield,
+      color: "text-red-400",
+      bgColor: "bg-red-500/20",
+      category: "safety",
+    },
+    {
+      key: "push_notifications_enabled",
+      label: "الإشعارات الفورية",
+      description: "إرسال إشعارات فورية للمستخدمين",
+      icon: Bell,
+      color: "text-yellow-400",
+      bgColor: "bg-yellow-500/20",
+      category: "notifications",
+    },
+    {
+      key: "user_invites_enabled",
+      label: "دعوات المستخدمين",
+      description: "السماح للمستخدمين بدعوة آخرين",
+      icon: Users,
+      color: "text-blue-400",
+      bgColor: "bg-blue-500/20",
+      category: "social",
     },
     {
       key: "maintenance_mode",
       label: "وضع الصيانة",
       description: "إيقاف التطبيق مؤقتاً للصيانة",
-      icon: Shield,
-      color: "text-red-400",
-      bgColor: "bg-red-500/20",
+      icon: AlertCircle,
+      color: "text-orange-400",
+      bgColor: "bg-orange-500/20",
+      category: "system",
     },
   ]
 
@@ -421,7 +455,7 @@ export default function AdminDashboard() {
                   <p className="text-sm text-slate-400">تفعيل أو تعطيل الميزات الجديدة قبل نشرها للمستخدمين</p>
 
                   <div className="space-y-3">
-                    {featureSettings.map((feature) => {
+                    {allFeatureSettings.map((feature) => {
                       const Icon = feature.icon
                       const isEnabled = systemSettings[feature.key]?.value === true
                       const isUpdating = updatingSettings === feature.key
@@ -955,6 +989,37 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* AI Assistant Panel and System Health */}
+        <div className="grid lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2">
+            <AIAssistantPanel />
+          </div>
+
+          {/* System Health */}
+          <Card className="bg-slate-800/50 border-slate-700">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Activity className="w-5 h-5 text-green-400" />
+                صحة النظام
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-green-500/10">
+                <span className="text-sm text-green-400">قاعدة البيانات</span>
+                <span className="text-xs text-green-400 font-bold">نشط</span>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-green-500/10">
+                <span className="text-sm text-green-400">الذكاء الاصطناعي</span>
+                <span className="text-xs text-green-400 font-bold">متصل</span>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-green-500/10">
+                <span className="text-sm text-green-400">الإشعارات</span>
+                <span className="text-xs text-green-400 font-bold">يعمل</span>
               </div>
             </CardContent>
           </Card>

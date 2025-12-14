@@ -5,6 +5,10 @@ const groq = createGroq({
   apiKey: process.env.GROQ_API_KEY,
 })
 
+export function getAIModel() {
+  return groq("llama-3.3-70b-versatile")
+}
+
 export async function generateAIText(
   prompt: string,
   options?: {
@@ -14,7 +18,7 @@ export async function generateAIText(
 ): Promise<string> {
   try {
     const { text } = await generateText({
-      model: groq("llama-3.3-70b-versatile"),
+      model: getAIModel(),
       prompt: prompt,
       maxTokens: options?.maxTokens || 2000,
       temperature: options?.temperature || 0.7,
@@ -35,7 +39,7 @@ export async function generateAIStream(
 ): Promise<ReadableStream> {
   try {
     const result = streamText({
-      model: groq("llama-3.3-70b-versatile"),
+      model: getAIModel(),
       prompt: prompt,
       maxTokens: options?.maxTokens || 2000,
       temperature: options?.temperature || 0.7,
