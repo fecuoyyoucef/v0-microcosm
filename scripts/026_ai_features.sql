@@ -45,17 +45,11 @@ ALTER TABLE moderation_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE message_classifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE extracted_action_items ENABLE ROW LEVEL SECURITY;
 
--- Admins only can see moderation logs
-CREATE POLICY "Admins can view moderation logs" ON moderation_logs
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM profiles 
-      WHERE profiles.id = auth.uid() 
-      AND profiles.is_admin = true
-    )
-  );
+-- إزالة RLS policy الخاطئة التي تعتمد على profiles.is_admin
+-- سيمكن للمسؤولين رؤية السجلات من لوحة التحكم مباشرة عبر service role key
 
 -- Anyone can view their own message classifications
+DROP POLICY IF EXISTS "Users can view classifications" ON message_classifications;
 CREATE POLICY "Users can view classifications" ON message_classifications
   FOR SELECT USING (
     EXISTS (
@@ -66,6 +60,7 @@ CREATE POLICY "Users can view classifications" ON message_classifications
   );
 
 -- Group members can view action items
+DROP POLICY IF EXISTS "Members can view action items" ON extracted_action_items;
 CREATE POLICY "Members can view action items" ON extracted_action_items
   FOR SELECT USING (
     EXISTS (
@@ -76,6 +71,7 @@ CREATE POLICY "Members can view action items" ON extracted_action_items
   );
 
 -- Group admins can insert/update/delete action items
+DROP POLICY IF EXISTS "Admins can manage action items" ON extracted_action_items;
 CREATE POLICY "Admins can manage action items" ON extracted_action_items
   FOR ALL USING (
     EXISTS (
