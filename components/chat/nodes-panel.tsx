@@ -129,6 +129,16 @@ export function NodesPanel({
     })
 
     if (!error) {
+      await fetch("/api/activity/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          activityType: createParentId ? "node_created" : "valuable_node_created",
+          groupId,
+          metadata: { node_title: newNodeTitle.trim(), is_primary: !createParentId },
+        }),
+      }).catch((err) => console.error("[v0] Failed to track node creation:", err))
+
       setNewNodeTitle("")
       setNewNodeColor(DEFAULT_COLORS[0])
       setIsCreateOpen(false)
@@ -163,6 +173,16 @@ export function NodesPanel({
       if (response.ok) {
         const data = await response.json()
         setSummaries((prev) => ({ ...prev, [node.id]: data.summary }))
+
+        await fetch("/api/activity/track", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            activityType: "node_summarized",
+            groupId,
+            metadata: { node_id: node.id, node_title: node.title },
+          }),
+        }).catch((err) => console.error("[v0] Failed to track summary:", err))
       }
     } catch (error) {
       console.error("Error generating summary:", error)

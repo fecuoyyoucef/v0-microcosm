@@ -152,6 +152,16 @@ export function DecisionsContainer({
     })
 
     if (!error) {
+      await fetch("/api/activity/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          activityType: "decision_created",
+          groupId,
+          metadata: { decision_title: title.trim() },
+        }),
+      }).catch((err) => console.error("[v0] Failed to track decision:", err))
+
       setTitle("")
       setDescription("")
       setAiError(null)
@@ -171,6 +181,16 @@ export function DecisionsContainer({
     )
 
     if (!error) {
+      await fetch("/api/activity/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          activityType: "decision_voted",
+          groupId,
+          metadata: { decision_id: decisionId, vote },
+        }),
+      }).catch((err) => console.error("[v0] Failed to track vote:", err))
+
       setUserVotes((prev) => ({ ...prev, [decisionId]: vote }))
     }
   }
