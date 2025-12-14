@@ -23,7 +23,19 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Users, MoreVertical, UserPlus, Settings, Copy, Check, LogOut, Download, Sparkles } from "lucide-react"
+import {
+  Users,
+  MoreVertical,
+  UserPlus,
+  Settings,
+  Copy,
+  Check,
+  LogOut,
+  Download,
+  Sparkles,
+  Gauge,
+  Loader2,
+} from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import type { Group, GroupMember } from "@/lib/types"
@@ -55,6 +67,9 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
   const supabase = createClient()
   const [metricsEnabled, setMetricsEnabled] = useState(false)
   const [classificationEnabled, setClassificationEnabled] = useState(false)
+  const [discussionQuality, setDiscussionQuality] = useState<number | null>(null)
+  const [isAssessingQuality, setIsAssessingQuality] = useState(false)
+  const [showQualityDialog, setShowQualityDialog] = useState(false)
 
   useEffect(() => {
     // Check if already in standalone mode (installed)
@@ -166,6 +181,27 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
     if (val >= 50) return "bg-yellow-500/20 border-yellow-500/30"
     if (val >= 25) return "bg-orange-500/20 border-orange-500/30"
     return "bg-red-500/20 border-red-500/30"
+  }
+
+  const handleAssessQuality = async () => {
+    setIsAssessingQuality(true)
+    try {
+      const response = await fetch("/api/ai/assess-discussion-quality", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupId: group.id }),
+      })
+
+      if (response.ok) {
+        const { quality } = await response.json()
+        setDiscussionQuality(quality.overall_score)
+        setShowQualityDialog(true)
+      }
+    } catch (error) {
+      console.error("Quality assessment error:", error)
+    } finally {
+      setIsAssessingQuality(false)
+    }
   }
 
   return (
@@ -291,11 +327,60 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
           </Dialog>
         )}
 
+        <Dialog open={showQualityDialog} onOpenChange={setShowQualityDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Gauge className="w-5 h-5 text-blue-500" />
+                تقييم جودة النقاش
+              </DialogTitle>
+            </DialogHeader>
+            {discussionQuality !== null && (
+              <div className="space-y-4">
+                <div className="p-6 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-500/30">
+                  <div className="text-center">
+                    <div className="text-5xl font-bold text-blue-500">{discussionQuality}%</div>
+                    <p className="text-sm text-muted-foreground mt-2">الدرجة الإجمالية</p>
+                  </div>
+                  <div className="mt-4 w-full bg-black/30 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 transition-all"
+                      style={{ width: `${discussionQuality}%` }}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-center text-muted-foreground">
+                  {discussionQuality >= 80 && "نقاش ممتاز! المحادثة متوازنة ومثمرة."}
+                  {discussionQuality >= 60 && discussionQuality < 80 && "نقاش جيد. يمكن تحسينه بمزيد من التفاعل."}
+                  {discussionQuality >= 40 && discussionQuality < 60 && "نقاش متوسط. يحتاج لمزيد من العمق."}
+                  {discussionQuality < 40 && "نقاش ضعيف. يحتاج إلى تحسين كبير."}
+                </p>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
         <div className="flex items-center gap-1 shrink-0">
           <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" asChild title="المساعد الذكي">
             <Link href="/chat/assistant">
               <Sparkles className="h-4 w-4 text-amber-500" />
             </Link>
+          </Button>
+
+          {/* Discussion Quality Assessment Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-xl"
+            onClick={handleAssessQuality}
+            disabled={isAssessingQuality}
+            title="تقييم جودة النقاش"
+          >
+            {isAssessingQuality ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Gauge className="h-4 w-4 text-blue-500" />
+            )}
           </Button>
 
           {canInstall && (

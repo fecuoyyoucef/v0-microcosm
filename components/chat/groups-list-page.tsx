@@ -13,6 +13,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { SmartRecommendations } from "@/components/groups/smart-recommendations"
 import {
   Plus,
   Users,
@@ -406,7 +407,7 @@ export function GroupsListPage({ groups: initialGroups, userId, profile, hasComp
   }
 
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="flex flex-col h-full max-h-[100dvh] overflow-hidden relative bg-background">
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border/50">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
@@ -512,6 +513,12 @@ export function GroupsListPage({ groups: initialGroups, userId, profile, hasComp
           </div>
         )}
       </ScrollArea>
+
+      {hasCompletedSurvey && (
+        <div className="p-4">
+          <SmartRecommendations userId={userId} />
+        </div>
+      )}
 
       <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
         <SheetContent side="right" className="w-80 p-0">

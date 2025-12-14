@@ -1,9 +1,12 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
-import { Palette, Monitor, Moon, Sun, Check, Globe } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { Palette, Monitor, Moon, Sun, Check, Globe, Sparkles } from "lucide-react"
 import { useTheme } from "next-themes"
 import { useSettings } from "@/components/settings-provider"
 
@@ -27,6 +30,10 @@ const translations = {
     arabic: "العربية",
     english: "English",
     french: "Français",
+    animatedBgTitle: "الخلفيات المتحركة",
+    animatedBgDesc: "تفعيل خلفيات الشبكة العصبية المتحركة",
+    animatedBgLabel: "تفعيل الخلفيات المتحركة",
+    animatedBgHint: "قد يؤثر على أداء الأجهزة الضعيفة",
   },
   en: {
     title: "Appearance & Themes",
@@ -47,6 +54,10 @@ const translations = {
     arabic: "العربية",
     english: "English",
     french: "Français",
+    animatedBgTitle: "Animated Backgrounds",
+    animatedBgDesc: "Enable animated neural mesh backgrounds",
+    animatedBgLabel: "Enable animated backgrounds",
+    animatedBgHint: "May affect performance on low-end devices",
   },
   fr: {
     title: "Apparence et Thèmes",
@@ -67,13 +78,44 @@ const translations = {
     arabic: "العربية",
     english: "English",
     french: "Français",
+    animatedBgTitle: "Arrière-plans animés",
+    animatedBgDesc: "Activer les arrière-plans de maillage neural animés",
+    animatedBgLabel: "Activer les arrière-plans animés",
+    animatedBgHint: "Peut affecter les performances sur les appareils faibles",
   },
 }
 
 export default function AppearanceSettingsPage() {
   const { theme, setTheme } = useTheme()
   const { fontSize, setFontSize, language, setLanguage } = useSettings()
+  const [animatedBgEnabled, setAnimatedBgEnabled] = useState(true)
   const t = translations[language]
+
+  useEffect(() => {
+    import("@/lib/system-settings").then((mod) => {
+      mod.getSystemSetting("animated_backgrounds_enabled").then((enabled) => {
+        setAnimatedBgEnabled(enabled)
+      })
+    })
+  }, [])
+
+  const handleAnimatedBgChange = async (checked: boolean) => {
+    setAnimatedBgEnabled(checked)
+    try {
+      await fetch("/api/admin/system-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          setting_key: "animated_backgrounds_enabled",
+          setting_value: checked,
+        }),
+      })
+      // Reload page to apply changes
+      window.location.reload()
+    } catch (error) {
+      console.error("Failed to save setting:", error)
+    }
+  }
 
   return (
     <div className="p-6 space-y-6 max-w-2xl overflow-auto">
@@ -167,6 +209,32 @@ export default function AppearanceSettingsPage() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground text-center">{t.savedAuto}</p>
+        </CardContent>
+      </Card>
+
+      <Separator />
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Sparkles className="w-5 h-5" />
+            {t.animatedBgTitle}
+          </CardTitle>
+          <CardDescription>{t.animatedBgDesc}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between p-3 rounded-lg hover:bg-secondary/30 transition">
+            <div className="flex items-center gap-3 flex-1">
+              <Sparkles className="w-5 h-5 text-amber-500" />
+              <div>
+                <Label htmlFor="animated-bg" className="font-semibold cursor-pointer">
+                  {t.animatedBgLabel}
+                </Label>
+                <p className="text-xs text-muted-foreground">{t.animatedBgHint}</p>
+              </div>
+            </div>
+            <Switch id="animated-bg" checked={animatedBgEnabled} onCheckedChange={handleAnimatedBgChange} />
+          </div>
         </CardContent>
       </Card>
 
