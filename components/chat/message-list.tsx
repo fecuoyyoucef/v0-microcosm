@@ -104,6 +104,20 @@ export function MessageList({
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null)
   const supabase = createClient()
   const longPressTimer = useRef<NodeJS.Timeout | null>(null)
+  const reactionPickerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (reactionPickerRef.current && !reactionPickerRef.current.contains(event.target as Node)) {
+        setShowReactionsFor(null)
+      }
+    }
+
+    if (showReactionsFor) {
+      document.addEventListener("mousedown", handleClickOutside)
+      return () => document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [showReactionsFor])
 
   useEffect(() => {
     if (messages.length === 0) return
@@ -285,14 +299,10 @@ export function MessageList({
                   !isSameSenderAsPrev && "mt-3",
                 )}
                 onMouseEnter={() => setActiveMessageId(message.id)}
-                onMouseLeave={() => {
-                  setActiveMessageId(null)
-                  setShowReactionsFor(null)
-                }}
+                onMouseLeave={() => setActiveMessageId(null)}
                 onTouchStart={() => handleTouchStart(message.id)}
                 onTouchEnd={handleTouchEnd}
               >
-                {/* Avatar - Instagram style: small, at bottom */}
                 {!isOwn && (
                   <div className="w-7 shrink-0">
                     {showAvatar ? (
@@ -311,12 +321,10 @@ export function MessageList({
                 )}
 
                 <div className={cn("max-w-[70%] flex flex-col", isOwn && "items-end")}>
-                  {/* Sender name - Instagram style */}
                   {showName && (
                     <span className="text-[11px] font-medium text-muted-foreground mb-0.5 px-1">{senderName}</span>
                   )}
 
-                  {/* Reply preview - Instagram style with vertical bar */}
                   {replyPreview && (
                     <div
                       className={cn(
@@ -329,7 +337,6 @@ export function MessageList({
                     </div>
                   )}
 
-                  {/* Message bubble - Instagram style: compact, rounded */}
                   <div
                     className={cn(
                       "relative px-3 py-1.5 transition-all",
@@ -352,7 +359,6 @@ export function MessageList({
                       message.layer === "shadow" && "italic opacity-80",
                     )}
                   >
-                    {/* Image */}
                     {hasImage && (
                       <div className="mb-1.5 -mx-1 -mt-0.5">
                         <img
@@ -368,7 +374,6 @@ export function MessageList({
                       <p className="text-[14px] whitespace-pre-wrap break-words leading-snug">{message.content}</p>
                     )}
 
-                    {/* Time and status - Instagram style: inline */}
                     <div className={cn("flex items-center gap-1 mt-0.5", isOwn ? "justify-start" : "justify-end")}>
                       <span className={cn("text-[10px]", isOwn ? "text-white/60" : "text-muted-foreground/70")}>
                         {format(new Date(message.created_at), "p", { locale: ar })}
@@ -377,7 +382,6 @@ export function MessageList({
                       {style.icon && <span className="text-[9px] opacity-50">{style.icon}</span>}
                     </div>
 
-                    {/* Node badge */}
                     {node && (
                       <Badge
                         variant="outline"
@@ -393,7 +397,6 @@ export function MessageList({
                     )}
                   </div>
 
-                  {/* Reactions - Instagram style: small emoji badges below message */}
                   {hasReactions && (
                     <div
                       className={cn(
@@ -434,7 +437,6 @@ export function MessageList({
                   )}
                 </div>
 
-                {/* Action buttons - show on hover/active */}
                 {isActive && (
                   <div
                     className={cn(
@@ -442,13 +444,15 @@ export function MessageList({
                       isOwn ? "left-0 -translate-x-full pr-1" : "right-0 translate-x-full pl-1",
                     )}
                   >
-                    {/* Reaction button */}
-                    <div className="relative">
+                    <div className="relative" ref={reactionPickerRef}>
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6 rounded-full hover:bg-muted"
-                        onClick={() => setShowReactionsFor(showReactionsFor === message.id ? null : message.id)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setShowReactionsFor(showReactionsFor === message.id ? null : message.id)
+                        }}
                       >
                         <span className="text-xs">😊</span>
                       </Button>
@@ -460,6 +464,7 @@ export function MessageList({
                             "bottom-full mb-1",
                             isOwn ? "right-0" : "left-0",
                           )}
+                          onClick={(e) => e.stopPropagation()}
                         >
                           {quickReactions.map((reaction) => {
                             const hasReacted = reactions[message.id]?.some(
@@ -487,7 +492,6 @@ export function MessageList({
                       )}
                     </div>
 
-                    {/* Reply button */}
                     {onReply && (
                       <Button
                         variant="ghost"
@@ -499,7 +503,6 @@ export function MessageList({
                       </Button>
                     )}
 
-                    {/* Delete button */}
                     {isOwn && onDelete && (
                       <Button
                         variant="ghost"
@@ -519,7 +522,6 @@ export function MessageList({
 
         <div ref={messagesEndRef} className="h-1" />
 
-        {/* Lightbox */}
         {lightboxImage && (
           <div
             className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
@@ -533,7 +535,6 @@ export function MessageList({
           </div>
         )}
 
-        {/* Delete confirmation dialog */}
         <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
