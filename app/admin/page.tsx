@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Switch } from "@/components/ui/switch"
+import { Badge } from "@/components/ui/badge"
+import { WeeklyInsightsPanel } from "@/components/admin/weekly-insights-panel"
+import { getAllFeatures, updateFeatureStatus } from "@/lib/feature-registry"
+import { WeeklySuggestionsPanel } from "@/components/admin/weekly-suggestions-panel"
 import {
   Users,
   MessageSquare,
@@ -25,7 +29,6 @@ import {
   TrendingUp,
   Layers,
   X,
-  Settings,
   Bug,
   Activity,
 } from "lucide-react"
@@ -103,6 +106,11 @@ export default function AdminDashboard() {
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({})
   const [updatingSettings, setUpdatingSettings] = useState<string | null>(null)
 
+  const [features, setFeatures] = useState<any[]>([])
+  const [syncingFeatures, setSyncingFeatures] = useState(false)
+
+  const [showSuggestions, setShowSuggestions] = useState(false)
+
   const fetchStats = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/stats")
@@ -153,11 +161,14 @@ export default function AdminDashboard() {
     }
   }, [])
 
-  useEffect(() => {
-    fetchStats()
-    fetchDevNotes()
-    fetchSystemSettings()
-  }, [fetchStats, fetchDevNotes, fetchSystemSettings])
+  const fetchFeatures = useCallback(async () => {
+    try {
+      const allFeatures = await getAllFeatures()
+      setFeatures(allFeatures)
+    } catch (error) {
+      console.error("Features fetch error:", error)
+    }
+  }, [])
 
   const handleLogout = async () => {
     await fetch("/api/admin/logout", { method: "POST" })
@@ -319,13 +330,43 @@ export default function AdminDashboard() {
     handleToggleSystemSetting(key, currentValue)
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
-      </div>
-    )
+  const handleSyncFeatures = async () => {
+    setSyncingFeatures(true)
+    try {
+      const res = await fetch("/api/admin/features/sync", {
+        method: "POST",
+      })
+      if (res.ok) {
+        const data = await res.json()
+        alert(data.message)
+        await fetchFeatures()
+      } else {
+        alert("فشلت المزامنة")
+      }
+    } catch (error) {
+      console.error("Sync error:", error)
+      alert("حدث خطأ")
+    } finally {
+      setSyncingFeatures(false)
+    }
   }
+
+  const handleToggleFeature = async (featureKey: string, currentValue: boolean) => {
+    const success = await updateFeatureStatus(featureKey, !currentValue)
+    if (success) {
+      await fetchFeatures()
+      alert("تم تحديث الميزة بنجاح")
+    } else {
+      alert("فشل تحديث الميزة")
+    }
+  }
+
+  useEffect(() => {
+    fetchStats()
+    fetchDevNotes()
+    fetchSystemSettings()
+    fetchFeatures()
+  }, [fetchStats, fetchDevNotes, fetchSystemSettings, fetchFeatures])
 
   const statusColors = {
     pending: "bg-yellow-500/20 text-yellow-400",
@@ -342,7 +383,7 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white" dir="rtl">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4 md:p-8" dir="rtl">
       {/* Header */}
       <header className="bg-slate-800/50 border-b border-slate-700 sticky top-0 z-50 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -369,107 +410,79 @@ export default function AdminDashboard() {
 
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
         {/* Feature Toggles */}
-        <Card className="bg-slate-800/50 border-slate-700">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Settings className="w-5 h-5 text-cyan-400" />
-              التحكم في الميزات
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[400px] pr-4">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 rounded-lg bg-slate-700/50">
-                  <div>
-                    <h4 className="font-medium text-white">تصنيف الخلايا</h4>
-                    <p className="text-xs text-slate-400">تمكين نظام تصنيف الخلايا</p>
-                  </div>
-                  <Switch
-                    checked={systemSettings.cell_classification_enabled?.value}
-                    onCheckedChange={() => toggleFeature("cell_classification_enabled")}
-                  />
-                </div>
+        <Dialog open={featureSettingsOpen} onOpenChange={setFeatureSettingsOpen}>
+          <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-3xl max-h-[80vh]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center justify-between">
+                <span>التحكم الشامل في الميزات</span>
+                <Button
+                  onClick={handleSyncFeatures}
+                  disabled={syncingFeatures}
+                  size="sm"
+                  variant="outline"
+                  className="gap-2 bg-transparent"
+                >
+                  <RefreshCw className={`w-4 h-4 ${syncingFeatures ? "animate-spin" : ""}`} />
+                  مزامنة
+                </Button>
+              </DialogTitle>
+            </DialogHeader>
 
-                <div className="flex items-center justify-between p-3 rounded-lg bg-slate-700/50">
-                  <div>
-                    <h4 className="font-medium text-white">معايير الخلايا</h4>
-                    <p className="text-xs text-slate-400">تمكين نظام معايير الانضمام</p>
-                  </div>
-                  <Switch
-                    checked={systemSettings.cell_criteria_enabled?.value}
-                    onCheckedChange={() => toggleFeature("cell_criteria_enabled")}
-                  />
-                </div>
+            <ScrollArea className="h-[500px] pr-4">
+              <div className="space-y-4">
+                {/* تجميع الميزات حسب الفئة */}
+                {["ai", "core", "ui", "experimental"].map((category) => {
+                  const categoryFeatures = features.filter((f) => f.category === category)
+                  if (categoryFeatures.length === 0) return null
 
-                <div className="flex items-center justify-between p-3 rounded-lg bg-slate-700/50">
-                  <div>
-                    <h4 className="font-medium text-white">المطابقة المشبكية</h4>
-                    <p className="text-xs text-slate-400">نظام اقتراح الخلايا الذكي</p>
-                  </div>
-                  <Switch
-                    checked={systemSettings.synaptic_matching_enabled?.value}
-                    onCheckedChange={() => toggleFeature("synaptic_matching_enabled")}
-                  />
-                </div>
+                  const categoryNames: Record<string, string> = {
+                    ai: "ميزات الذكاء الاصطناعي",
+                    core: "الميزات الأساسية",
+                    ui: "واجهة المستخدم",
+                    experimental: "ميزات تجريبية",
+                  }
 
-                <div className="flex items-center justify-between p-3 rounded-lg bg-slate-700/50">
-                  <div>
-                    <h4 className="font-medium text-white">ميزات الذكاء الاصطناعي</h4>
-                    <p className="text-xs text-slate-400">تفعيل جميع خدمات AI</p>
-                  </div>
-                  <Switch
-                    checked={systemSettings.ai_features_enabled?.value}
-                    onCheckedChange={() => toggleFeature("ai_features_enabled")}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-3 rounded-lg bg-slate-700/50">
-                  <div>
-                    <h4 className="font-medium text-white">فحص المحتوى التلقائي</h4>
-                    <p className="text-xs text-slate-400">فحص الرسائل قبل الإرسال</p>
-                  </div>
-                  <Switch
-                    checked={systemSettings.content_moderation_enabled?.value}
-                    onCheckedChange={() => toggleFeature("content_moderation_enabled")}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-3 rounded-lg bg-slate-700/50">
-                  <div>
-                    <h4 className="font-medium text-white">البحث الدلالي</h4>
-                    <p className="text-xs text-slate-400">بحث متقدم بالذكاء الاصطناعي</p>
-                  </div>
-                  <Switch
-                    checked={systemSettings.semantic_search_enabled?.value}
-                    onCheckedChange={() => toggleFeature("semantic_search_enabled")}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-3 rounded-lg bg-slate-700/50">
-                  <div>
-                    <h4 className="font-medium text-white">الإشعارات الفورية</h4>
-                    <p className="text-xs text-slate-400">Web Push Notifications</p>
-                  </div>
-                  <Switch
-                    checked={systemSettings.push_notifications_enabled?.value}
-                    onCheckedChange={() => toggleFeature("push_notifications_enabled")}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-3 rounded-lg bg-slate-700/50">
-                  <div>
-                    <h4 className="font-medium text-white">الخلفيات المتحركة</h4>
-                    <p className="text-xs text-slate-400">Neural Mesh Background</p>
-                  </div>
-                  <Switch
-                    checked={systemSettings.animated_backgrounds_enabled?.value}
-                    onCheckedChange={() => toggleFeature("animated_backgrounds_enabled")}
-                  />
-                </div>
+                  return (
+                    <div key={category}>
+                      <h3 className="text-sm font-semibold text-cyan-400 mb-3">{categoryNames[category]}</h3>
+                      <div className="space-y-2">
+                        {categoryFeatures.map((feature) => (
+                          <div
+                            key={feature.id}
+                            className="flex items-center justify-between p-3 rounded-lg bg-slate-700/50"
+                          >
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-medium text-white">{feature.feature_name_ar}</h4>
+                                <Badge variant="outline" className="text-xs">
+                                  v{feature.version}
+                                </Badge>
+                              </div>
+                              {feature.description_ar && (
+                                <p className="text-xs text-slate-400 mt-1">{feature.description_ar}</p>
+                              )}
+                            </div>
+                            <Switch
+                              checked={feature.is_enabled}
+                              onCheckedChange={() => handleToggleFeature(feature.feature_key, feature.is_enabled)}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </ScrollArea>
-          </CardContent>
-        </Card>
+          </DialogContent>
+        </Dialog>
+
+        {/* Suggestions Dialog */}
+        <Dialog open={showSuggestions} onOpenChange={setShowSuggestions}>
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+            <WeeklySuggestionsPanel />
+          </DialogContent>
+        </Dialog>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -663,6 +676,7 @@ export default function AdminDashboard() {
                   fetchStats()
                   fetchDevNotes()
                   fetchSystemSettings()
+                  fetchFeatures()
                 }}
               >
                 <RefreshCw className="w-6 h-6 text-cyan-400" />
@@ -845,7 +859,8 @@ export default function AdminDashboard() {
         {/* AI Assistant Panel and System Health */}
         <div className="grid lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2">
-            <AIAssistantPanel />
+            <WeeklyInsightsPanel />
+            <AIAssistantPanel stats={stats} />
           </div>
 
           {/* System Health */}
