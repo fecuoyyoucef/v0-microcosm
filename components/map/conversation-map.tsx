@@ -274,7 +274,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
     : localNodes
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-background overflow-hidden">
+    <div className="flex flex-col h-screen bg-background overflow-hidden">
       {/* Header */}
       <div className="h-14 border-b border-border px-3 md:px-4 flex items-center justify-between bg-card/50 shrink-0">
         <div className="flex items-center gap-2 md:gap-3 min-w-0">
