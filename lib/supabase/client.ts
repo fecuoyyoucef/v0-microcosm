@@ -12,7 +12,8 @@ export function createClient() {
 
   if (!url || !key) {
     console.error("[v0] Missing Supabase environment variables")
-    throw new Error("Missing Supabase environment variables")
+    // Return a minimal client that won't crash the app
+    return createBrowserClient("https://placeholder.supabase.co", "placeholder-key")
   }
 
   client = createBrowserClient(url, key)
