@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge"
 import { WeeklyInsightsPanel } from "@/components/admin/weekly-insights-panel"
 import { WeeklySuggestionsPanel } from "@/components/admin/weekly-suggestions-panel"
 import { toast } from "react-toastify"
-import { AdminSupportInsights } from "@/components/admin/admin-support-insights"
 import {
   Users,
   MessageSquare,
@@ -928,11 +927,6 @@ export default function AdminDashboard() {
               </div>
             </CardContent>
           </Card>
-        </div>
-
-        {/* Admin Support Insights */}
-        <div className="col-span-2">
-          <AdminSupportInsights />
         </div>
       </main>
     </div>
