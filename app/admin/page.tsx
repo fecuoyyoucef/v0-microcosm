@@ -413,6 +413,14 @@ export default function AdminDashboard() {
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setFeatureSettingsOpen(true)}
+              className="gap-2 bg-cyan-600 hover:bg-cyan-700 border-cyan-500 text-white"
+            >
+              <Layers className="w-4 h-4" />
+              إدارة الميزات
+            </Button>
             <Button variant="ghost" size="icon" onClick={fetchStats} className="text-slate-400 hover:text-white">
               <RefreshCw className="w-5 h-5" />
             </Button>
@@ -594,6 +602,24 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <Button
+                variant="outline"
+                className="h-auto py-4 flex flex-col items-center gap-2 bg-cyan-600/20 border-cyan-500 hover:bg-cyan-600/30"
+                onClick={() => setFeatureSettingsOpen(true)}
+              >
+                <Layers className="w-6 h-6 text-cyan-400" />
+                <span className="text-sm">إدارة الميزات</span>
+              </Button>
+
+              <Button
+                variant="outline"
+                className="h-auto py-4 flex flex-col items-center gap-2 bg-purple-600/20 border-purple-500 hover:bg-purple-600/30"
+                onClick={() => setShowSuggestions(true)}
+              >
+                <TrendingUp className="w-6 h-6 text-purple-400" />
+                <span className="text-sm">الاقتراحات الأسبوعية</span>
+              </Button>
+
               <Dialog open={notificationOpen} onOpenChange={setNotificationOpen}>
                 <DialogTrigger asChild>
                   <Button
