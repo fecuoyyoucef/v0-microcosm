@@ -17,6 +17,7 @@ import {
   Sparkles,
   Activity,
   HelpCircle,
+  ArrowLeft,
 } from "lucide-react"
 import Image from "next/image"
 
@@ -83,7 +84,16 @@ export function AdminSidebar() {
       </ScrollArea>
 
       {/* Footer */}
-      <div className="p-3 border-t border-slate-800">
+      <div className="p-3 border-t border-slate-800 space-y-2">
+        <Link href="/chat">
+          <Button
+            variant="ghost"
+            className="w-full justify-start gap-3 h-10 px-3 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            واجهة المستخدم
+          </Button>
+        </Link>
         <Button
           variant="ghost"
           className="w-full justify-start gap-3 h-10 px-3 text-red-400 hover:text-red-300 hover:bg-red-500/10"

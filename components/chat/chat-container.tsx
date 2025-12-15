@@ -390,9 +390,11 @@ export function ChatContainer({
 
   return (
     <div className="flex flex-col h-full min-h-0 relative">
-      <AnimatedBackground style={(group.background_style as BackgroundStyle) || "neural_mesh"} />
+      {group.background_style && group.background_style !== "none" && (
+        <AnimatedBackground style={(group.background_style as BackgroundStyle) || "neural_mesh"} />
+      )}
 
-      <div className="relative z-10 flex flex-col h-full min-h-0">
+      <div className="relative z-10 flex flex-col h-full min-h-0 bg-background/80">
         <ChatHeader
           group={group}
           members={members}

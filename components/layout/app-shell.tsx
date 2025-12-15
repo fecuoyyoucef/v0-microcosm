@@ -37,6 +37,8 @@ import {
   Trophy,
   HelpCircle,
   Shield,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react"
 import type { Group, Profile } from "@/lib/types"
 import { useTheme } from "next-themes"
@@ -126,6 +128,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
   const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [isBottomNavCollapsed, setIsBottomNavCollapsed] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
@@ -134,7 +137,6 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
   const { language } = useSettings()
   const t = translations[language]
 
-  // Check if user is admin
   useEffect(() => {
     const checkAdmin = async () => {
       const { data } = await supabase.from("profiles").select("role").eq("id", userId).single()
@@ -424,11 +426,26 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
             </div>
           </header>
 
-          {children}
+          <div className="flex-1 pb-20 md:pb-0 overflow-hidden">{children}</div>
         </main>
 
-        {/* Mobile Bottom Navigation */}
-        <nav className="md:hidden fixed bottom-0 inset-x-0 bg-background/80 backdrop-blur-xl border-t border-border z-50 safe-area-bottom">
+        <nav
+          className={cn(
+            "md:hidden fixed inset-x-0 bg-background/95 backdrop-blur-xl border-t border-border z-50 transition-all duration-300",
+            isBottomNavCollapsed ? "bottom-0 translate-y-[calc(100%-48px)]" : "bottom-0",
+          )}
+        >
+          <button
+            onClick={() => setIsBottomNavCollapsed(!isBottomNavCollapsed)}
+            className="w-full flex justify-center py-1 border-b border-border"
+          >
+            {isBottomNavCollapsed ? (
+              <ChevronUp className="w-4 h-4 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            )}
+          </button>
+
           <div className="flex items-center justify-around py-2 px-4">
             <Link href="/chat">
               <Button
@@ -502,13 +519,24 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
               </CommandItem>
               <CommandItem
                 onSelect={() => {
-                  router.push("/chat/settings")
+                  router.push("/chat/settings/appearance")
                   setCommandOpen(false)
                 }}
               >
                 <Settings className="ml-2 h-4 w-4" />
                 {t.settings}
               </CommandItem>
+              {isAdmin && (
+                <CommandItem
+                  onSelect={() => {
+                    router.push("/admin")
+                    setCommandOpen(false)
+                  }}
+                >
+                  <Shield className="ml-2 h-4 w-4" />
+                  {t.admin}
+                </CommandItem>
+              )}
             </CommandGroup>
             <CommandGroup heading={t.cells}>
               {groups.map((group) => (
