@@ -32,7 +32,6 @@ import {
   Moon,
   Sun,
   Hash,
-  Menu,
   Users,
   Trophy,
   HelpCircle,
@@ -388,101 +387,81 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
 
   return (
     <TooltipProvider delayDuration={0}>
-      <div className="h-dvh flex bg-background overflow-hidden">
+      <div className="relative h-dvh flex bg-background overflow-hidden">
         {/* Desktop Sidebar */}
         <aside className="hidden md:flex w-64 flex-col bg-card border-l border-border">
           <SidebarContent />
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 flex flex-col min-w-0 min-h-0">
-          {/* Mobile Header */}
-          <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-border bg-background/80 backdrop-blur-xl">
-            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <Menu className="w-5 h-5" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-72 p-0">
-                <SidebarContent isMobile />
-              </SheetContent>
-            </Sheet>
+        <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          <div className="flex-1 overflow-auto pb-16 md:pb-0">{children}</div>
 
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" onClick={() => setCommandOpen(true)}>
+          <nav
+            className={cn(
+              "md:hidden fixed inset-x-0 bottom-0 bg-background/95 backdrop-blur-xl border-t border-border z-50 transition-all duration-300 safe-area-inset-bottom",
+              isBottomNavCollapsed ? "translate-y-full" : "translate-y-0",
+            )}
+          >
+            <button
+              onClick={() => setIsBottomNavCollapsed(!isBottomNavCollapsed)}
+              className="absolute -top-8 left-1/2 -translate-x-1/2 w-12 h-8 bg-background/95 backdrop-blur-xl border border-border rounded-t-xl flex items-center justify-center"
+            >
+              {isBottomNavCollapsed ? (
+                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              )}
+            </button>
+
+            <div className="flex items-center justify-around py-3 px-4">
+              <Link href="/chat">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn("h-12 w-12 rounded-xl", pathname === "/chat" && "bg-primary/10 text-primary")}
+                >
+                  <Home className="w-5 h-5" />
+                </Button>
+              </Link>
+
+              <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl" onClick={() => setCommandOpen(true)}>
                 <Search className="w-5 h-5" />
               </Button>
+
               <Link href="/chat/notifications">
-                <Button variant="ghost" size="icon" className="relative">
-                  <Bell className="w-5 h-5" />
+                <Button size="icon" className="h-14 w-14 rounded-xl bg-primary text-primary-foreground relative">
+                  <Bell className="w-6 h-6" />
                   {unreadNotifications > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-destructive-foreground text-[10px] rounded-full flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground text-[10px] rounded-full flex items-center justify-center">
                       {unreadNotifications > 9 ? "9+" : unreadNotifications}
                     </span>
                   )}
                 </Button>
               </Link>
+
+              <Link href="/chat/assistant">
+                <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl">
+                  <Sparkles className="w-5 h-5 text-amber-500" />
+                </Button>
+              </Link>
+
+              <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Avatar className="w-10 h-10 cursor-pointer">
+                    <AvatarImage src={profile?.avatar_url || undefined} />
+                    <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                      {profile?.display_name?.charAt(0) || <User className="w-4 h-4" />}
+                    </AvatarFallback>
+                  </Avatar>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-72 p-0">
+                  <SidebarContent isMobile />
+                </SheetContent>
+              </Sheet>
             </div>
-          </header>
-
-          <div className="flex-1 pb-20 md:pb-0 overflow-hidden">{children}</div>
+          </nav>
         </main>
-
-        <nav
-          className={cn(
-            "md:hidden fixed inset-x-0 bg-background/95 backdrop-blur-xl border-t border-border z-50 transition-all duration-300",
-            isBottomNavCollapsed ? "bottom-0 translate-y-[calc(100%-48px)]" : "bottom-0",
-          )}
-        >
-          <button
-            onClick={() => setIsBottomNavCollapsed(!isBottomNavCollapsed)}
-            className="w-full flex justify-center py-1 border-b border-border"
-          >
-            {isBottomNavCollapsed ? (
-              <ChevronUp className="w-4 h-4 text-muted-foreground" />
-            ) : (
-              <ChevronDown className="w-4 h-4 text-muted-foreground" />
-            )}
-          </button>
-
-          <div className="flex items-center justify-around py-2 px-4">
-            <Link href="/chat">
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn("h-12 w-12 rounded-xl", pathname === "/chat" && "bg-primary/10 text-primary")}
-              >
-                <Home className="w-5 h-5" />
-              </Button>
-            </Link>
-
-            <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl" onClick={() => setCommandOpen(true)}>
-              <Search className="w-5 h-5" />
-            </Button>
-
-            <Link href="/chat?new=true">
-              <Button size="icon" className="h-12 w-12 rounded-xl bg-primary text-primary-foreground">
-                <Plus className="w-5 h-5" />
-              </Button>
-            </Link>
-
-            <Link href="/chat/assistant">
-              <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl">
-                <Sparkles className="w-5 h-5 text-amber-500" />
-              </Button>
-            </Link>
-
-            <Link href="/chat/profile">
-              <Avatar className="w-9 h-9">
-                <AvatarImage src={profile?.avatar_url || undefined} />
-                <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                  {profile?.display_name?.charAt(0) || <User className="w-4 h-4" />}
-                </AvatarFallback>
-              </Avatar>
-            </Link>
-          </div>
-        </nav>
 
         {/* Command Palette */}
         <CommandDialog open={commandOpen} onOpenChange={setCommandOpen}>

@@ -389,12 +389,14 @@ export function ChatContainer({
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 relative">
+    <div className="relative flex flex-col h-full w-full overflow-hidden">
       {group.background_style && group.background_style !== "none" && (
-        <AnimatedBackground style={(group.background_style as BackgroundStyle) || "neural_mesh"} />
+        <div className="absolute inset-0 z-0">
+          <AnimatedBackground style={(group.background_style as BackgroundStyle) || "neural_mesh"} />
+        </div>
       )}
 
-      <div className="relative z-10 flex flex-col h-full min-h-0 bg-background/80">
+      <div className="relative z-10 flex flex-col h-full overflow-hidden">
         <ChatHeader
           group={group}
           members={members}
@@ -423,7 +425,7 @@ export function ChatContainer({
           }))}
         />
 
-        <div className="flex-1 min-h-0 overflow-auto">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
           <MessageList
             messages={filteredMessages}
             currentUserId={currentUserId}
