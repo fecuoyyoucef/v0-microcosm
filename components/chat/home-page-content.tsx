@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { SmartRecommendations } from "@/components/groups/smart-recommendations"
 import { SuggestedCells } from "@/components/groups/suggested-cells"
 import { CellSurveyDialog } from "@/components/groups/cell-survey-dialog"
-import { Plus, Users, Search, Loader2, Sparkles } from "lucide-react"
+import { Plus, Users, Search, Loader2, MessageCircle } from "lucide-react"
 import type { Group, Profile } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { useSettings } from "@/components/settings-provider"
@@ -50,6 +50,11 @@ const translations = {
     newCell: "خلية جديدة",
     assistant: "المساعد الذكي",
     exploreAI: "استكشف الذكاء الاصطناعي",
+    supportAgent: "دعم العملاء",
+    supportDesc: "تحدث مع وكيل الدعم الذكي",
+    sendMessage: "إرسال",
+    typeMessage: "اكتب رسالتك...",
+    supportTitle: "دعم العملاء",
   },
   en: {
     welcome: "Welcome",
@@ -73,6 +78,11 @@ const translations = {
     newCell: "New Cell",
     assistant: "AI Assistant",
     exploreAI: "Explore AI Features",
+    supportAgent: "Customer Support",
+    supportDesc: "Chat with AI support agent",
+    sendMessage: "Send",
+    typeMessage: "Type your message...",
+    supportTitle: "Customer Support",
   },
   fr: {
     welcome: "Bienvenue",
@@ -96,6 +106,11 @@ const translations = {
     newCell: "Nouvelle Cellule",
     assistant: "Assistant IA",
     exploreAI: "Explorer l'IA",
+    supportAgent: "Support Client",
+    supportDesc: "Discuter avec l'agent",
+    sendMessage: "Envoyer",
+    typeMessage: "Votre message...",
+    supportTitle: "Support Client",
   },
 }
 
@@ -111,6 +126,10 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
   const [newGroupId, setNewGroupId] = useState<string | null>(null)
   const [memberCounts, setMemberCounts] = useState<Record<string, number>>({})
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
+  const [showSupportDialog, setShowSupportDialog] = useState(false)
+  const [supportMessages, setSupportMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([])
+  const [supportInput, setSupportInput] = useState("")
+  const [isSendingSupport, setIsSendingSupport] = useState(false)
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -118,7 +137,6 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
   const { language } = useSettings()
   const t = translations[language]
 
-  // Open create dialog if ?new=true
   useEffect(() => {
     if (searchParams.get("new") === "true") {
       setIsCreateDialogOpen(true)
@@ -130,7 +148,6 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
     fetchMemberCounts()
     fetchUnreadCounts()
 
-    // Real-time subscription
     const channel = supabase
       .channel("home-updates")
       .on(
@@ -240,6 +257,34 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
     }
   }
 
+  const sendSupportMessage = async () => {
+    if (!supportInput.trim() || isSendingSupport) return
+
+    const userMessage = supportInput.trim()
+    setSupportInput("")
+    setSupportMessages((prev) => [...prev, { role: "user", content: userMessage }])
+    setIsSendingSupport(true)
+
+    try {
+      const response = await fetch("/api/support/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: userMessage, userId }),
+      })
+
+      const data = await response.json()
+
+      if (data.reply) {
+        setSupportMessages((prev) => [...prev, { role: "assistant", content: data.reply }])
+      }
+    } catch (error) {
+      console.error("Support chat error:", error)
+      setSupportMessages((prev) => [...prev, { role: "assistant", content: "عذراً، حدث خطأ. حاول مرة أخرى." }])
+    } finally {
+      setIsSendingSupport(false)
+    }
+  }
+
   return (
     <div className="flex flex-col h-full bg-background pb-16 md:pb-0">
       {/* Header */}
@@ -284,16 +329,17 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
               </CardContent>
             </Card>
 
-            <Link href="/chat/assistant">
-              <Card className="cursor-pointer hover:bg-muted/50 transition-colors h-full">
-                <CardContent className="p-4 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                    <Sparkles className="w-5 h-5 text-amber-500" />
-                  </div>
-                  <span className="font-medium">{t.assistant}</span>
-                </CardContent>
-              </Card>
-            </Link>
+            <Card
+              className="cursor-pointer hover:bg-muted/50 transition-colors"
+              onClick={() => setShowSupportDialog(true)}
+            >
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center">
+                  <MessageCircle className="w-5 h-5 text-cyan-500" />
+                </div>
+                <span className="font-medium">{t.supportAgent}</span>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Suggested Cells */}
@@ -405,6 +451,56 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
               ) : (
                 t.create
               )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Support Dialog */}
+      <Dialog open={showSupportDialog} onOpenChange={setShowSupportDialog}>
+        <DialogContent className="sm:max-w-md h-[500px] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{t.supportTitle}</DialogTitle>
+            <DialogDescription>{t.supportDesc}</DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="flex-1 -mx-6 px-6 my-4">
+            <div className="space-y-4">
+              {supportMessages.length === 0 ? (
+                <div className="text-center text-muted-foreground py-8">
+                  <MessageCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">{t.supportDesc}</p>
+                </div>
+              ) : (
+                supportMessages.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    className={cn(
+                      "p-3 rounded-xl max-w-[80%]",
+                      msg.role === "user" ? "bg-primary text-primary-foreground mr-auto" : "bg-muted ml-auto",
+                    )}
+                  >
+                    <p className="text-sm">{msg.content}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </ScrollArea>
+          <div className="flex gap-2">
+            <Input
+              value={supportInput}
+              onChange={(e) => setSupportInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendSupportMessage()}
+              placeholder={t.typeMessage}
+              className="rounded-xl"
+              disabled={isSendingSupport}
+            />
+            <Button
+              onClick={sendSupportMessage}
+              disabled={!supportInput.trim() || isSendingSupport}
+              size="icon"
+              className="rounded-xl shrink-0"
+            >
+              {isSendingSupport ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
             </Button>
           </div>
         </DialogContent>
