@@ -15,6 +15,7 @@ body {
   min-height: 100dvh;
 }
 
+/* Updated version marker for deployment */
 :root {
   --background: oklch(0.98 0.005 270);
   --foreground: oklch(0.2 0.02 270);
