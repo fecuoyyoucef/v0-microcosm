@@ -13,28 +13,75 @@ export async function GET() {
   try {
     const supabase = await createClient()
 
-    // Try to fetch from support_tickets table if it exists
-    const { data: tickets, error } = await supabase
-      .from("support_tickets")
+    const { data: conversations, error: convError } = await supabase
+      .from("support_conversations")
       .select(`
-        *,
+        id,
+        user_id,
+        issue_detected,
+        created_at,
+        updated_at,
+        conversation_data,
         profiles:user_id (display_name)
       `)
       .order("created_at", { ascending: false })
       .limit(50)
 
-    if (error) {
-      // Table might not exist yet, return empty array
-      console.log("Support tickets table not found, returning empty array")
-      return NextResponse.json({ tickets: [] })
+    const { data: reports, error: reportsError } = await supabase
+      .from("user_issue_reports")
+      .select(`
+        id,
+        user_id,
+        title,
+        description,
+        issue_type,
+        severity,
+        status,
+        created_at,
+        profiles:user_id (display_name)
+      `)
+      .order("created_at", { ascending: false })
+      .limit(50)
+
+    const tickets = []
+
+    if (!convError && conversations) {
+      conversations.forEach((conv: any) => {
+        if (conv.issue_detected) {
+          tickets.push({
+            id: conv.id,
+            user_id: conv.user_id,
+            user_name: conv.profiles?.display_name || "مستخدم",
+            type: "question",
+            title: conv.issue_detected.substring(0, 100),
+            description: conv.issue_detected,
+            status: conv.escalated_to_admin ? "in_progress" : "open",
+            priority: "normal",
+            created_at: conv.created_at,
+          })
+        }
+      })
     }
 
-    const formattedTickets = tickets.map((ticket) => ({
-      ...ticket,
-      user_name: ticket.profiles?.display_name || "مستخدم",
-    }))
+    if (!reportsError && reports) {
+      reports.forEach((report: any) => {
+        tickets.push({
+          id: report.id,
+          user_id: report.user_id,
+          user_name: report.profiles?.display_name || "مستخدم",
+          type: report.issue_type === "bug" ? "bug" : report.issue_type === "feature_request" ? "feature" : "feedback",
+          title: report.title,
+          description: report.description,
+          status: report.status || "open",
+          priority: report.severity || "normal",
+          created_at: report.created_at,
+        })
+      })
+    }
 
-    return NextResponse.json({ tickets: formattedTickets })
+    tickets.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+    return NextResponse.json({ tickets })
   } catch (error) {
     console.error("Error fetching support tickets:", error)
     return NextResponse.json({ tickets: [] })
