@@ -13,13 +13,13 @@ import {
   Sparkles,
   FileText,
   TrendingUp,
+  Archive,
 } from "lucide-react"
 import type { MessageLayer, ConversationNode } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { NodesPanel } from "./nodes-panel"
-import { useFeature } from "@/hooks/use-features"
 import { useState } from "react"
 
 interface LayerFilterProps {
@@ -51,14 +51,6 @@ export function LayerFilter({
   const groupId = propGroupId || (params.groupId as string)
   const selectedNode = nodes.find((n) => n.id === selectedNodeId)
   const [isNodesPanelOpen, setIsNodesPanelOpen] = useState(false)
-
-  const mindMapEnabled = useFeature("mind_map")
-  const notebookEnabled = useFeature("group_notebook")
-  const memoryEnabled = useFeature("daily_memory")
-  const decisionsEnabled = useFeature("decisions_system")
-  const nodesEnabled = useFeature("conversation_nodes")
-  const aiSummaryEnabled = useFeature("ai_summary")
-  const discussionQualityEnabled = useFeature("discussion_quality")
 
   return (
     <div className="shrink-0 border-b border-border/50 bg-background/80 backdrop-blur-xl w-full">
@@ -114,91 +106,84 @@ export function LayerFilter({
           {/* فاصل */}
           <div className="w-px h-6 bg-border/50 mx-1" />
 
-          {/* الأدوات */}
-          {decisionsEnabled && (
-            <Link href={`/chat/${groupId}/decisions`}>
-              <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-amber-500/10">
-                <Vote className="w-3.5 h-3.5 text-amber-600" />
-                القرارات
-              </Button>
-            </Link>
-          )}
+          {/* الأدوات - إزالة شروط Feature Flags لإظهار جميع الأدوات دائماً */}
+          <Link href={`/chat/${groupId}/decisions`}>
+            <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-amber-500/10">
+              <Vote className="w-3.5 h-3.5 text-amber-600" />
+              القرارات
+            </Button>
+          </Link>
 
-          {nodesEnabled && (
-            <Sheet open={isNodesPanelOpen} onOpenChange={setIsNodesPanelOpen}>
-              <SheetTrigger asChild>
-                <Button
-                  variant={selectedNodeId ? "secondary" : "ghost"}
-                  size="sm"
-                  className="h-8 text-xs gap-1.5 rounded-full hover:bg-violet-500/10"
-                >
-                  <GitBranch className="w-3.5 h-3.5 text-violet-600" />
-                  العقد
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-80 p-0">
-                {currentUserId && onNodeChange && onNodesUpdate && (
-                  <NodesPanel
-                    groupId={groupId}
-                    nodes={nodes}
-                    selectedNodeId={selectedNodeId}
-                    onNodeSelect={(id) => {
-                      onNodeChange(id)
-                      setIsNodesPanelOpen(false)
-                    }}
-                    onNodesUpdate={onNodesUpdate}
-                    currentUserId={currentUserId}
-                    isAdmin={isAdmin}
-                  />
-                )}
-              </SheetContent>
-            </Sheet>
-          )}
-
-          {mindMapEnabled && (
-            <Link href={`/chat/${groupId}/map`}>
-              <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-cyan-500/10">
-                <Map className="w-3.5 h-3.5 text-cyan-600" />
-                الخريطة
+          <Sheet open={isNodesPanelOpen} onOpenChange={setIsNodesPanelOpen}>
+            <SheetTrigger asChild>
+              <Button
+                variant={selectedNodeId ? "secondary" : "ghost"}
+                size="sm"
+                className="h-8 text-xs gap-1.5 rounded-full hover:bg-violet-500/10"
+              >
+                <GitBranch className="w-3.5 h-3.5 text-violet-600" />
+                العقد
               </Button>
-            </Link>
-          )}
+            </SheetTrigger>
+            <SheetContent side="right" className="w-80 p-0">
+              {currentUserId && onNodeChange && onNodesUpdate && (
+                <NodesPanel
+                  groupId={groupId}
+                  nodes={nodes}
+                  selectedNodeId={selectedNodeId}
+                  onNodeSelect={(id) => {
+                    onNodeChange(id)
+                    setIsNodesPanelOpen(false)
+                  }}
+                  onNodesUpdate={onNodesUpdate}
+                  currentUserId={currentUserId}
+                  isAdmin={isAdmin}
+                />
+              )}
+            </SheetContent>
+          </Sheet>
 
-          {notebookEnabled && (
-            <Link href={`/chat/${groupId}/notebook`}>
-              <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-emerald-500/10">
-                <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
-                المفكرة
-              </Button>
-            </Link>
-          )}
+          <Link href={`/chat/${groupId}/map`}>
+            <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-cyan-500/10">
+              <Map className="w-3.5 h-3.5 text-cyan-600" />
+              الخريطة
+            </Button>
+          </Link>
 
-          {memoryEnabled && (
-            <Link href={`/chat/${groupId}/memory`}>
-              <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-purple-500/10">
-                <Brain className="w-3.5 h-3.5 text-purple-600" />
-                الذاكرة
-              </Button>
-            </Link>
-          )}
+          <Link href={`/chat/${groupId}/notebook`}>
+            <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-emerald-500/10">
+              <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
+              المفكرة
+            </Button>
+          </Link>
 
-          {aiSummaryEnabled && (
-            <Link href={`/chat/${groupId}/summary`}>
-              <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-blue-500/10">
-                <FileText className="w-3.5 h-3.5 text-blue-600" />
-                الملخص
-              </Button>
-            </Link>
-          )}
+          <Link href={`/chat/${groupId}/memory`}>
+            <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-purple-500/10">
+              <Brain className="w-3.5 h-3.5 text-purple-600" />
+              الذاكرة
+            </Button>
+          </Link>
 
-          {discussionQualityEnabled && (
-            <Link href={`/chat/${groupId}/quality`}>
-              <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-green-500/10">
-                <TrendingUp className="w-3.5 h-3.5 text-green-600" />
-                جودة النقاش
-              </Button>
-            </Link>
-          )}
+          <Link href={`/chat/${groupId}/archive`}>
+            <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-stone-500/10">
+              <Archive className="w-3.5 h-3.5 text-stone-600" />
+              الأرشيف
+            </Button>
+          </Link>
+
+          <Link href={`/chat/${groupId}/summary`}>
+            <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-blue-500/10">
+              <FileText className="w-3.5 h-3.5 text-blue-600" />
+              الملخص
+            </Button>
+          </Link>
+
+          <Link href={`/chat/${groupId}/quality`}>
+            <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-green-500/10">
+              <TrendingUp className="w-3.5 h-3.5 text-green-600" />
+              جودة النقاش
+            </Button>
+          </Link>
 
           <Link href={`/chat/${groupId}/search`}>
             <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-blue-500/10">
