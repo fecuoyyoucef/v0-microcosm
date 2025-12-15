@@ -20,6 +20,7 @@ import {
   ArrowLeft,
   ChevronRight,
   ChevronLeft,
+  AlertTriangle,
 } from "lucide-react"
 import Image from "next/image"
 import { useState } from "react"
@@ -32,6 +33,7 @@ const menuItems = [
   { href: "/admin/analytics", icon: TrendingUp, label: "التحليلات" },
   { href: "/admin/notifications", icon: Bell, label: "الإشعارات" },
   { href: "/admin/support", icon: HelpCircle, label: "الدعم" },
+  { href: "/admin/errors", icon: AlertTriangle, label: "الأخطاء" },
   { href: "/admin/ai", icon: Sparkles, label: "الذكاء الاصطناعي" },
   { href: "/admin/logs", icon: Activity, label: "السجلات" },
   { href: "/admin/settings", icon: Settings, label: "الإعدادات" },
