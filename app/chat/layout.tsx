@@ -18,10 +18,6 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
   // Fetch user profile
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
-  if (profile?.role === "owner") {
-    redirect("/admin")
-  }
-
   // Fetch user's groups
   const { data: memberships } = await supabase.from("group_members").select("groups(*)").eq("user_id", user.id)
 

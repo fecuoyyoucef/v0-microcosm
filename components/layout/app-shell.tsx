@@ -43,6 +43,7 @@ import {
 import type { Group, Profile } from "@/lib/types"
 import { useTheme } from "next-themes"
 import { useSettings } from "@/components/settings-provider"
+import { useSwipeable } from "react-swipeable"
 
 interface AppShellProps {
   children: React.ReactNode
@@ -136,6 +137,13 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
   const { theme, setTheme } = useTheme()
   const { language } = useSettings()
   const t = translations[language]
+
+  const handlers = useSwipeable({
+    onSwipedLeft: () => setMobileMenuOpen(false),
+    onSwipedRight: () => setMobileMenuOpen(true),
+    preventDefaultTouchmoveEvent: true,
+    trackMouse: true,
+  })
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -388,7 +396,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
 
   return (
     <TooltipProvider delayDuration={0}>
-      <div className="h-dvh flex bg-background overflow-hidden">
+      <div className="h-dvh flex bg-background overflow-hidden relative" {...handlers}>
         {/* Desktop Sidebar */}
         <aside className="hidden md:flex w-64 flex-col bg-card border-l border-border">
           <SidebarContent />
@@ -413,37 +421,36 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
               <Button variant="ghost" size="icon" onClick={() => setCommandOpen(true)}>
                 <Search className="w-5 h-5" />
               </Button>
-              <Link href="/chat/notifications">
-                <Button variant="ghost" size="icon" className="relative">
-                  <Bell className="w-5 h-5" />
-                  {unreadNotifications > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-destructive-foreground text-[10px] rounded-full flex items-center justify-center">
-                      {unreadNotifications > 9 ? "9+" : unreadNotifications}
-                    </span>
-                  )}
-                </Button>
-              </Link>
             </div>
           </header>
 
-          <div className="flex-1 pb-20 md:pb-0 overflow-hidden">{children}</div>
+          <div
+            className={cn("flex-1 overflow-auto transition-all duration-300", isBottomNavCollapsed ? "pb-12" : "pb-32")}
+          >
+            {children}
+          </div>
         </main>
 
         <nav
           className={cn(
             "md:hidden fixed inset-x-0 bg-background/95 backdrop-blur-xl border-t border-border z-50 transition-all duration-300",
-            isBottomNavCollapsed ? "bottom-0 translate-y-[calc(100%-48px)]" : "bottom-0",
+            isBottomNavCollapsed ? "bottom-0 translate-y-full" : "bottom-0",
           )}
         >
+          {isBottomNavCollapsed && (
+            <button
+              onClick={() => setIsBottomNavCollapsed(false)}
+              className="absolute -top-12 left-1/2 -translate-x-1/2 w-12 h-12 bg-primary text-primary-foreground rounded-full shadow-lg flex items-center justify-center"
+            >
+              <ChevronUp className="w-5 h-5" />
+            </button>
+          )}
+
           <button
             onClick={() => setIsBottomNavCollapsed(!isBottomNavCollapsed)}
             className="w-full flex justify-center py-1 border-b border-border"
           >
-            {isBottomNavCollapsed ? (
-              <ChevronUp className="w-4 h-4 text-muted-foreground" />
-            ) : (
-              <ChevronDown className="w-4 h-4 text-muted-foreground" />
-            )}
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
           </button>
 
           <div className="flex items-center justify-around py-2 px-4">
@@ -461,9 +468,14 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
               <Search className="w-5 h-5" />
             </Button>
 
-            <Link href="/chat?new=true">
-              <Button size="icon" className="h-12 w-12 rounded-xl bg-primary text-primary-foreground">
-                <Plus className="w-5 h-5" />
+            <Link href="/chat/notifications">
+              <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl relative">
+                <Bell className="w-5 h-5" />
+                {unreadNotifications > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground text-[10px] rounded-full flex items-center justify-center">
+                    {unreadNotifications > 9 ? "9+" : unreadNotifications}
+                  </span>
+                )}
               </Button>
             </Link>
 
