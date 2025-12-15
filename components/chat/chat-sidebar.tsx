@@ -36,6 +36,8 @@ import {
   Bell,
   Sparkles,
   Shield,
+  MessageCircle,
+  X,
 } from "lucide-react"
 import type { Profile } from "@/lib/types"
 import { useTheme } from "next-themes"
@@ -80,6 +82,7 @@ const translations = {
     unexpectedError: "حدث خطأ غير متوقع",
     user: "مستخدم",
     assistant: "المساعد الذكي",
+    supportAgent: "دعم العملاء", // Added support agent translation
   },
   en: {
     profile: "My Profile",
@@ -107,6 +110,7 @@ const translations = {
     unexpectedError: "An unexpected error occurred",
     user: "User",
     assistant: "AI Assistant",
+    supportAgent: "Customer Support", // Added support agent translation
   },
   fr: {
     profile: "Mon Profil",
@@ -134,6 +138,7 @@ const translations = {
     unexpectedError: "Une erreur inattendue s'est produite",
     user: "Utilisateur",
     assistant: "Assistant IA",
+    supportAgent: "Support Client", // Added support agent translation
   },
 }
 
@@ -157,6 +162,7 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
   const { theme, setTheme } = useTheme()
   const { language } = useSettings()
   const t = translations[language]
+  const [showSupportChat, setShowSupportChat] = useState(false) // Added state for support chat
 
   const touchStartX = useRef<number>(0)
   const touchStartY = useRef<number>(0)
@@ -525,6 +531,17 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
             </div>
           </Link>
 
+          <div
+            className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer"
+            onClick={() => {
+              setShowSupportChat(true)
+              closeSidebar()
+            }}
+          >
+            <MessageCircle className="w-5 h-5 text-cyan-500" />
+            <span className="text-sm font-medium">{t.supportAgent}</span>
+          </div>
+
           <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer opacity-50">
             <HelpCircle className="w-5 h-5 text-muted-foreground" />
             <span className="text-sm font-medium">{t.help}</span>
@@ -562,6 +579,24 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
             onComplete={handleSurveyComplete}
           />
         )}
+        {showSupportChat && (
+          <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setShowSupportChat(false)}>
+            <div className="fixed bottom-0 right-0 w-full max-w-md h-[600px]" onClick={(e) => e.stopPropagation()}>
+              <div className="h-full bg-card rounded-t-xl overflow-hidden">
+                <div className="flex items-center justify-between p-4 border-b border-border">
+                  <div className="flex items-center gap-2">
+                    <MessageCircle className="w-5 h-5 text-cyan-500" />
+                    <h3 className="font-semibold">{t.supportAgent}</h3>
+                  </div>
+                  <Button variant="ghost" size="icon" onClick={() => setShowSupportChat(false)}>
+                    <X className="w-5 h-5" />
+                  </Button>
+                </div>
+                <iframe src="/chat/support/agent" className="w-full h-[calc(100%-65px)] border-0" />
+              </div>
+            </div>
+          </div>
+        )}
       </>
     )
   }
@@ -576,6 +611,24 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
           groupId={newGroupId}
           onComplete={handleSurveyComplete}
         />
+      )}
+      {showSupportChat && (
+        <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setShowSupportChat(false)}>
+          <div className="fixed bottom-6 right-6 w-96 h-[600px]" onClick={(e) => e.stopPropagation()}>
+            <div className="h-full bg-card rounded-xl overflow-hidden shadow-2xl">
+              <div className="flex items-center justify-between p-4 border-b border-border">
+                <div className="flex items-center gap-2">
+                  <MessageCircle className="w-5 h-5 text-cyan-500" />
+                  <h3 className="font-semibold">{t.supportAgent}</h3>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setShowSupportChat(false)}>
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              <iframe src="/chat/support/agent" className="w-full h-[calc(100%-65px)] border-0" />
+            </div>
+          </div>
+        </div>
       )}
     </>
   )
