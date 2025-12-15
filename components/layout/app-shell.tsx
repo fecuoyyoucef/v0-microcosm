@@ -129,6 +129,8 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isBottomNavCollapsed, setIsBottomNavCollapsed] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [touchStart, setTouchStart] = useState<number | null>(null)
+  const [touchEnd, setTouchEnd] = useState<number | null>(null)
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -385,9 +387,39 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
     </div>
   )
 
+  const minSwipeDistance = 50
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null)
+    setTouchStart(e.targetTouches[0].clientX)
+  }
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX)
+  }
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return
+
+    const distance = touchStart - touchEnd
+    const isRightSwipe = distance < -minSwipeDistance
+
+    if (isRightSwipe) {
+      setMobileMenuOpen(true)
+    }
+
+    setTouchStart(null)
+    setTouchEnd(null)
+  }
+
   return (
     <TooltipProvider delayDuration={0}>
-      <div className="relative h-dvh flex bg-background overflow-hidden">
+      <div
+        className="relative h-dvh flex bg-background overflow-hidden"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
         {/* Desktop Sidebar */}
         <aside className="hidden md:flex w-64 flex-col bg-card border-l border-border">
           <SidebarContent />
@@ -395,7 +427,14 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
 
         {/* Main Content */}
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <div className="flex-1 overflow-auto pb-16 md:pb-0">{children}</div>
+          <div
+            className={cn(
+              "flex-1 overflow-auto transition-all duration-300",
+              isBottomNavCollapsed ? "pb-0 md:pb-0" : "pb-20 md:pb-0",
+            )}
+          >
+            {children}
+          </div>
 
           <nav
             className={cn(
@@ -405,7 +444,8 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
           >
             <button
               onClick={() => setIsBottomNavCollapsed(!isBottomNavCollapsed)}
-              className="absolute -top-8 left-1/2 -translate-x-1/2 w-12 h-8 bg-background/95 backdrop-blur-xl border border-border rounded-t-xl flex items-center justify-center"
+              className="absolute -top-10 left-1/2 -translate-x-1/2 w-12 h-10 bg-background/95 backdrop-blur-xl border border-border rounded-t-xl flex items-center justify-center shadow-lg hover:bg-muted transition-colors"
+              aria-label={isBottomNavCollapsed ? "إظهار الشريط السفلي" : "إخفاء الشريط السفلي"}
             >
               {isBottomNavCollapsed ? (
                 <ChevronUp className="w-4 h-4 text-muted-foreground" />
