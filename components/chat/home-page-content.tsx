@@ -474,7 +474,7 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
             <DialogDescription>{t.supportDesc}</DialogDescription>
           </DialogHeader>
           <ScrollArea className="flex-1 -mx-6 px-6 my-4">
-            <div className="space-y-4">
+            <div className="space-y-4 flex flex-col">
               {supportMessages.length === 0 ? (
                 <div className="text-center text-muted-foreground py-8">
                   <MessageCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
@@ -485,11 +485,11 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
                   <div
                     key={idx}
                     className={cn(
-                      "p-3 rounded-xl max-w-[80%]",
-                      msg.role === "user" ? "bg-primary text-primary-foreground mr-auto" : "bg-muted ml-auto",
+                      "p-3 rounded-xl flex",
+                      msg.role === "user" ? "bg-primary text-primary-foreground justify-end" : "bg-muted justify-start",
                     )}
                   >
-                    <p className="text-sm">{msg.content}</p>
+                    <p className="text-sm break-words max-w-xs">{msg.content}</p>
                   </div>
                 ))
               )}
