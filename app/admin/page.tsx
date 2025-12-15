@@ -180,12 +180,12 @@ export default function AdminDashboard() {
   const knowledgePercent = ((stats?.messagesByLayer?.knowledge || 0) / totalMessages) * 100
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 md:p-6 space-y-6 bg-slate-950 min-h-screen">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">لوحة التحكم</h1>
-          <p className="text-slate-400 flex items-center gap-2">
+          <h1 className="text-xl md:text-2xl font-bold text-white">لوحة التحكم</h1>
+          <p className="text-xs md:text-sm text-slate-400 flex items-center gap-2 mt-1">
             <Clock className="w-3 h-3" />
             آخر تحديث: {lastUpdate.toLocaleTimeString("ar-SA")}
           </p>
@@ -195,23 +195,23 @@ export default function AdminDashboard() {
           size="sm"
           onClick={handleRefresh}
           disabled={refreshing}
-          className="gap-2 bg-slate-800 border-slate-700 text-white hover:bg-slate-700"
+          className="gap-2 bg-slate-800 border-slate-700 text-white hover:bg-slate-700 w-full sm:w-auto"
         >
           <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
-          تحديث
+          <span className="hidden sm:inline">تحديث</span>
         </Button>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         {statCards.map((stat) => (
           <Link key={stat.label} href={stat.href}>
-            <Card className="bg-slate-900/50 border-slate-800 hover:bg-slate-800/50 transition-colors cursor-pointer group">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-slate-400">{stat.label}</p>
-                    <p className="text-3xl font-bold text-white mt-1">{stat.value.toLocaleString()}</p>
+            <Card className="bg-slate-900/50 border-slate-800 hover:bg-slate-800/50 transition-colors cursor-pointer group h-full">
+              <CardContent className="p-4 md:p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs md:text-sm text-slate-400">{stat.label}</p>
+                    <p className="text-2xl md:text-3xl font-bold text-white mt-1">{stat.value.toLocaleString()}</p>
                     {stat.change && (
                       <p className="text-xs text-emerald-400 mt-1 flex items-center gap-1">
                         <TrendingUp className="w-3 h-3" />
@@ -220,9 +220,9 @@ export default function AdminDashboard() {
                     )}
                   </div>
                   <div
-                    className={`w-14 h-14 rounded-2xl ${stat.bgColor} flex items-center justify-center group-hover:scale-110 transition-transform`}
+                    className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl ${stat.bgColor} flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0`}
                   >
-                    <stat.icon className="w-7 h-7 text-white" />
+                    <stat.icon className="w-6 h-6 md:w-7 md:h-7 text-white" />
                   </div>
                 </div>
               </CardContent>
@@ -232,45 +232,52 @@ export default function AdminDashboard() {
       </div>
 
       {/* Features Status & Messages by Layer */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* Features Status */}
         <Card className="bg-slate-900/50 border-slate-800">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="flex items-center gap-2 text-white">
-              <Layers className="w-5 h-5 text-cyan-400" />
+          <CardHeader className="flex flex-row items-center justify-between pb-3 md:pb-2 px-4 md:px-6">
+            <CardTitle className="flex items-center gap-2 text-base md:text-lg text-white">
+              <Layers className="w-4 h-4 md:w-5 md:h-5 text-cyan-400" />
               حالة الميزات
             </CardTitle>
             <Link href="/admin/features">
-              <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs md:text-sm text-slate-400 hover:text-white p-0 h-auto"
+              >
                 إدارة
-                <ArrowUpLeft className="w-4 h-4 mr-1" />
+                <ArrowUpLeft className="w-3 h-3 md:w-4 md:h-4 mr-1" />
               </Button>
             </Link>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 md:p-6">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-slate-400">إجمالي الميزات</span>
-                <span className="text-2xl font-bold text-white">{featureStatus.total}</span>
+                <span className="text-xs md:text-sm text-slate-400">إجمالي الميزات</span>
+                <span className="text-xl md:text-2xl font-bold text-white">{featureStatus.total}</span>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+              <div className="grid grid-cols-2 gap-2 md:gap-4">
+                <div className="p-3 md:p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
                   <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                    <span className="text-emerald-400 font-medium">مفعلة</span>
+                    <CheckCircle2 className="w-4 h-4 md:w-5 md:h-5 text-emerald-400" />
+                    <span className="text-xs md:text-sm text-emerald-400 font-medium">مفعلة</span>
                   </div>
-                  <p className="text-3xl font-bold text-white">{featureStatus.enabled}</p>
-                  <Progress value={(featureStatus.enabled / featureStatus.total) * 100} className="mt-2 bg-slate-700" />
+                  <p className="text-xl md:text-3xl font-bold text-white">{featureStatus.enabled}</p>
+                  <Progress
+                    value={(featureStatus.enabled / featureStatus.total) * 100}
+                    className="mt-2 bg-slate-700 h-1"
+                  />
                 </div>
-                <div className="p-4 rounded-xl bg-slate-500/10 border border-slate-500/20">
+                <div className="p-3 md:p-4 rounded-xl bg-slate-500/10 border border-slate-500/20">
                   <div className="flex items-center gap-2 mb-2">
-                    <XCircle className="w-5 h-5 text-slate-400" />
-                    <span className="text-slate-400 font-medium">معطلة</span>
+                    <XCircle className="w-4 h-4 md:w-5 md:h-5 text-slate-400" />
+                    <span className="text-xs md:text-sm text-slate-400 font-medium">معطلة</span>
                   </div>
-                  <p className="text-3xl font-bold text-white">{featureStatus.disabled}</p>
+                  <p className="text-xl md:text-3xl font-bold text-white">{featureStatus.disabled}</p>
                   <Progress
                     value={(featureStatus.disabled / featureStatus.total) * 100}
-                    className="mt-2 bg-slate-700"
+                    className="mt-2 bg-slate-700 h-1"
                   />
                 </div>
               </div>
@@ -280,37 +287,43 @@ export default function AdminDashboard() {
 
         {/* Messages by Layer */}
         <Card className="bg-slate-900/50 border-slate-800">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-white">
-              <Activity className="w-5 h-5 text-cyan-400" />
+          <CardHeader className="pb-3 md:pb-2 px-4 md:px-6">
+            <CardTitle className="flex items-center gap-2 text-base md:text-lg text-white">
+              <Activity className="w-4 h-4 md:w-5 md:h-5 text-cyan-400" />
               الرسائل حسب الطبقة
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+          <CardContent className="p-4 md:p-6">
+            <div className="space-y-3 md:space-y-4">
+              <div className="p-3 md:p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-emerald-400 font-medium">اجتماعية</span>
-                  <span className="text-white font-bold">{stats?.messagesByLayer?.social || 0}</span>
+                  <span className="text-xs md:text-sm text-emerald-400 font-medium">اجتماعية</span>
+                  <span className="text-white font-bold text-sm md:text-base">
+                    {stats?.messagesByLayer?.social || 0}
+                  </span>
                 </div>
-                <Progress value={socialPercent} className="bg-slate-700" />
-                <p className="text-xs text-slate-400 mt-1">{socialPercent.toFixed(1)}% من الإجمالي</p>
+                <Progress value={socialPercent} className="bg-slate-700 h-1" />
+                <p className="text-xs text-slate-400 mt-1">{socialPercent.toFixed(1)}%</p>
               </div>
-              <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+              <div className="p-3 md:p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-blue-400 font-medium">تنسيقية</span>
-                  <span className="text-white font-bold">{stats?.messagesByLayer?.coordination || 0}</span>
+                  <span className="text-xs md:text-sm text-blue-400 font-medium">تنسيقية</span>
+                  <span className="text-white font-bold text-sm md:text-base">
+                    {stats?.messagesByLayer?.coordination || 0}
+                  </span>
                 </div>
-                <Progress value={coordPercent} className="bg-slate-700" />
-                <p className="text-xs text-slate-400 mt-1">{coordPercent.toFixed(1)}% من الإجمالي</p>
+                <Progress value={coordPercent} className="bg-slate-700 h-1" />
+                <p className="text-xs text-slate-400 mt-1">{coordPercent.toFixed(1)}%</p>
               </div>
-              <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20">
+              <div className="p-3 md:p-4 rounded-xl bg-purple-500/10 border border-purple-500/20">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-purple-400 font-medium">معرفية</span>
-                  <span className="text-white font-bold">{stats?.messagesByLayer?.knowledge || 0}</span>
+                  <span className="text-xs md:text-sm text-purple-400 font-medium">معرفية</span>
+                  <span className="text-white font-bold text-sm md:text-base">
+                    {stats?.messagesByLayer?.knowledge || 0}
+                  </span>
                 </div>
-                <Progress value={knowledgePercent} className="bg-slate-700" />
-                <p className="text-xs text-slate-400 mt-1">{knowledgePercent.toFixed(1)}% من الإجمالي</p>
+                <Progress value={knowledgePercent} className="bg-slate-700 h-1" />
+                <p className="text-xs text-slate-400 mt-1">{knowledgePercent.toFixed(1)}%</p>
               </div>
             </div>
           </CardContent>
@@ -318,29 +331,29 @@ export default function AdminDashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
         <Link href="/admin/features">
-          <Card className="bg-gradient-to-br from-cyan-500/10 to-cyan-600/10 border-cyan-500/20 hover:border-cyan-500/40 transition-all cursor-pointer hover:scale-105">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-cyan-500/20 flex items-center justify-center">
-                <Layers className="w-6 h-6 text-cyan-400" />
+          <Card className="bg-gradient-to-br from-cyan-500/10 to-cyan-600/10 border-cyan-500/20 hover:border-cyan-500/40 transition-all cursor-pointer hover:scale-105 h-full">
+            <CardContent className="p-3 md:p-4 flex flex-col items-center md:flex-row md:items-center gap-2 md:gap-3">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-cyan-500/20 flex items-center justify-center flex-shrink-0">
+                <Layers className="w-5 h-5 md:w-6 md:h-6 text-cyan-400" />
               </div>
-              <div>
-                <span className="font-medium text-white block">إدارة الميزات</span>
-                <span className="text-xs text-slate-400">{featureStatus.total} ميزة</span>
+              <div className="text-center md:text-left">
+                <span className="font-medium text-white block text-xs md:text-sm">إدارة الميزات</span>
+                <span className="text-xs text-slate-400 line-clamp-1">{featureStatus.total} ميزة</span>
               </div>
             </CardContent>
           </Card>
         </Link>
 
         <Link href="/admin/notifications">
-          <Card className="bg-gradient-to-br from-amber-500/10 to-amber-600/10 border-amber-500/20 hover:border-amber-500/40 transition-all cursor-pointer hover:scale-105">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
-                <Bell className="w-6 h-6 text-amber-400" />
+          <Card className="bg-gradient-to-br from-amber-500/10 to-amber-600/10 border-amber-500/20 hover:border-amber-500/40 transition-all cursor-pointer hover:scale-105 h-full">
+            <CardContent className="p-3 md:p-4 flex flex-col items-center md:flex-row md:items-center gap-2 md:gap-3">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                <Bell className="w-5 h-5 md:w-6 md:h-6 text-amber-400" />
               </div>
-              <div>
-                <span className="font-medium text-white block">إرسال إشعار</span>
+              <div className="text-center md:text-left">
+                <span className="font-medium text-white block text-xs md:text-sm">إرسال إشعار</span>
                 <span className="text-xs text-slate-400">للجميع</span>
               </div>
             </CardContent>
@@ -348,13 +361,13 @@ export default function AdminDashboard() {
         </Link>
 
         <Link href="/admin/ai">
-          <Card className="bg-gradient-to-br from-purple-500/10 to-purple-600/10 border-purple-500/20 hover:border-purple-500/40 transition-all cursor-pointer hover:scale-105">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                <Sparkles className="w-6 h-6 text-purple-400" />
+          <Card className="bg-gradient-to-br from-purple-500/10 to-purple-600/10 border-purple-500/20 hover:border-purple-500/40 transition-all cursor-pointer hover:scale-105 h-full">
+            <CardContent className="p-3 md:p-4 flex flex-col items-center md:flex-row md:items-center gap-2 md:gap-3">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-5 h-5 md:w-6 md:h-6 text-purple-400" />
               </div>
-              <div>
-                <span className="font-medium text-white block">مساعد AI</span>
+              <div className="text-center md:text-left">
+                <span className="font-medium text-white block text-xs md:text-sm">مساعد AI</span>
                 <span className="text-xs text-slate-400">تحليل ذكي</span>
               </div>
             </CardContent>
@@ -362,13 +375,13 @@ export default function AdminDashboard() {
         </Link>
 
         <Link href="/admin/support">
-          <Card className="bg-gradient-to-br from-rose-500/10 to-rose-600/10 border-rose-500/20 hover:border-rose-500/40 transition-all cursor-pointer hover:scale-105">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-rose-500/20 flex items-center justify-center">
-                <AlertTriangle className="w-6 h-6 text-rose-400" />
+          <Card className="bg-gradient-to-br from-rose-500/10 to-rose-600/10 border-rose-500/20 hover:border-rose-500/40 transition-all cursor-pointer hover:scale-105 h-full">
+            <CardContent className="p-3 md:p-4 flex flex-col items-center md:flex-row md:items-center gap-2 md:gap-3">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-rose-500/20 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 md:w-6 md:h-6 text-rose-400" />
               </div>
-              <div>
-                <span className="font-medium text-white block">رؤى الدعم</span>
+              <div className="text-center md:text-left">
+                <span className="font-medium text-white block text-xs md:text-sm">رؤى الدعم</span>
                 <span className="text-xs text-slate-400">مشاكل المستخدمين</span>
               </div>
             </CardContent>
@@ -378,44 +391,47 @@ export default function AdminDashboard() {
 
       {/* Recent Activity Tabs */}
       <Card className="bg-slate-900/50 border-slate-800">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <Zap className="w-5 h-5 text-amber-400" />
+        <CardHeader className="pb-3 md:pb-4 px-4 md:px-6">
+          <CardTitle className="text-base md:text-lg text-white flex items-center gap-2">
+            <Zap className="w-4 h-4 md:w-5 md:h-5 text-amber-400" />
             النشاط الأخير
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 md:p-6">
           <Tabs defaultValue="users" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 bg-slate-800/50">
-              <TabsTrigger value="users" className="data-[state=active]:bg-slate-700">
+            <TabsList className="grid w-full grid-cols-3 bg-slate-800/50 h-9 md:h-10">
+              <TabsTrigger value="users" className="text-xs md:text-sm data-[state=active]:bg-slate-700">
                 المستخدمين
               </TabsTrigger>
-              <TabsTrigger value="groups" className="data-[state=active]:bg-slate-700">
+              <TabsTrigger value="groups" className="text-xs md:text-sm data-[state=active]:bg-slate-700">
                 الخلايا
               </TabsTrigger>
-              <TabsTrigger value="messages" className="data-[state=active]:bg-slate-700">
+              <TabsTrigger value="messages" className="text-xs md:text-sm data-[state=active]:bg-slate-700">
                 الرسائل
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="users" className="mt-4">
-              <ScrollArea className="h-64">
-                <div className="space-y-3">
+              <ScrollArea className="h-48 md:h-64">
+                <div className="space-y-2 md:space-y-3">
                   {recentUsers.map((user) => (
-                    <div key={user.id} className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/30">
-                      <Avatar className="h-10 w-10">
+                    <div
+                      key={user.id}
+                      className="flex items-center gap-2 md:gap-3 p-2 md:p-3 rounded-lg bg-slate-800/30"
+                    >
+                      <Avatar className="h-8 w-8 md:h-10 md:w-10 flex-shrink-0">
                         <AvatarImage src={user.avatar_url || undefined} />
-                        <AvatarFallback className="bg-blue-500/20 text-blue-400">
+                        <AvatarFallback className="bg-blue-500/20 text-blue-400 text-xs">
                           {user.display_name?.charAt(0) || "U"}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-white truncate">{user.display_name || "مستخدم"}</p>
+                        <p className="font-medium text-white truncate text-sm">{user.display_name || "مستخدم"}</p>
                         <p className="text-xs text-slate-400">
                           {new Date(user.created_at).toLocaleDateString("ar-SA")}
                         </p>
                       </div>
-                      <Badge variant="outline" className="border-emerald-500/50 text-emerald-400 text-xs">
+                      <Badge variant="outline" className="border-emerald-500/50 text-emerald-400 text-xs flex-shrink-0">
                         جديد
                       </Badge>
                     </div>
@@ -425,15 +441,18 @@ export default function AdminDashboard() {
             </TabsContent>
 
             <TabsContent value="groups" className="mt-4">
-              <ScrollArea className="h-64">
-                <div className="space-y-3">
+              <ScrollArea className="h-48 md:h-64">
+                <div className="space-y-2 md:space-y-3">
                   {recentGroups.map((group) => (
-                    <div key={group.id} className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/30">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white font-bold">
+                    <div
+                      key={group.id}
+                      className="flex items-center gap-2 md:gap-3 p-2 md:p-3 rounded-lg bg-slate-800/30"
+                    >
+                      <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs md:text-sm flex-shrink-0">
                         {group.name?.substring(0, 2)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-white truncate">{group.name}</p>
+                        <p className="font-medium text-white truncate text-sm">{group.name}</p>
                         <p className="text-xs text-slate-400">
                           {new Date(group.created_at).toLocaleDateString("ar-SA")}
                         </p>
@@ -445,11 +464,11 @@ export default function AdminDashboard() {
             </TabsContent>
 
             <TabsContent value="messages" className="mt-4">
-              <ScrollArea className="h-64">
-                <div className="space-y-3">
+              <ScrollArea className="h-48 md:h-64">
+                <div className="space-y-2 md:space-y-3">
                   {recentMessages.map((msg) => (
-                    <div key={msg.id} className="p-3 rounded-lg bg-slate-800/30">
-                      <p className="text-white line-clamp-2 text-sm">{msg.content}</p>
+                    <div key={msg.id} className="p-2 md:p-3 rounded-lg bg-slate-800/30">
+                      <p className="text-white line-clamp-2 text-xs md:text-sm">{msg.content}</p>
                       <div className="flex items-center gap-2 mt-2">
                         <Badge
                           variant="outline"
@@ -461,7 +480,7 @@ export default function AdminDashboard() {
                                 : "border-purple-500/50 text-purple-400"
                           }`}
                         >
-                          {msg.layer === "social" ? "اجتماعي" : msg.layer === "coordination" ? "تنسيقي" : "معرفي"}
+                          {msg.layer === "social" ? "اجتماعي" : msg.layer === "coordination" ? "تنسيقية" : "معرفي"}
                         </Badge>
                         <span className="text-xs text-slate-400">
                           {new Date(msg.created_at).toLocaleDateString("ar-SA")}
