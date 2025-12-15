@@ -1,5 +1,3 @@
-"use client"
-
 import { createBrowserClient } from "@supabase/ssr"
 
 let client: ReturnType<typeof createBrowserClient> | null = null
@@ -7,13 +5,11 @@ let client: ReturnType<typeof createBrowserClient> | null = null
 export function createClient() {
   if (client) return client
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
   if (!url || !key) {
-    console.error("[v0] Missing Supabase environment variables")
-    // Return a minimal client that won't crash the app
-    return createBrowserClient("https://placeholder.supabase.co", "placeholder-key")
+    throw new Error("Missing Supabase environment variables. Please check your .env file.")
   }
 
   client = createBrowserClient(url, key)
