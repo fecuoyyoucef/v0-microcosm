@@ -18,8 +18,11 @@ import {
   Activity,
   HelpCircle,
   ArrowLeft,
+  ChevronRight,
+  ChevronLeft,
 } from "lucide-react"
 import Image from "next/image"
+import { useState } from "react"
 
 const menuItems = [
   { href: "/admin", icon: LayoutDashboard, label: "لوحة التحكم", exact: true },
@@ -37,6 +40,7 @@ const menuItems = [
 export function AdminSidebar() {
   const pathname = usePathname()
   const router = useRouter()
+  const [isCollapsed, setIsCollapsed] = useState(false)
 
   const handleLogout = async () => {
     await fetch("/api/admin/logout", { method: "POST" })
@@ -49,18 +53,40 @@ export function AdminSidebar() {
   }
 
   return (
-    <aside className="w-64 bg-slate-900/50 border-l border-slate-800 flex flex-col">
+    <aside
+      className={cn(
+        "bg-slate-900/50 border-l border-slate-800 flex flex-col transition-all duration-300",
+        isCollapsed ? "w-16" : "w-64",
+      )}
+    >
       {/* Logo */}
       <div className="p-4 border-b border-slate-800">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl overflow-hidden bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center">
+        <div className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-3")}>
+          <div className="w-10 h-10 rounded-xl overflow-hidden bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center flex-shrink-0">
             <Image src="/icons/icon-96x96.png" alt="Logo" width={32} height={32} className="rounded-lg" />
           </div>
-          <div>
-            <h1 className="font-bold text-white">Synaptic Space</h1>
-            <p className="text-xs text-slate-400">لوحة تحكم المالك</p>
-          </div>
+          {!isCollapsed && (
+            <div>
+              <h1 className="font-bold text-white">Synaptic Space</h1>
+              <p className="text-xs text-slate-400">لوحة تحكم المالك</p>
+            </div>
+          )}
         </div>
+      </div>
+
+      <div className="px-3 pt-3">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className={cn(
+            "h-8 text-slate-400 hover:text-white hover:bg-slate-800",
+            isCollapsed ? "w-full px-0 justify-center" : "w-full justify-start gap-2",
+          )}
+        >
+          {isCollapsed ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          {!isCollapsed && <span className="text-xs">طي القائمة</span>}
+        </Button>
       </div>
 
       {/* Navigation */}
@@ -71,12 +97,14 @@ export function AdminSidebar() {
               <Button
                 variant="ghost"
                 className={cn(
-                  "w-full justify-start gap-3 h-10 px-3 text-slate-400 hover:text-white hover:bg-slate-800",
+                  "w-full h-10 px-3 text-slate-400 hover:text-white hover:bg-slate-800",
+                  isCollapsed ? "justify-center px-0" : "justify-start gap-3",
                   isActive(item.href, item.exact) && "bg-slate-800 text-white",
                 )}
+                title={isCollapsed ? item.label : undefined}
               >
                 <item.icon className="w-5 h-5" />
-                {item.label}
+                {!isCollapsed && item.label}
               </Button>
             </Link>
           ))}
@@ -88,19 +116,27 @@ export function AdminSidebar() {
         <Link href="/chat">
           <Button
             variant="ghost"
-            className="w-full justify-start gap-3 h-10 px-3 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
+            className={cn(
+              "w-full h-10 px-3 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10",
+              isCollapsed ? "justify-center px-0" : "justify-start gap-3",
+            )}
+            title={isCollapsed ? "واجهة المستخدم" : undefined}
           >
             <ArrowLeft className="w-5 h-5" />
-            واجهة المستخدم
+            {!isCollapsed && "واجهة المستخدم"}
           </Button>
         </Link>
         <Button
           variant="ghost"
-          className="w-full justify-start gap-3 h-10 px-3 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+          className={cn(
+            "w-full h-10 px-3 text-red-400 hover:text-red-300 hover:bg-red-500/10",
+            isCollapsed ? "justify-center px-0" : "justify-start gap-3",
+          )}
           onClick={handleLogout}
+          title={isCollapsed ? "تسجيل الخروج" : undefined}
         >
           <LogOut className="w-5 h-5" />
-          تسجيل الخروج
+          {!isCollapsed && "تسجيل الخروج"}
         </Button>
       </div>
     </aside>
