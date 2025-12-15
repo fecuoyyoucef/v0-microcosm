@@ -509,10 +509,10 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
             <span className="text-xs text-muted-foreground mr-auto">{t.comingSoon}</span>
           </div>
 
-          <Link href="/chat/settings" onClick={closeSidebar}>
+          <Link href="/chat/about" onClick={closeSidebar}>
             <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
-              <Settings className="w-5 h-5 text-muted-foreground" />
-              <span className="text-sm font-medium">{t.settings}</span>
+              <Info className="w-5 h-5 text-muted-foreground" />
+              <span className="text-sm font-medium">{t.about}</span>
             </div>
           </Link>
 
@@ -524,24 +524,6 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
             <span className="text-xs text-muted-foreground mr-auto">{t.comingSoon}</span>
           </div>
 
-          <Link href="/chat/about" onClick={closeSidebar}>
-            <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
-              <Info className="w-5 h-5 text-muted-foreground" />
-              <span className="text-sm font-medium">{t.about}</span>
-            </div>
-          </Link>
-
-          <div
-            className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer"
-            onClick={() => {
-              setShowSupportChat(true)
-              closeSidebar()
-            }}
-          >
-            <MessageCircle className="w-5 h-5 text-cyan-500" />
-            <span className="text-sm font-medium">{t.supportAgent}</span>
-          </div>
-
           <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer opacity-50">
             <HelpCircle className="w-5 h-5 text-muted-foreground" />
             <span className="text-sm font-medium">{t.help}</span>
@@ -549,6 +531,26 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
           </div>
         </div>
       </ScrollArea>
+
+      <div className="border-t border-border">
+        <div
+          className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer"
+          onClick={() => {
+            setShowSupportChat(true)
+            closeSidebar()
+          }}
+        >
+          <MessageCircle className="w-5 h-5 text-cyan-500" />
+          <span className="text-sm font-medium">{t.supportAgent}</span>
+        </div>
+
+        <Link href="/chat/settings" onClick={closeSidebar}>
+          <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
+            <Settings className="w-5 h-5 text-muted-foreground" />
+            <span className="text-sm font-medium">{t.settings}</span>
+          </div>
+        </Link>
+      </div>
 
       <div className="p-3 border-t border-border">
         <Button
