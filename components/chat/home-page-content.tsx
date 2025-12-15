@@ -130,6 +130,7 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
   const [supportMessages, setSupportMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([])
   const [supportInput, setSupportInput] = useState("")
   const [isSendingSupport, setIsSendingSupport] = useState(false)
+  const [conversationId, setConversationId] = useState<string | null>(null)
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -269,13 +270,22 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
       const response = await fetch("/api/support/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userMessage, userId }),
+        body: JSON.stringify({
+          message: userMessage,
+          conversationId,
+          history: supportMessages,
+        }),
       })
 
       const data = await response.json()
 
-      if (data.reply) {
-        setSupportMessages((prev) => [...prev, { role: "assistant", content: data.reply }])
+      if (data.response) {
+        setSupportMessages((prev) => [...prev, { role: "assistant", content: data.response }])
+        if (data.conversationId) {
+          setConversationId(data.conversationId)
+        }
+      } else if (data.error) {
+        setSupportMessages((prev) => [...prev, { role: "assistant", content: "عذراً، حدث خطأ. حاول مرة أخرى." }])
       }
     } catch (error) {
       console.error("Support chat error:", error)
