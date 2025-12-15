@@ -35,6 +35,7 @@ import {
   Info,
   Bell,
   Sparkles,
+  Shield,
 } from "lucide-react"
 import type { Profile } from "@/lib/types"
 import { useTheme } from "next-themes"
@@ -138,6 +139,7 @@ const translations = {
 
 export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }: ChatSidebarProps) {
   const [profile, setProfile] = useState<ExtendedProfile | null>(null)
+  const [isOwner, setIsOwner] = useState(false)
   const [userEmail, setUserEmail] = useState<string>("")
   const [isCreating, setIsCreating] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -164,8 +166,8 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
   useEffect(() => {
     fetchProfile()
     fetchUnreadNotifications()
+    checkOwnerStatus()
 
-    // Subscribe to notifications
     const channel = supabase
       .channel("sidebar-notifications")
       .on(
@@ -346,6 +348,19 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
     }
   }
 
+  const checkOwnerStatus = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user?.email === "youcef192837@gmail.com") {
+        setIsOwner(true)
+      }
+    } catch (error) {
+      console.error("Error checking owner status:", error)
+    }
+  }
+
   const SidebarContent = () => (
     <div className="flex flex-col h-full bg-card">
       <div className="p-4 bg-primary/10">
@@ -380,6 +395,15 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
               <span className="text-sm font-medium">{t.home}</span>
             </div>
           </Link>
+
+          {isOwner && (
+            <Link href="/admin" onClick={closeSidebar}>
+              <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer bg-cyan-500/10 border-l-4 border-cyan-500">
+                <Shield className="w-5 h-5 text-cyan-500" />
+                <span className="text-sm font-medium text-cyan-500">لوحة التحكم</span>
+              </div>
+            </Link>
+          )}
 
           <Link href="/chat/notifications" onClick={closeSidebar}>
             <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
