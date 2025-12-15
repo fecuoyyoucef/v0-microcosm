@@ -215,10 +215,10 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
 
     const handleTouchMove = (e: TouchEvent) => {
       touchEndX.current = e.touches[0].clientX
-      const deltaX = touchStartX.current - touchEndX.current
+      const deltaX = touchEndX.current - touchStartX.current
       const deltaY = Math.abs(e.touches[0].clientY - touchStartY.current)
 
-      if (deltaX > 30 && deltaY < 50) {
+      if (deltaX < -30 && deltaY < 50) {
         isSwiping.current = true
       }
     }
@@ -226,10 +226,10 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
     const handleTouchEnd = () => {
       if (!isSwiping.current) return
 
-      const swipeDistance = touchStartX.current - touchEndX.current
-      const startedFromRightHalf = touchStartX.current > window.innerWidth / 2
+      const swipeDistance = touchEndX.current - touchStartX.current
+      const startedFromRightEdge = touchStartX.current > window.innerWidth * 0.7
 
-      if (swipeDistance > 80 && startedFromRightHalf) {
+      if (swipeDistance < -80 && startedFromRightEdge) {
         setIsMobileMenuOpen(true)
       }
 
