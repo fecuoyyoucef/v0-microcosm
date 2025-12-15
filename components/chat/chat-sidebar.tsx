@@ -227,7 +227,7 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
       if (!isSwiping.current) return
 
       const swipeDistance = touchEndX.current - touchStartX.current
-      const startedFromRightEdge = touchStartX.current > window.innerWidth * 0.9
+      const startedFromRightEdge = touchStartX.current > window.innerWidth * 0.7
 
       if (swipeDistance < -80 && startedFromRightEdge) {
         setIsMobileMenuOpen(true)
