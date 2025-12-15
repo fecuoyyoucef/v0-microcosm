@@ -328,7 +328,7 @@ export function MessageList({
 
   return (
     <TooltipProvider>
-      <div className="flex-1 overflow-auto bg-background" ref={containerRef}>
+      <div className="flex-1 overflow-auto bg-transparent" ref={containerRef}>
         <div className="space-y-0.5">
           {Object.values(groupedMessages).map(({ date, messages: dayMessages }) => (
             <div key={date} className="space-y-2">
