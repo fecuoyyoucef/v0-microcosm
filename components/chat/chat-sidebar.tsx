@@ -503,7 +503,7 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
             <span className="text-xs text-muted-foreground mr-auto">{t.comingSoon}</span>
           </div>
 
-          <Link href="/chat/settings/appearance" onClick={closeSidebar}>
+          <Link href="/chat/settings" onClick={closeSidebar}>
             <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
               <Settings className="w-5 h-5 text-muted-foreground" />
               <span className="text-sm font-medium">{t.settings}</span>

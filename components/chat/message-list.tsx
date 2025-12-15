@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { CheckCheck, Reply, Trash2, Languages, Loader2, Check } from "lucide-react"
-import { format } from "date-fns"
+import { formatDistanceToNow } from "date-fns"
 import { ar } from "date-fns/locale"
 import type { Message, GroupMember, ConversationNode } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -153,6 +153,12 @@ export function MessageList({
     }
   }, [messages, supabase])
 
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight
+    }
+  }, [messages.length])
+
   const toggleReaction = async (messageId: string, reactionId: string) => {
     const existingReaction = reactions[messageId]?.find((r) => r.user_id === currentUserId)
 
@@ -279,16 +285,18 @@ export function MessageList({
 
   if (isLoading) {
     return (
-      <div className="flex-1 p-3 space-y-3">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className={cn("flex gap-2", i % 2 === 0 && "flex-row-reverse")}>
-            <Skeleton className="h-8 w-8 rounded-full shrink-0" />
-            <div className="space-y-1.5">
-              <Skeleton className="h-3 w-16" />
-              <Skeleton className="h-10 w-48 rounded-2xl" />
+      <div className="flex-1 overflow-auto bg-transparent" ref={containerRef}>
+        <div className="p-4 space-y-4">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="flex items-start gap-3">
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-16 w-full max-w-md" />
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     )
   }
@@ -308,7 +316,7 @@ export function MessageList({
 
   const groupedMessages = messages.reduce(
     (acc, message) => {
-      const date = format(new Date(message.created_at), "yyyy-MM-dd")
+      const date = formatDistanceToNow(new Date(message.created_at), { locale: ar })
       if (!acc[date]) {
         acc[date] = { date, messages: [] }
       }
@@ -462,7 +470,7 @@ export function MessageList({
 
                         <div className={cn("flex items-center gap-1 mt-0.5", isOwn ? "justify-start" : "justify-end")}>
                           <span className={cn("text-[10px]", isOwn ? "text-white/60" : "text-muted-foreground/70")}>
-                            {format(new Date(message.created_at), "p", { locale: ar })}
+                            {formatDistanceToNow(new Date(message.created_at), { locale: ar })}
                           </span>
                           {isOwn && <CheckCheck className="w-3 h-3 text-white/60" />}
                           {style.icon && <span className="text-[9px] opacity-50">{style.icon}</span>}
