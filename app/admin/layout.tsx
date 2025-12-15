@@ -13,9 +13,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     redirect("/auth/login")
   }
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+  const { data: adminData } = await supabase.from("admins").select("role, is_active").eq("email", user.email).single()
 
-  if (!profile || (profile.role !== "owner" && profile.role !== "admin")) {
+  if (!adminData || !adminData.is_active || (adminData.role !== "owner" && adminData.role !== "admin")) {
     redirect("/chat")
   }
 
