@@ -12,7 +12,7 @@ import { format } from "date-fns"
 import { ar } from "date-fns/locale"
 import type { Message, GroupMember, ConversationNode } from "@/lib/types"
 import { cn } from "@/lib/utils"
-import { Link } from "next/link"
+import Link from "next/link"
 import {
   AlertDialog,
   AlertDialogAction,
