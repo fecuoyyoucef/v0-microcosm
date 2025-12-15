@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
-import { GroupsListPage } from "@/components/chat/groups-list-page"
+import { HomePageContent } from "@/components/chat/home-page-content"
 
 export default async function ChatPage() {
   const supabase = await createClient()
@@ -17,10 +17,9 @@ export default async function ChatPage() {
 
   const groups = memberships?.map((m) => m.groups).filter(Boolean) || []
 
-  // Fetch profile
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
   const { data: survey } = await supabase.from("user_surveys").select("*").eq("user_id", user.id).single()
 
-  return <GroupsListPage groups={groups} userId={user.id} profile={profile} hasCompletedSurvey={!!survey} />
+  return <HomePageContent groups={groups as any} userId={user.id} profile={profile} hasCompletedSurvey={!!survey} />
 }

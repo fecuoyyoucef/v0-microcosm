@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { NodesPanel } from "./nodes-panel"
+import { AIToolbar } from "./ai-toolbar"
+import { useFeature } from "@/hooks/use-features"
 
 interface LayerFilterProps {
   activeLayer: MessageLayer | "all"
@@ -19,6 +21,7 @@ interface LayerFilterProps {
   currentUserId?: string
   isAdmin?: boolean
   groupId?: string
+  messages?: Array<{ id: string; content: string; sender_id: string; created_at: string }>
 }
 
 export function LayerFilter({
@@ -31,12 +34,19 @@ export function LayerFilter({
   currentUserId,
   isAdmin = false,
   groupId: propGroupId,
+  messages = [],
 }: LayerFilterProps) {
   const params = useParams()
   const groupId = propGroupId || (params.groupId as string)
   const selectedNode = nodes.find((n) => n.id === selectedNodeId)
   const [isExpanded, setIsExpanded] = useState(false)
   const [isNodesPanelOpen, setIsNodesPanelOpen] = useState(false)
+
+  const mindMapEnabled = useFeature("mind_map")
+  const notebookEnabled = useFeature("group_notebook")
+  const memoryEnabled = useFeature("daily_memory")
+  const decisionsEnabled = useFeature("decisions_system")
+  const nodesEnabled = useFeature("conversation_nodes")
 
   const getFilterSummary = () => {
     const parts: string[] = []
@@ -67,40 +77,50 @@ export function LayerFilter({
         <div className="flex items-center gap-1 shrink-0">
           {!isExpanded && (
             <div className="flex items-center gap-1 mr-2">
+              <div onClick={(e) => e.stopPropagation()}>
+                <AIToolbar groupId={groupId} messages={messages} />
+              </div>
+
               {/* Nodes Panel Trigger */}
-              <Sheet open={isNodesPanelOpen} onOpenChange={setIsNodesPanelOpen}>
-                <SheetTrigger asChild onClick={(e) => e.stopPropagation()}>
-                  <div className="w-7 h-7 rounded-full hover:bg-muted flex items-center justify-center cursor-pointer">
-                    <GitBranch className="w-3.5 h-3.5 text-violet-600" />
+              {nodesEnabled && (
+                <Sheet open={isNodesPanelOpen} onOpenChange={setIsNodesPanelOpen}>
+                  <SheetTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <div className="w-7 h-7 rounded-full hover:bg-muted flex items-center justify-center cursor-pointer">
+                      <GitBranch className="w-3.5 h-3.5 text-violet-600" />
+                    </div>
+                  </SheetTrigger>
+                  <SheetContent side="right" className="w-80 p-0">
+                    {currentUserId && onNodeChange && onNodesUpdate && (
+                      <NodesPanel
+                        groupId={groupId}
+                        nodes={nodes}
+                        selectedNodeId={selectedNodeId}
+                        onNodeSelect={(id) => {
+                          onNodeChange(id)
+                          setIsNodesPanelOpen(false)
+                        }}
+                        onNodesUpdate={onNodesUpdate}
+                        currentUserId={currentUserId}
+                        isAdmin={isAdmin}
+                      />
+                    )}
+                  </SheetContent>
+                </Sheet>
+              )}
+              {mindMapEnabled && (
+                <Link href={`/chat/${groupId}/map`} onClick={(e) => e.stopPropagation()}>
+                  <div className="w-7 h-7 rounded-full hover:bg-muted flex items-center justify-center">
+                    <Map className="w-3.5 h-3.5 text-primary" />
                   </div>
-                </SheetTrigger>
-                <SheetContent side="right" className="w-80 p-0">
-                  {currentUserId && onNodeChange && onNodesUpdate && (
-                    <NodesPanel
-                      groupId={groupId}
-                      nodes={nodes}
-                      selectedNodeId={selectedNodeId}
-                      onNodeSelect={(id) => {
-                        onNodeChange(id)
-                        setIsNodesPanelOpen(false)
-                      }}
-                      onNodesUpdate={onNodesUpdate}
-                      currentUserId={currentUserId}
-                      isAdmin={isAdmin}
-                    />
-                  )}
-                </SheetContent>
-              </Sheet>
-              <Link href={`/chat/${groupId}/map`} onClick={(e) => e.stopPropagation()}>
-                <div className="w-7 h-7 rounded-full hover:bg-muted flex items-center justify-center">
-                  <Map className="w-3.5 h-3.5 text-primary" />
-                </div>
-              </Link>
-              <Link href={`/chat/${groupId}/notebook`} onClick={(e) => e.stopPropagation()}>
-                <div className="w-7 h-7 rounded-full hover:bg-muted flex items-center justify-center">
-                  <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
-                </div>
-              </Link>
+                </Link>
+              )}
+              {notebookEnabled && (
+                <Link href={`/chat/${groupId}/notebook`} onClick={(e) => e.stopPropagation()}>
+                  <div className="w-7 h-7 rounded-full hover:bg-muted flex items-center justify-center">
+                    <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
+                  </div>
+                </Link>
+              )}
             </div>
           )}
           {isExpanded ? (
@@ -175,84 +195,96 @@ export function LayerFilter({
                 </Button>
               </div>
 
-              {/* Quick Actions */}
+              {/* Quick Actions - with feature flags */}
               <div className="flex items-center gap-1">
+                <AIToolbar groupId={groupId} messages={messages} />
+
                 {/* Nodes Panel */}
-                <Sheet open={isNodesPanelOpen} onOpenChange={setIsNodesPanelOpen}>
-                  <SheetTrigger asChild>
-                    <Button
-                      variant={selectedNodeId ? "secondary" : "ghost"}
-                      size="sm"
-                      className={cn(
-                        "h-8 text-xs gap-1 rounded-lg px-2 hover:bg-violet-500/10 whitespace-nowrap",
-                        selectedNodeId && "shadow-sm",
+                {nodesEnabled && (
+                  <Sheet open={isNodesPanelOpen} onOpenChange={setIsNodesPanelOpen}>
+                    <SheetTrigger asChild>
+                      <Button
+                        variant={selectedNodeId ? "secondary" : "ghost"}
+                        size="sm"
+                        className={cn(
+                          "h-8 text-xs gap-1 rounded-lg px-2 hover:bg-violet-500/10 whitespace-nowrap",
+                          selectedNodeId && "shadow-sm",
+                        )}
+                      >
+                        <GitBranch className="w-3.5 h-3.5 text-violet-600" />
+                        العقد
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="right" className="w-80 p-0">
+                      {currentUserId && onNodeChange && onNodesUpdate && (
+                        <NodesPanel
+                          groupId={groupId}
+                          nodes={nodes}
+                          selectedNodeId={selectedNodeId}
+                          onNodeSelect={(id) => {
+                            onNodeChange(id)
+                            setIsNodesPanelOpen(false)
+                          }}
+                          onNodesUpdate={onNodesUpdate}
+                          currentUserId={currentUserId}
+                          isAdmin={isAdmin}
+                        />
                       )}
+                    </SheetContent>
+                  </Sheet>
+                )}
+
+                {mindMapEnabled && (
+                  <Link href={`/chat/${groupId}/map`}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs gap-1 rounded-lg px-2 hover:bg-primary/10 whitespace-nowrap"
                     >
-                      <GitBranch className="w-3.5 h-3.5 text-violet-600" />
-                      العقد
+                      <Map className="w-3.5 h-3.5 text-primary" />
+                      الخريطة
                     </Button>
-                  </SheetTrigger>
-                  <SheetContent side="right" className="w-80 p-0">
-                    {currentUserId && onNodeChange && onNodesUpdate && (
-                      <NodesPanel
-                        groupId={groupId}
-                        nodes={nodes}
-                        selectedNodeId={selectedNodeId}
-                        onNodeSelect={(id) => {
-                          onNodeChange(id)
-                          setIsNodesPanelOpen(false)
-                        }}
-                        onNodesUpdate={onNodesUpdate}
-                        currentUserId={currentUserId}
-                        isAdmin={isAdmin}
-                      />
-                    )}
-                  </SheetContent>
-                </Sheet>
+                  </Link>
+                )}
 
-                <Link href={`/chat/${groupId}/map`}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 text-xs gap-1 rounded-lg px-2 hover:bg-primary/10 whitespace-nowrap"
-                  >
-                    <Map className="w-3.5 h-3.5 text-primary" />
-                    الخريطة
-                  </Button>
-                </Link>
+                {notebookEnabled && (
+                  <Link href={`/chat/${groupId}/notebook`}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs gap-1 rounded-lg px-2 hover:bg-emerald-500/10 whitespace-nowrap"
+                    >
+                      <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
+                      المفكرة
+                    </Button>
+                  </Link>
+                )}
 
-                <Link href={`/chat/${groupId}/notebook`}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 text-xs gap-1 rounded-lg px-2 hover:bg-emerald-500/10 whitespace-nowrap"
-                  >
-                    <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
-                    المفكرة
-                  </Button>
-                </Link>
+                {memoryEnabled && (
+                  <Link href={`/chat/${groupId}/memory`}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs gap-1 rounded-lg px-2 hover:bg-purple-500/10 whitespace-nowrap"
+                    >
+                      <Brain className="w-3.5 h-3.5 text-purple-600" />
+                      الذاكرة
+                    </Button>
+                  </Link>
+                )}
 
-                <Link href={`/chat/${groupId}/memory`}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 text-xs gap-1 rounded-lg px-2 hover:bg-purple-500/10 whitespace-nowrap"
-                  >
-                    <Brain className="w-3.5 h-3.5 text-purple-600" />
-                    الذاكرة
-                  </Button>
-                </Link>
-
-                <Link href={`/chat/${groupId}/decisions`}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 text-xs gap-1 rounded-lg px-2 hover:bg-amber-500/10 whitespace-nowrap"
-                  >
-                    <Vote className="w-3.5 h-3.5 text-amber-600" />
-                    القرارات
-                  </Button>
-                </Link>
+                {decisionsEnabled && (
+                  <Link href={`/chat/${groupId}/decisions`}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs gap-1 rounded-lg px-2 hover:bg-amber-500/10 whitespace-nowrap"
+                    >
+                      <Vote className="w-3.5 h-3.5 text-amber-600" />
+                      القرارات
+                    </Button>
+                  </Link>
+                )}
               </div>
             </div>
           </div>

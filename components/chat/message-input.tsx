@@ -32,6 +32,7 @@ interface MessageInputProps {
   groupSettings?: GroupSettings
   replyingTo?: Message | null
   onCancelReply?: () => void
+  onTyping?: () => void
 }
 
 const layerOptions: { value: MessageLayer; label: string; icon: string }[] = [
@@ -51,6 +52,7 @@ export function MessageInput({
   groupSettings,
   replyingTo,
   onCancelReply,
+  onTyping,
 }: MessageInputProps) {
   const [content, setContent] = useState("")
   const [selectedLayer, setSelectedLayer] = useState<MessageLayer>("standard")
@@ -67,6 +69,7 @@ export function MessageInput({
   const [showCorrectionHint, setShowCorrectionHint] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const supabase = createClient()
 
   const otherMembers = members.filter((m) => m.user_id !== currentUserId)
@@ -110,6 +113,22 @@ export function MessageInput({
       setShowCorrectionHint(false)
     }
   }, [content])
+
+  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setContent(e.target.value)
+
+    if (onTyping) {
+      onTyping()
+
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current)
+      }
+
+      typingTimeoutRef.current = setTimeout(() => {
+        typingTimeoutRef.current = null
+      }, 2000)
+    }
+  }
 
   const handleCorrectArabic = async () => {
     if (!content.trim()) return
@@ -370,7 +389,7 @@ export function MessageInput({
             <Textarea
               ref={textareaRef}
               value={content}
-              onChange={(e) => setContent(e.target.value)}
+              onChange={handleContentChange}
               onKeyDown={handleKeyDown}
               placeholder="Message..."
               className="min-h-[32px] max-h-20 resize-none border-0 bg-transparent px-2 text-sm py-1.5 focus-visible:ring-0 flex-1 min-w-0"

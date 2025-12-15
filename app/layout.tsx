@@ -4,6 +4,7 @@ import { IBM_Plex_Sans_Arabic, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/theme-provider"
 import { SettingsProvider } from "@/components/settings-provider"
+import { FeaturesProvider } from "@/components/features/features-provider"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import "./globals.css"
 
@@ -85,8 +86,10 @@ export default function RootLayout({
       <body className={`${ibmPlexArabic.variable} ${geistMono.variable} font-sans antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <SettingsProvider>
-            {children}
-            <PWAInstallPrompt />
+            <FeaturesProvider>
+              {children}
+              <PWAInstallPrompt />
+            </FeaturesProvider>
           </SettingsProvider>
         </ThemeProvider>
         <Analytics />

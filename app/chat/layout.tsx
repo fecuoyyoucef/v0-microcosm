@@ -1,7 +1,7 @@
 import type React from "react"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
-import { ChatSidebar } from "@/components/chat/chat-sidebar"
+import { AppShell } from "@/components/layout/app-shell"
 import { InstallPromptNotification } from "@/components/pwa/install-button"
 
 export default async function ChatLayout({ children }: { children: React.ReactNode }) {
@@ -15,22 +15,20 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
     redirect("/auth/login")
   }
 
+  // Fetch user profile
+  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+
+  // Fetch user's groups
+  const { data: memberships } = await supabase.from("group_members").select("groups(*)").eq("user_id", user.id)
+
+  const groups = memberships?.map((m) => m.groups).filter(Boolean) || []
+
   return (
-    <div className="h-dvh flex bg-background relative">
+    <>
       <InstallPromptNotification />
-
-      {/* Sidebar - hidden on mobile, visible on desktop */}
-      <aside className="hidden md:flex md:w-72 lg:w-80 border-l border-border bg-card flex-col shrink-0">
-        <ChatSidebar userId={user.id} />
-      </aside>
-
-      {/* Main content area */}
-      <main className="flex-1 flex flex-col min-w-0 min-h-0">
-        {/* Mobile swipe sidebar - no header bar */}
-        <ChatSidebar userId={user.id} mobileOnly />
-
-        <div className="flex-1 flex flex-col min-w-0 min-h-0">{children}</div>
-      </main>
-    </div>
+      <AppShell userId={user.id} profile={profile} groups={groups as any}>
+        {children}
+      </AppShell>
+    </>
   )
 }

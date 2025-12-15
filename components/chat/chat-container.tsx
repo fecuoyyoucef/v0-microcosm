@@ -7,6 +7,9 @@ import { MessageList } from "./message-list"
 import { MessageInput } from "./message-input"
 import { LayerFilter } from "./layer-filter"
 import { AnimatedBackground, type BackgroundStyle } from "@/components/background/animated-background"
+import { useRealtimePresence } from "@/hooks/use-realtime-presence"
+import { TypingIndicator } from "./typing-indicator"
+import { OnlineIndicator } from "./online-indicator"
 import type { Group, GroupMember, Message, MessageLayer, ConversationNode, GroupSettings } from "@/lib/types"
 
 interface ChatContainerProps {
@@ -138,6 +141,18 @@ export function ChatContainer({
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
+
+  const currentProfile = members.find((m) => m.user_id === currentUserId)?.profile
+  const { onlineUsers, typingUsers, broadcastTyping } = useRealtimePresence(
+    groupId,
+    currentUserId,
+    currentProfile?.display_name || "مستخدم",
+  )
+
+  const typingUserNames = Array.from(typingUsers).map((userId) => {
+    const member = members.find((m) => m.user_id === userId)
+    return member?.profile?.display_name || "مستخدم"
+  })
 
   useEffect(() => {
     isMounted.current = true
@@ -386,6 +401,8 @@ export function ChatContainer({
           onMembersUpdate={fetchMembers}
         />
 
+        <OnlineIndicator onlineUsers={onlineUsers} />
+
         <LayerFilter
           activeLayer={activeLayer}
           onLayerChange={setActiveLayer}
@@ -396,6 +413,12 @@ export function ChatContainer({
           currentUserId={currentUserId}
           isAdmin={currentUserRole === "admin"}
           groupId={groupId}
+          messages={messages.map((m) => ({
+            id: m.id,
+            content: m.content,
+            sender_id: m.sender_id,
+            created_at: m.created_at,
+          }))}
         />
 
         <div className="flex-1 min-h-0 overflow-auto">
@@ -409,6 +432,7 @@ export function ChatContainer({
             onReply={handleReply}
             onDelete={handleDeleteMessage}
           />
+          <TypingIndicator userNames={typingUserNames} />
         </div>
 
         <MessageInput
@@ -422,6 +446,7 @@ export function ChatContainer({
           groupSettings={groupSettings}
           replyingTo={replyingTo}
           onCancelReply={() => setReplyingTo(null)}
+          onTyping={broadcastTyping}
         />
       </div>
     </div>
