@@ -14,6 +14,8 @@ export async function POST(request: Request) {
 
     const { groupId, content, mentionedUsers } = await request.json()
 
+    console.log("[v0] Processing mentions:", { groupId, mentionedUsers: mentionedUsers?.length })
+
     // Send notifications to mentioned users
     if (mentionedUsers && mentionedUsers.length > 0) {
       const { data: groupData } = await supabase.from("groups").select("name").eq("id", groupId).single()
@@ -30,31 +32,47 @@ export async function POST(request: Request) {
         sender_id: user.id,
         group_id: groupId,
         type: "mention",
-        title: `${senderProfile?.display_name} mentioned you`,
+        title: `${senderProfile?.display_name || "Someone"} أشار إليك`,
         body: content.substring(0, 100),
         data: {
           groupId,
           groupName: groupData?.name,
+          url: `/chat/${groupId}`,
         },
       }))
 
-      await supabase.from("notifications").insert(notifications)
+      const { error: notifError } = await supabase.from("notifications").insert(notifications)
+
+      if (notifError) {
+        console.error("[v0] Notification insert error:", notifError)
+      } else {
+        console.log("[v0] Created", notifications.length, "mention notifications")
+      }
 
       // Try to send push notifications
       try {
-        await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/push/send`, {
+        const pushResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/push/send`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             userIds: mentionedUsers,
-            title: `${senderProfile?.display_name} mentioned you in ${groupData?.name}`,
+            title: `${senderProfile?.display_name || "Someone"} أشار إليك في ${groupData?.name || "مجموعة"}`,
             body: content.substring(0, 100),
             data: {
               url: `/chat/${groupId}`,
               groupId,
+              type: "mention",
             },
+            badge: "/images/logo.png",
+            icon: "/images/logo.png",
           }),
         })
+
+        if (!pushResponse.ok) {
+          console.error("[v0] Push notification failed:", await pushResponse.text())
+        } else {
+          console.log("[v0] Push notifications sent successfully")
+        }
       } catch (error) {
         console.error("[v0] Push notification error:", error)
       }
