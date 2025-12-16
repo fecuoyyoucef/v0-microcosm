@@ -283,6 +283,50 @@ export function MessageList({
     }
   }
 
+  const renderContentWithMentions = (content: string) => {
+    const mentionPattern = /@(\w+)/g
+    const parts = []
+    let lastIndex = 0
+    let match
+
+    while ((match = mentionPattern.exec(content)) !== null) {
+      // Add text before mention
+      if (match.index > lastIndex) {
+        parts.push(content.substring(lastIndex, match.index))
+      }
+
+      // Add mention
+      const username = match[1]
+      const isMentioningCurrentUser =
+        members.find((m) => m.user_id === currentUserId)?.profile?.username?.toLowerCase() === username.toLowerCase() ||
+        members
+          .find((m) => m.user_id === currentUserId)
+          ?.profile?.display_name?.replace(/\s+/g, "")
+          .toLowerCase() === username.toLowerCase()
+
+      parts.push(
+        <span
+          key={match.index}
+          className={cn(
+            "font-medium px-1 rounded",
+            isMentioningCurrentUser ? "bg-primary/20 text-primary" : "bg-muted-foreground/20 text-muted-foreground",
+          )}
+        >
+          @{username}
+        </span>,
+      )
+
+      lastIndex = match.index + match[0].length
+    }
+
+    // Add remaining text
+    if (lastIndex < content.length) {
+      parts.push(content.substring(lastIndex))
+    }
+
+    return parts.length > 0 ? parts : content
+  }
+
   if (isLoading) {
     return (
       <div className="flex-1 overflow-auto bg-transparent" ref={containerRef}>
@@ -354,6 +398,13 @@ export function MessageList({
                 const groupedReactions = getGroupedReactions(message.id)
                 const hasReactions = Object.keys(groupedReactions).length > 0
 
+                const isMentioned =
+                  message.content &&
+                  new RegExp(
+                    `@(${members.find((m) => m.user_id === currentUserId)?.profile?.username}|${members.find((m) => m.user_id === currentUserId)?.profile?.display_name?.replace(/\s+/g, "")})`,
+                    "i",
+                  ).test(message.content)
+
                 return (
                   <div
                     key={message.id}
@@ -361,6 +412,7 @@ export function MessageList({
                       "group relative flex items-end gap-2",
                       isOwn ? "flex-row-reverse" : "flex-row",
                       !isSameSenderAsPrev && "mt-3",
+                      isMentioned && !isOwn && "animate-pulse-subtle", // Subtle highlight for mentions
                     )}
                     onMouseEnter={() => setActiveMessageId(message.id)}
                     onMouseLeave={() => setActiveMessageId(null)}
@@ -439,6 +491,7 @@ export function MessageList({
                                 isSameSenderAsPrev && !isSameSenderAsNext && "rounded-tl-md",
                                 !isSameSenderAsPrev && isSameSenderAsNext && "rounded-bl-md",
                                 isSameSenderAsPrev && isSameSenderAsNext && "rounded-l-md",
+                                isMentioned && "ring-2 ring-primary/30", // Highlight mentioned messages
                               ],
                           message.layer === "shadow" && "italic opacity-80",
                         )}
@@ -455,7 +508,9 @@ export function MessageList({
                         )}
 
                         {message.content && message.content !== "📷 صورة" && (
-                          <p className="text-[14px] whitespace-pre-wrap break-words leading-snug">{message.content}</p>
+                          <p className="text-[14px] whitespace-pre-wrap break-words leading-snug">
+                            {renderContentWithMentions(message.content)}
+                          </p>
                         )}
 
                         {translatedMessages[message.id] && (

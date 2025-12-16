@@ -21,7 +21,14 @@ async function getWebPush() {
 
 export async function POST(request: Request) {
   try {
-    const { userId, title, body, url, data } = await request.json()
+    const body = await request.json()
+    const { userId, userIds, title, body: messageBody, url, data } = body
+
+    const targetUserIds = userIds || (userId ? [userId] : [])
+
+    if (!targetUserIds || targetUserIds.length === 0) {
+      return NextResponse.json({ error: "No user IDs provided" }, { status: 400 })
+    }
 
     if (!process.env.VAPID_PRIVATE_KEY) {
       console.error("[Push] VAPID_PRIVATE_KEY not configured")
@@ -31,8 +38,10 @@ export async function POST(request: Request) {
     const webpush = await getWebPush()
     const supabase = await createClient()
 
-    // Get user's push subscriptions
-    const { data: subscriptions, error } = await supabase.from("push_subscriptions").select("*").eq("user_id", userId)
+    const { data: subscriptions, error } = await supabase
+      .from("push_subscriptions")
+      .select("*")
+      .in("user_id", targetUserIds)
 
     if (error) {
       console.error("[Push] Error fetching subscriptions:", error)
@@ -45,14 +54,17 @@ export async function POST(request: Request) {
 
     const payload = JSON.stringify({
       title: title || "Synaptic Space",
-      body: body || "لديك إشعار جديد",
+      body: messageBody || "لديك إشعار جديد",
       icon: "/icons/icon-192x192.png",
       badge: "/icons/icon-72x72.png",
       url: url || "/chat/notifications",
+      tag: data?.type || "default",
+      requireInteraction: data?.priority === "high",
       ...data,
     })
 
     let sentCount = 0
+    const errors = []
 
     for (const sub of subscriptions) {
       try {
@@ -68,6 +80,7 @@ export async function POST(request: Request) {
         sentCount++
       } catch (err: any) {
         console.error("[Push] Send error:", err.statusCode, err.body)
+        errors.push({ userId: sub.user_id, error: err.message })
 
         // Remove invalid subscriptions (410 Gone or 404 Not Found)
         if (err.statusCode === 410 || err.statusCode === 404) {
@@ -76,7 +89,12 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ success: true, sent: sentCount, total: subscriptions.length })
+    return NextResponse.json({
+      success: true,
+      sent: sentCount,
+      total: subscriptions.length,
+      errors: errors.length > 0 ? errors : undefined,
+    })
   } catch (error: any) {
     console.error("[Push] Error:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })

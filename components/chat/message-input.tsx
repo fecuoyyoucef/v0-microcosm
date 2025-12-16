@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select"
-import { Send, Eye, GitBranch, X, Loader2, Reply, Camera, Sparkles } from "lucide-react"
+import { Send, Eye, GitBranch, X, Loader2, Reply, Camera, Sparkles, AtSign } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import type { MessageLayer, GroupMember, ConversationNode, GroupSettings, Message } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -67,6 +67,7 @@ export function MessageInput({
   const [isCheckingContent, setIsCheckingContent] = useState(false)
   const [isCorrectingText, setIsCorrectingText] = useState(false)
   const [showCorrectionHint, setShowCorrectionHint] = useState(false)
+  const [mentionedUsers, setMentionedUsers] = useState<string[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -103,19 +104,31 @@ export function MessageInput({
     if (fileInputRef.current) fileInputRef.current.value = ""
   }
 
-  useEffect(() => {
-    if (content.length > 20) {
-      const hasCommonErrors =
-        content.includes("اللذي") || content.includes("التى") || content.match(/\b(في|من|على)\s+(ال[أ-ي]+)\b/)
+  const parseMentions = (text: string): string[] => {
+    const mentionPattern = /@(\w+)/g
+    const mentions = []
+    let match
 
-      setShowCorrectionHint(hasCommonErrors)
-    } else {
-      setShowCorrectionHint(false)
+    while ((match = mentionPattern.exec(text)) !== null) {
+      const username = match[1]
+      const member = members.find(
+        (m) =>
+          m.profile?.username?.toLowerCase() === username.toLowerCase() ||
+          m.profile?.display_name?.replace(/\s+/g, "").toLowerCase() === username.toLowerCase(),
+      )
+      if (member && !mentions.includes(member.user_id)) {
+        mentions.push(member.user_id)
+      }
     }
-  }, [content])
+    return mentions
+  }
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setContent(e.target.value)
+    const newContent = e.target.value
+    setContent(newContent)
+
+    const mentions = parseMentions(newContent)
+    setMentionedUsers(mentions)
 
     if (onTyping) {
       onTyping()
@@ -242,6 +255,22 @@ export function MessageInput({
         replyingTo?.id || null,
       )
 
+      if (mentionedUsers.length > 0) {
+        try {
+          await fetch("/api/messages/send-with-mentions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              groupId,
+              content: messageContent,
+              mentionedUsers,
+            }),
+          })
+        } catch (error) {
+          console.error("[v0] Failed to send mention notifications:", error)
+        }
+      }
+
       const pendingTasks = (window as any).__pendingTasks
       if (pendingTasks?.tasks && pendingTasks.tasks.length > 0) {
         // Get the last message ID from the group
@@ -271,6 +300,7 @@ export function MessageInput({
 
       setContent("")
       setVisibleTo([])
+      setMentionedUsers([])
       clearImage()
     } finally {
       setIsSending(false)
@@ -290,6 +320,8 @@ export function MessageInput({
   const toggleVisibleTo = (userId: string) => {
     setVisibleTo((prev) => (prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]))
   }
+
+  const hasMentions = mentionedUsers.length > 0
 
   return (
     <div className="shrink-0 border-t border-border/50 bg-background w-full max-w-full overflow-hidden">
@@ -326,6 +358,15 @@ export function MessageInput({
           >
             تصحيح
           </Button>
+        </div>
+      )}
+
+      {hasMentions && (
+        <div className="px-3 py-1 bg-violet-50 dark:bg-violet-900/20 border-b border-violet-200 dark:border-violet-800 flex items-center gap-2 animate-in slide-in-from-top-2 duration-200">
+          <AtSign className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400 shrink-0" />
+          <p className="text-[11px] text-violet-700 dark:text-violet-300 flex-1">
+            ذكرت {mentionedUsers.length} {mentionedUsers.length === 1 ? "شخص" : "أشخاص"}
+          </p>
         </div>
       )}
 
@@ -391,7 +432,7 @@ export function MessageInput({
               value={content}
               onChange={handleContentChange}
               onKeyDown={handleKeyDown}
-              placeholder="Message..."
+              placeholder="اكتب رسالة... (@للإشارة)"
               className="min-h-[32px] max-h-20 resize-none border-0 bg-transparent px-2 text-sm py-1.5 focus-visible:ring-0 flex-1 min-w-0"
               rows={1}
             />
@@ -472,7 +513,9 @@ export function MessageInput({
         </div>
 
         {/* Hint text */}
-        <p className="text-[9px] text-muted-foreground/60 mt-1 text-center">Shift + Enter للإرسال</p>
+        <p className="text-[9px] text-muted-foreground/60 mt-1 text-center">
+          Shift + Enter للإرسال • اكتب @ للإشارة لشخص
+        </p>
       </div>
     </div>
   )

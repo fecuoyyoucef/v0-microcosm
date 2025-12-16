@@ -193,3 +193,36 @@ body {
 .animate-pulse-slow {
   animation: pulse-slow 10s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* Adding subtle pulse animation for mentioned messages */
+@keyframes pulse-subtle {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(var(--color-primary), 0);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(var(--color-primary), 0.1);
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s ease-in-out 3;
+}
+
+/* Smooth mention highlight */
+.mention-highlight {
+  position: relative;
+  animation: mentionGlow 1.5s ease-in-out;
+}
+
+@keyframes mentionGlow {
+  0% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: rgba(var(--color-primary), 0.1);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
