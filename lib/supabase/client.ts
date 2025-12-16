@@ -1,8 +1,8 @@
-import { createBrowserClient } from "@supabase/ssr"
+import { createBrowserClient as createSupabaseBrowserClient } from "@supabase/ssr"
 
-let client: ReturnType<typeof createBrowserClient> | null = null
+let client: ReturnType<typeof createSupabaseBrowserClient> | null = null
 
-export function createClient() {
+export function createBrowserClient() {
   if (client) return client
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -12,6 +12,11 @@ export function createClient() {
     throw new Error("Missing Supabase environment variables. Please check your .env file.")
   }
 
-  client = createBrowserClient(url, key)
+  client = createSupabaseBrowserClient(url, key)
   return client
+}
+
+// Keep the old function for backward compatibility
+export function createClient() {
+  return createBrowserClient()
 }
