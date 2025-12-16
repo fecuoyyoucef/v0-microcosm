@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     console.log("[v0] Conversation ID:", conversationId)
     console.log("[v0] History length:", history?.length)
 
-    const systemPrompt = `أنت وكيل دعم ذكي لتطبيق Microcosm. هدفك مساعدة المستخدمين على فهم التطبيق وحل المشاكل.
+    const systemPrompt = `أنت وكيل دعم ذكي لتطبيق Synaptic Space. هدفك مساعدة المستخدمين على فهم التطبيق وحل المشاكل.
 
 التطبيق يحتوي على:
 - الخلايا (Cells): مجموعات مصغرة لمواضيع محددة
