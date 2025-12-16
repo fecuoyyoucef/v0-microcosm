@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
-import { CheckCheck, Reply, Trash2, Languages, Loader2 } from "lucide-react"
+import { CheckCheck, Reply, Trash2, Languages, Loader2, FileText, File } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ar } from "date-fns/locale"
 import type { Message, GroupMember, ConversationNode } from "@/lib/types"
@@ -79,7 +79,7 @@ const layerStyles: Record<string, { bg: string; ownBg: string; icon: string }> =
   },
 }
 
-export function MessageList({
+const MessageList = ({
   messages,
   currentUserId,
   members = [], // Default members to empty array
@@ -88,7 +88,7 @@ export function MessageList({
   nodes,
   onReply,
   onDelete,
-}: MessageListProps) {
+}: MessageListProps) => {
   const supabase = createClient()
   const containerRef = useRef<HTMLDivElement>(null)
   const reactionPickerRef = useRef<HTMLDivElement>(null) // Keep this for potential future use or if needed for context
@@ -375,6 +375,46 @@ export function MessageList({
     setLongPressActive(null)
   }
 
+  const getAttachments = (message: Message): Array<{ url: string; type: string; name: string }> => {
+    if (!message.attachment_url) return []
+
+    try {
+      // Try parsing as JSON (new format)
+      const parsed = JSON.parse(message.attachment_url)
+      if (Array.isArray(parsed)) return parsed
+    } catch {
+      // Old format: single URL string
+      const url = message.attachment_url
+      const isImage = url.match(/\.(jpg|jpeg|png|gif|webp)$/i)
+      return [
+        {
+          url,
+          type: isImage ? "image" : "document",
+          name: url.split("/").pop() || "file",
+        },
+      ]
+    }
+
+    return []
+  }
+
+  const handleDownload = async (url: string, fileName: string) => {
+    try {
+      const response = await fetch(url)
+      const blob = await response.blob()
+      const blobUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = blobUrl
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(blobUrl)
+    } catch (error) {
+      console.error("Error downloading file:", error)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex-1 overflow-auto bg-transparent" ref={containerRef}>
@@ -419,294 +459,359 @@ export function MessageList({
   )
 
   return (
-    <>
-      <div className="flex-1 overflow-auto bg-transparent" ref={containerRef}>
-        <div className="space-y-0.5">
-          {Object.values(groupedMessages).map(({ date, messages: dayMessages }) => (
-            <div key={date} className="space-y-2">
-              {dayMessages.map((message, index) => {
-                const isOwn = message.sender_id === currentUserId
-                const senderName = message.sender?.display_name || "مستخدم"
-                const prevMessage = index > 0 ? dayMessages[index - 1] : null
-                const isSameSenderAsPrev = prevMessage?.sender_id === message.sender_id
-                const nextMessage = index < dayMessages.length - 1 ? dayMessages[index + 1] : null
-                const isSameSenderAsNext = nextMessage?.sender_id === message.sender_id
+    <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+      {Object.values(groupedMessages).map(({ date, messages: dayMessages }) => (
+        <div key={date} className="space-y-2">
+          {dayMessages.map((message, index) => {
+            const sender = members.find((m) => m.user_id === message.sender_id)
+            const isOwn = message.sender_id === currentUserId
+            const attachments = getAttachments(message)
+            const hasAttachments = attachments.length > 0
+            const prevMessage = index > 0 ? dayMessages[index - 1] : null
+            const isSameSenderAsPrev = prevMessage?.sender_id === message.sender_id
+            const nextMessage = index < dayMessages.length - 1 ? dayMessages[index + 1] : null
+            const isSameSenderAsNext = nextMessage?.sender_id === message.sender_id
 
-                const style = layerStyles[message.layer] || layerStyles.standard
-                const node = nodes.find((n) => n.id === message.node_id)
+            const style = layerStyles[message.layer] || layerStyles.standard
+            const node = nodes.find((n) => n.id === message.node_id)
 
-                const showAvatar = !isOwn && !isSameSenderAsPrev
-                const showName = !isOwn && !isSameSenderAsPrev
+            const showAvatar = !isOwn && !isSameSenderAsPrev
+            const showName = !isOwn && !isSameSenderAsPrev
 
-                const hasImage = message.attachment_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i)
-                const isActive = activeMessageId === message.id
-                const replyPreview = message.reply_to ? getReplyPreview(message.reply_to) : null
+            const isActive = activeMessageId === message.id
+            const replyPreview = message.reply_to ? getReplyPreview(message.reply_to) : null
 
-                const groupedReactions = getGroupedReactions(message.id)
-                const hasReactions = Object.keys(groupedReactions).length > 0
+            const groupedReactions = getGroupedReactions(message.id)
+            const hasReactions = Object.keys(groupedReactions).length > 0
 
-                const isMentioned =
-                  message.content &&
-                  new RegExp(
-                    `@(${members.find((m) => m.user_id === currentUserId)?.profile?.username}|${members.find((m) => m.user_id === currentUserId)?.profile?.display_name?.replace(/\s+/g, "")})`,
-                    "i",
-                  ).test(message.content)
+            const isMentioned =
+              message.content &&
+              new RegExp(
+                `@(${members.find((m) => m.user_id === currentUserId)?.profile?.username}|${members.find((m) => m.user_id === currentUserId)?.profile?.display_name?.replace(/\s+/g, "")})`,
+                "i",
+              ).test(message.content)
 
-                return (
-                  <div
-                    key={message.id}
-                    className={cn("flex items-end gap-2 px-2 group", isOwn ? "flex-row-reverse" : "flex-row")}
-                    onTouchStart={(e) => handleTouchStart(message.id, e)}
-                    onTouchEnd={handleTouchEnd}
-                    onTouchMove={handleTouchMove}
-                    onMouseEnter={() => setActiveMessageId(message.id)}
-                    onMouseLeave={() => {
-                      setActiveMessageId(null)
-                      setShowReactionsFor(null)
-                    }}
-                  >
-                    {!isOwn && (
-                      <div className="w-7 shrink-0">
-                        {showAvatar ? (
-                          <Avatar className="w-7 h-7 ring-2 ring-background">
-                            {message.sender?.avatar_url && (
-                              <AvatarImage src={message.sender.avatar_url || "/placeholder.svg"} />
-                            )}
-                            <AvatarFallback
-                              className={cn(getAvatarColor(message.sender_id), "text-white font-bold text-[10px]")}
-                            >
-                              {senderName.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                        ) : null}
-                      </div>
-                    )}
+            return (
+              <div
+                key={message.id}
+                className={cn("flex items-end gap-2 group", isOwn ? "flex-row-reverse" : "flex-row")}
+                onTouchStart={(e) => handleTouchStart(message.id, e)}
+                onTouchEnd={handleTouchEnd}
+                onTouchMove={handleTouchMove}
+                onMouseEnter={() => setActiveMessageId(message.id)}
+                onMouseLeave={() => {
+                  setActiveMessageId(null)
+                  setShowReactionsFor(null)
+                }}
+              >
+                {!isOwn && (
+                  <div className="w-7 shrink-0">
+                    {showAvatar ? (
+                      <Avatar className="w-7 h-7 ring-2 ring-background">
+                        {sender?.avatar_url && <AvatarImage src={sender.avatar_url || "/placeholder.svg"} />}
+                        <AvatarFallback
+                          className={cn(getAvatarColor(message.sender_id), "text-white font-bold text-[10px]")}
+                        >
+                          {sender?.display_name?.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                    ) : null}
+                  </div>
+                )}
 
-                    <div className={cn("max-w-[70%] flex flex-col", isOwn && "items-end")}>
-                      {showName && (
-                        <div className="flex items-center gap-2 mb-0.5 px-1">
-                          <Link href={`/chat/profile/${message.sender_id}`} className="hover:underline">
-                            <span className="text-[11px] font-medium text-muted-foreground cursor-pointer">
-                              {senderName}
-                            </span>
-                          </Link>
-                          {message.sender?.active_title && (
-                            <Badge
-                              variant="secondary"
-                              className="text-[9px] h-4 px-1.5 gap-0.5"
-                              style={{
-                                backgroundColor: `${message.sender.active_title.color}20`,
-                                borderColor: message.sender.active_title.color,
-                                color: message.sender.active_title.color,
-                              }}
-                            >
-                              <span>{message.sender.active_title.icon}</span>
-                              <span>{message.sender.active_title.name_ar}</span>
-                            </Badge>
-                          )}
-                        </div>
-                      )}
-
-                      {replyPreview && (
-                        <div
-                          className={cn(
-                            "flex items-center gap-1.5 mb-1 px-2 py-1 rounded-lg border-r-2 border-primary bg-primary/5 cursor-pointer hover:bg-primary/10 transition-colors",
-                            isOwn && "border-r-0 border-l-2",
-                          )}
-                          onClick={() => {
-                            // Implement scroll to the replied message if needed
+                <div className={cn("max-w-[70%] flex flex-col", isOwn && "items-end")}>
+                  {showName && (
+                    <div className="flex items-center gap-2 mb-0.5 px-1">
+                      <Link href={`/chat/profile/${message.sender_id}`} className="hover:underline">
+                        <span className="text-[11px] font-medium text-muted-foreground cursor-pointer">
+                          {sender?.display_name || "مستخدم"}
+                        </span>
+                      </Link>
+                      {sender?.active_title && (
+                        <Badge
+                          variant="secondary"
+                          className="text-[9px] h-4 px-1.5 gap-0.5"
+                          style={{
+                            backgroundColor: `${sender.active_title.color}20`,
+                            borderColor: sender.active_title.color,
+                            color: sender.active_title.color,
                           }}
                         >
-                          <Reply className="w-3 h-3 text-primary shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[10px] font-medium text-primary truncate">{replyPreview.senderName}</p>
-                            <p className="text-[10px] text-muted-foreground truncate">{replyPreview.content}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      <div
-                        className={cn(
-                          "relative group/message rounded-2xl px-3 py-2 text-sm transition-all duration-200",
-                          isOwn
-                            ? [
-                                style.ownBg,
-                                "text-white shadow-md",
-                                "rounded-2xl",
-                                isSameSenderAsPrev && !isSameSenderAsNext && "rounded-tr-md", // Adjusted for potentially missing nextMessage logic
-                                !isSameSenderAsPrev && isSameSenderAsNext && "rounded-br-md", // Adjusted for potentially missing nextMessage logic
-                                isSameSenderAsPrev && isSameSenderAsNext && "rounded-r-md", // Adjusted for potentially missing nextMessage logic
-                              ]
-                            : [
-                                style.bg,
-                                "rounded-2xl",
-                                isSameSenderAsPrev && !isSameSenderAsNext && "rounded-tl-md", // Adjusted for potentially missing nextMessage logic
-                                !isSameSenderAsPrev && isSameSenderAsNext && "rounded-bl-md", // Adjusted for potentially missing nextMessage logic
-                                isSameSenderAsPrev && isSameSenderAsNext && "rounded-l-md", // Adjusted for potentially missing nextMessage logic
-                                isMentioned && "ring-2 ring-primary/30", // Highlight mentioned messages
-                              ],
-                          message.layer === "shadow" && "italic opacity-80",
-                          isActive && "ring-2 ring-primary ring-offset-2 ring-offset-background",
-                        )}
-                      >
-                        {node && (
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              "absolute -bottom-2 text-[8px] px-1 py-0 h-3.5 gap-0.5 bg-background shadow-sm",
-                              isOwn ? "right-2" : "left-2",
-                            )}
-                            style={{ borderColor: node.color, color: node.color }}
-                          >
-                            <span className="w-1 h-1 rounded-full" style={{ backgroundColor: node.color }} />
-                            {node.title}
-                          </Badge>
-                        )}
-
-                        {hasImage && (
-                          <div className="mb-1.5 -mx-1 -mt-0.5">
-                            <img
-                              src={message.attachment_url || "/placeholder.svg"}
-                              alt="مرفق"
-                              className="max-w-full max-h-56 rounded-xl cursor-pointer hover:opacity-90 transition-opacity"
-                              onClick={() => setLightboxImage(message.attachment_url || null)}
-                            />
-                          </div>
-                        )}
-
-                        {message.content && message.content !== "📷 صورة" && (
-                          <p className="text-[14px] whitespace-pre-wrap break-words leading-snug">
-                            {translatedMessages[message.id] || renderContentWithMentions(message.content)}
-                          </p>
-                        )}
-
-                        {translatedMessages[message.id] && (
-                          <div className="mt-1 p-2 bg-muted/50 rounded-lg border border-border/50 text-sm">
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
-                              <Languages className="w-3 h-3" />
-                              <span>ترجمة</span>
-                            </div>
-                            {translatedMessages[message.id]}
-                          </div>
-                        )}
-
-                        <div className={cn("flex items-center gap-1 mt-0.5", isOwn ? "justify-start" : "justify-end")}>
-                          <span className={cn("text-[10px]", isOwn ? "text-white/60" : "text-muted-foreground/70")}>
-                            {formatDistanceToNow(new Date(message.created_at), { locale: ar })}
-                          </span>
-                          {isOwn && <CheckCheck className="w-3 h-3 text-white/60" />}
-                          {style.icon && <span className="text-[9px] opacity-50">{style.icon}</span>}
-                        </div>
-                      </div>
-
-                      {hasReactions && (
-                        <div className="flex flex-wrap gap-1 mt-1 px-1">
-                          {Object.entries(groupedReactions).map(([emoji, data]) => (
-                            <button
-                              key={emoji}
-                              onClick={() => toggleReaction(message.id, emoji)}
-                              className={cn(
-                                "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs border transition-all",
-                                data.hasCurrentUser
-                                  ? "bg-primary/20 border-primary text-primary font-medium"
-                                  : "bg-muted border-border hover:bg-muted/80",
-                              )}
-                              title={data.users.join(", ")}
-                            >
-                              <span>{emoji}</span>
-                              {data.count > 1 && <span className="text-[10px]">{data.count}</span>}
-                            </button>
-                          ))}
-                        </div>
+                          <span>{sender.active_title.icon}</span>
+                          <span>{sender.active_title.name_ar}</span>
+                        </Badge>
                       )}
                     </div>
+                  )}
 
-                    {isActive && (
-                      <div
+                  {replyPreview && (
+                    <div
+                      className={cn(
+                        "flex items-center gap-1.5 mb-1 px-2 py-1 rounded-lg border-r-2 border-primary bg-primary/5 cursor-pointer hover:bg-primary/10 transition-colors",
+                        isOwn && "border-r-0 border-l-2",
+                      )}
+                      onClick={() => {
+                        // Implement scroll to the replied message if needed
+                      }}
+                    >
+                      <Reply className="w-3 h-3 text-primary shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-medium text-primary truncate">{replyPreview.senderName}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">{replyPreview.content}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div
+                    className={cn(
+                      "relative group/message rounded-2xl px-3 py-2 text-sm transition-all duration-200",
+                      isOwn
+                        ? [
+                            style.ownBg,
+                            "text-white shadow-md",
+                            "rounded-2xl",
+                            isSameSenderAsPrev && !isSameSenderAsNext && "rounded-tr-md", // Adjusted for potentially missing nextMessage logic
+                            !isSameSenderAsPrev && isSameSenderAsNext && "rounded-br-md", // Adjusted for potentially missing nextMessage logic
+                            isSameSenderAsPrev && isSameSenderAsNext && "rounded-r-md", // Adjusted for potentially missing nextMessage logic
+                          ]
+                        : [
+                            style.bg,
+                            "rounded-2xl",
+                            isSameSenderAsPrev && !isSameSenderAsNext && "rounded-tl-md", // Adjusted for potentially missing nextMessage logic
+                            !isSameSenderAsPrev && isSameSenderAsNext && "rounded-bl-md", // Adjusted for potentially missing nextMessage logic
+                            isSameSenderAsPrev && isSameSenderAsNext && "rounded-l-md", // Adjusted for potentially missing nextMessage logic
+                            isMentioned && "ring-2 ring-primary/30", // Highlight mentioned messages
+                          ],
+                      message.layer === "shadow" && "italic opacity-80",
+                      isActive && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+                    )}
+                  >
+                    {node && (
+                      <Badge
+                        variant="outline"
                         className={cn(
-                          "absolute top-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity animate-in fade-in duration-150",
-                          isOwn ? "left-0 -translate-x-full pr-1" : "right-0 translate-x-full pl-1",
+                          "absolute -bottom-2 text-[8px] px-1 py-0 h-3.5 gap-0.5 bg-background shadow-sm",
+                          isOwn ? "right-2" : "left-2",
                         )}
+                        style={{ borderColor: node.color, color: node.color }}
                       >
-                        {onReply && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 rounded-full"
-                            onClick={() => onReply(message)}
+                        <span className="w-1 h-1 rounded-full" style={{ backgroundColor: node.color }} />
+                        {node.title}
+                      </Badge>
+                    )}
+
+                    {hasAttachments && (
+                      <div className="mb-1.5 -mx-1 -mt-0.5 space-y-2">
+                        {/* Images grid */}
+                        {attachments.filter((a) => a.type === "image").length > 0 && (
+                          <div
+                            className={`grid gap-2 ${
+                              attachments.filter((a) => a.type === "image").length === 1
+                                ? "grid-cols-1"
+                                : attachments.filter((a) => a.type === "image").length === 2
+                                  ? "grid-cols-2"
+                                  : attachments.filter((a) => a.type === "image").length === 3
+                                    ? "grid-cols-3"
+                                    : "grid-cols-2"
+                            }`}
                           >
-                            <Reply className="w-3.5 h-3.5" />
-                          </Button>
+                            {attachments
+                              .filter((a) => a.type === "image")
+                              .slice(0, 4)
+                              .map((attachment, index) => (
+                                <div
+                                  key={index}
+                                  className={`relative ${
+                                    attachments.filter((a) => a.type === "image").length === 1 ? "max-h-80" : "h-32"
+                                  }`}
+                                >
+                                  <img
+                                    src={attachment.url || "/placeholder.svg"}
+                                    alt={attachment.name}
+                                    className="w-full h-full object-cover rounded-xl cursor-pointer hover:opacity-90 transition-opacity"
+                                    onClick={() => setLightboxImage(attachment.url)}
+                                  />
+                                  {index === 3 && attachments.filter((a) => a.type === "image").length > 4 && (
+                                    <div
+                                      className="absolute inset-0 bg-black/60 rounded-xl flex items-center justify-center cursor-pointer"
+                                      onClick={() => setLightboxImage(attachments[3].url)}
+                                    >
+                                      <span className="text-white text-2xl font-bold">
+                                        +{attachments.filter((a) => a.type === "image").length - 4}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                          </div>
                         )}
-                        {message.content && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 rounded-full"
-                            onClick={() => handleTranslate(message.id, message.content!)}
-                            disabled={translatingMessages.has(message.id)}
-                          >
-                            {translatingMessages.has(message.id) ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              <Languages className="w-3.5 h-3.5" />
-                            )}
-                          </Button>
-                        )}
-                        {isOwn && onDelete && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 rounded-full text-destructive hover:text-destructive"
-                            onClick={() => handleDeleteClick(message.id)}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
+
+                        {/* Documents */}
+                        {attachments.filter((a) => a.type === "document").length > 0 && (
+                          <div className="space-y-2">
+                            {attachments
+                              .filter((a) => a.type === "document")
+                              .map((attachment, index) => (
+                                <div
+                                  key={index}
+                                  className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer group"
+                                  onClick={() => handleDownload(attachment.url, attachment.name)}
+                                >
+                                  {attachment.name.endsWith(".pdf") ? (
+                                    <FileText className="w-8 h-8 text-red-500 shrink-0" />
+                                  ) : attachment.name.endsWith(".docx") ? (
+                                    <FileText className="w-8 h-8 text-blue-500 shrink-0" />
+                                  ) : (
+                                    <File className="w-8 h-8 text-muted-foreground shrink-0" />
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+                                      {attachment.name}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {attachment.name.split(".").pop()?.toUpperCase()} • "اضغط للتحميل"
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
                         )}
                       </div>
                     )}
+
+                    {message.content && message.content !== "📷 صورة" && (
+                      <p className="text-[14px] whitespace-pre-wrap break-words leading-snug">
+                        {translatedMessages[message.id] || renderContentWithMentions(message.content)}
+                      </p>
+                    )}
+
+                    {translatedMessages[message.id] && (
+                      <div className="mt-1 p-2 bg-muted/50 rounded-lg border border-border/50 text-sm">
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+                          <Languages className="w-3 h-3" />
+                          <span>ترجمة</span>
+                        </div>
+                        {translatedMessages[message.id]}
+                      </div>
+                    )}
+
+                    <div className={cn("flex items-center gap-1 mt-0.5", isOwn ? "justify-start" : "justify-end")}>
+                      <span className={cn("text-[10px]", isOwn ? "text-white/60" : "text-muted-foreground/70")}>
+                        {formatDistanceToNow(new Date(message.created_at), { locale: ar })}
+                      </span>
+                      {isOwn && <CheckCheck className="w-3 h-3 text-white/60" />}
+                      {style.icon && <span className="text-[9px] opacity-50">{style.icon}</span>}
+                    </div>
                   </div>
-                )
-              })}
-            </div>
-          ))}
+
+                  {hasReactions && (
+                    <div className="flex flex-wrap gap-1 mt-1 px-1">
+                      {Object.entries(groupedReactions).map(([emoji, data]) => (
+                        <button
+                          key={emoji}
+                          onClick={() => toggleReaction(message.id, emoji)}
+                          className={cn(
+                            "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs border transition-all",
+                            data.hasCurrentUser
+                              ? "bg-primary/20 border-primary text-primary font-medium"
+                              : "bg-muted border-border hover:bg-muted/80",
+                          )}
+                          title={data.users.join(", ")}
+                        >
+                          <span>{emoji}</span>
+                          {data.count > 1 && <span className="text-[10px]">{data.count}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {isActive && (
+                  <div
+                    className={cn(
+                      "absolute top-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity animate-in fade-in duration-150",
+                      isOwn ? "left-0 -translate-x-full pr-1" : "right-0 translate-x-full pl-1",
+                    )}
+                  >
+                    {onReply && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 rounded-full"
+                        onClick={() => onReply(message)}
+                      >
+                        <Reply className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
+                    {message.content && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 rounded-full"
+                        onClick={() => handleTranslate(message.id, message.content!)}
+                        disabled={translatingMessages.has(message.id)}
+                      >
+                        {translatingMessages.has(message.id) ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Languages className="w-3.5 h-3.5" />
+                        )}
+                      </Button>
+                    )}
+                    {isOwn && onDelete && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 rounded-full text-destructive hover:text-destructive"
+                        onClick={() => handleDeleteClick(message.id)}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
+      ))}
 
-        <div ref={messagesEndRef} className="h-1" />
+      <div ref={messagesEndRef} className="h-1" />
 
-        {lightboxImage && (
-          <div
-            className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
-            onClick={() => setLightboxImage(null)}
-          >
-            <img
-              src={lightboxImage || "/placeholder.svg"}
-              alt="صورة مكبرة"
-              className="max-w-full max-h-full object-contain rounded-lg"
-            />
-          </div>
-        )}
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightboxImage(null)}
+        >
+          <img
+            src={lightboxImage || "/placeholder.svg"}
+            alt="صورة مكبرة"
+            className="max-w-full max-h-full object-contain rounded-lg"
+          />
+        </div>
+      )}
 
-        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>حذف الرسالة</AlertDialogTitle>
-              <AlertDialogDescription>
-                هل أنت متأكد من حذف هذه الرسالة؟ لا يمكن التراجع عن هذا الإجراء.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>إلغاء</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={confirmDelete}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                حذف
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
-    </>
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>حذف الرسالة</AlertDialogTitle>
+            <AlertDialogDescription>
+              هل أنت متأكد من حذف هذه الرسالة؟ لا يمكن التراجع عن هذا الإجراء.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              حذف
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   )
 }
+
+export { MessageList }

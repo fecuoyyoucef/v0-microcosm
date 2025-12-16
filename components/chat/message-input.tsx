@@ -9,10 +9,11 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select"
-import { Send, Eye, GitBranch, X, Loader2, Reply, Camera, Sparkles, AtSign } from "lucide-react"
+import { Send, Eye, GitBranch, X, Loader2, Reply, Sparkles, AtSign, Paperclip, FileText, File } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import type { MessageLayer, GroupMember, ConversationNode, GroupSettings, Message } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { useLanguage } from "@/lib/language-context"
 
 interface MessageInputProps {
   onSend: (
@@ -41,7 +42,7 @@ const layerOptions: { value: MessageLayer; label: string; icon: string }[] = [
   { value: "shadow", label: "ظل", icon: "🔘" },
 ]
 
-export function MessageInput({
+export default function MessageInput({
   onSend,
   members,
   currentUserId,
@@ -61,9 +62,11 @@ export function MessageInput({
   const [isVisibilityOpen, setIsVisibilityOpen] = useState(false)
   const [isLayerOpen, setIsLayerOpen] = useState(false)
   const [messageNodeId, setMessageNodeId] = useState<string | null>(selectedNodeId)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [filePreviews, setFilePreviews] = useState<{ url: string; type: string; name: string }[]>([])
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false)
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
-  const [isUploadingImage, setIsUploadingImage] = useState(false)
   const [isCheckingContent, setIsCheckingContent] = useState(false)
   const [isCorrectingText, setIsCorrectingText] = useState(false)
   const [showCorrectionHint, setShowCorrectionHint] = useState(false)
@@ -76,6 +79,7 @@ export function MessageInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const supabase = createClient()
+  const { language } = useLanguage()
 
   const otherMembers = members.filter((m) => m.user_id !== currentUserId)
   const currentLayerOption = layerOptions.find((l) => l.value === selectedLayer)!
@@ -231,15 +235,17 @@ export function MessageInput({
   }
 
   const handleSend = async () => {
-    if ((!content.trim() && !selectedImage) || isSending) return
+    const trimmedContent = content.trim()
+    if (!trimmedContent && selectedFiles.length === 0) return
+    if (!groupId) return
 
-    if (content.trim()) {
+    if (trimmedContent) {
       setIsCheckingContent(true)
       try {
         const moderationResponse = await fetch("/api/ai/content-moderation", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: content.trim() }),
+          body: JSON.stringify({ content: trimmedContent }),
         })
 
         if (moderationResponse.ok) {
@@ -260,87 +266,76 @@ export function MessageInput({
 
     setIsSending(true)
     try {
-      let attachmentUrl: string | undefined
+      const attachmentUrls: string[] = []
 
-      if (selectedImage) {
-        setIsUploadingImage(true)
-        const fileExt = selectedImage.name.split(".").pop()
-        const fileName = `${groupId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+      if (selectedFiles.length > 0) {
+        setIsUploadingFiles(true)
 
-        const { error: uploadError } = await supabase.storage
-          .from("message-attachments")
-          .upload(fileName, selectedImage)
+        for (const file of selectedFiles) {
+          const fileExt = file.name.split(".").pop()
+          const fileName = `${groupId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
 
-        if (uploadError) throw uploadError
+          const { error: uploadError } = await supabase.storage.from("message-attachments").upload(fileName, file)
 
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from("message-attachments").getPublicUrl(fileName)
-        attachmentUrl = publicUrl
-        setIsUploadingImage(false)
+          if (uploadError) throw uploadError
+
+          const {
+            data: { publicUrl },
+          } = supabase.storage.from("message-attachments").getPublicUrl(fileName)
+
+          attachmentUrls.push(publicUrl)
+        }
+
+        setIsUploadingFiles(false)
       }
 
-      const messageContent = content.trim() || (attachmentUrl ? "📷 صورة" : "")
+      let messageContent = trimmedContent
+      if (attachmentUrls.length > 0 && !messageContent) {
+        const imageCount = selectedFiles.filter((f) => f.type.startsWith("image/")).length
+        const docCount = selectedFiles.length - imageCount
+
+        if (imageCount > 0 && docCount === 0) {
+          messageContent = imageCount === 1 ? "📷 صورة" : `📷 ${imageCount} صور`
+        } else if (docCount > 0 && imageCount === 0) {
+          messageContent = docCount === 1 ? "📄 ملف" : `📄 ${docCount} ملفات`
+        } else {
+          messageContent = `📷 ${imageCount} صور، 📄 ${docCount} ملفات`
+        }
+      }
+
+      const attachmentData =
+        attachmentUrls.length > 0
+          ? JSON.stringify(
+              attachmentUrls.map((url, index) => ({
+                url,
+                type: selectedFiles[index].type.startsWith("image/") ? "image" : "document",
+                name: selectedFiles[index].name,
+              })),
+            )
+          : undefined
 
       await onSend(
         messageContent,
         selectedLayer,
         messageNodeId,
         selectedLayer === "shadow" && visibleTo.length > 0 ? visibleTo : undefined,
-        attachmentUrl,
+        attachmentData,
         replyingTo?.id || null,
       )
-
-      if (mentionedUsers.length > 0) {
-        try {
-          await fetch("/api/messages/send-with-mentions", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              groupId,
-              content: messageContent,
-              mentionedUsers,
-            }),
-          })
-        } catch (error) {
-          console.error("[v0] Failed to send mention notifications:", error)
-        }
-      }
-
-      const pendingTasks = (window as any).__pendingTasks
-      if (pendingTasks?.tasks && pendingTasks.tasks.length > 0) {
-        // Get the last message ID from the group
-        const { data: lastMessage } = await supabase
-          .from("messages")
-          .select("id")
-          .eq("group_id", groupId)
-          .eq("sender_id", currentUserId)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single()
-
-        if (lastMessage) {
-          for (const task of pendingTasks.tasks) {
-            await supabase.from("extracted_tasks").insert({
-              message_id: lastMessage.id,
-              group_id: groupId,
-              task_content: task,
-              created_by: currentUserId,
-              status: "pending",
-            })
-          }
-        }
-
-        delete (window as any).__pendingTasks
-      }
 
       setContent("")
       setVisibleTo([])
       setMentionedUsers([])
-      clearImage()
+      clearAllFiles()
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto"
+      }
+    } catch (error) {
+      console.error("Error sending message:", error)
+      alert("حدث خطأ أثناء إرسال الرسالة")
     } finally {
       setIsSending(false)
-      setIsUploadingImage(false)
+      setIsUploadingFiles(false)
     }
   }
 
@@ -375,8 +370,89 @@ export function MessageInput({
     }
   }
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    const newFiles: File[] = []
+    const newPreviews: { url: string; type: string; name: string }[] = []
+
+    files.forEach((file) => {
+      // Check file type
+      const isImage = file.type.startsWith("image/")
+      const isDocument =
+        file.type === "application/pdf" ||
+        file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+        file.type === "text/markdown" ||
+        file.name.endsWith(".md")
+
+      if (!isImage && !isDocument) {
+        alert(
+          language === "ar"
+            ? "نوع الملف غير مدعوم. يمكنك رفع الصور أو PDF أو DOCX أو Markdown فقط."
+            : language === "en"
+              ? "File type not supported. You can only upload images, PDF, DOCX, or Markdown files."
+              : "Type de fichier non pris en charge. Vous ne pouvez télécharger que des images, PDF, DOCX ou Markdown.",
+        )
+        return
+      }
+
+      // Check file size (10MB limit)
+      if (file.size > 10 * 1024 * 1024) {
+        alert(
+          language === "ar"
+            ? "حجم الملف كبير جداً. الحد الأقصى 10 ميجابايت."
+            : language === "en"
+              ? "File size too large. Maximum 10MB."
+              : "Taille de fichier trop grande. Maximum 10 Mo.",
+        )
+        return
+      }
+
+      newFiles.push(file)
+
+      if (isImage) {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          newPreviews.push({
+            url: e.target?.result as string,
+            type: "image",
+            name: file.name,
+          })
+          if (newPreviews.length === newFiles.length) {
+            setFilePreviews((prev) => [...prev, ...newPreviews])
+          }
+        }
+        reader.readAsDataURL(file)
+      } else {
+        newPreviews.push({
+          url: "",
+          type: "document",
+          name: file.name,
+        })
+        if (newPreviews.length === newFiles.length) {
+          setFilePreviews((prev) => [...prev, ...newPreviews])
+        }
+      }
+    })
+
+    setSelectedFiles((prev) => [...prev, ...newFiles])
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }
+
+  const removeFile = (index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
+    setFilePreviews((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const clearAllFiles = () => {
+    setSelectedFiles([])
+    setFilePreviews([])
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }
+
   return (
-    <div className="shrink-0 border-t border-border/50 bg-background w-full max-w-full overflow-hidden relative">
+    <div className="border-t border-border/40 bg-card/95 backdrop-blur-sm">
       {/* Reply preview */}
       {replyingTo && (
         <div className="px-3 py-1.5 bg-muted/50 border-b border-border/50 flex items-center justify-between animate-in slide-in-from-bottom-2 duration-200">
@@ -391,7 +467,7 @@ export function MessageInput({
             </div>
           </div>
           <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 rounded-full" onClick={onCancelReply}>
-            <X className="w-3.5 h-3.5" />
+            <X className="w-3 h-3" />
           </Button>
         </div>
       )}
@@ -422,56 +498,62 @@ export function MessageInput({
         </div>
       )}
 
-      <div className="p-2 w-full max-w-full">
-        {/* Image preview */}
-        {imagePreview && (
-          <div className="mb-2 relative inline-block animate-in zoom-in-95 duration-200">
-            <img src={imagePreview || "/placeholder.svg"} alt="Preview" className="max-h-20 rounded-xl shadow-md" />
-            <button
-              onClick={clearImage}
-              className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center shadow-md hover:scale-110 transition-transform"
-            >
-              <X className="w-3 h-3" />
-            </button>
+      {filePreviews.length > 0 && (
+        <div className="px-3 pt-3 pb-2">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-muted-foreground">
+              {filePreviews.length}{" "}
+              {filePreviews.length === 1 ? (language === "ar" ? "ملف" : "file") : language === "ar" ? "ملفات" : "files"}
+            </p>
+            <Button variant="ghost" size="sm" onClick={clearAllFiles} className="h-6 px-2 text-xs">
+              <X className="w-3 h-3 mr-1" />
+              {language === "ar" ? "مسح الكل" : "Clear all"}
+            </Button>
           </div>
-        )}
-
-        {showMentionSuggestions && mentionSuggestions.length > 0 && (
-          <div className="absolute bottom-full left-2 right-2 mb-1 bg-card border border-border rounded-xl shadow-lg overflow-hidden animate-in slide-in-from-bottom-2 duration-200 max-h-48 overflow-y-auto z-50">
-            {mentionSuggestions.map((member, index) => (
-              <button
-                key={member.id}
-                className={cn(
-                  "w-full px-3 py-2 flex items-center gap-2 hover:bg-muted transition-colors text-left",
-                  index === selectedSuggestionIndex && "bg-muted",
-                )}
-                onClick={() => selectMention(member)}
-              >
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                  {member.profile?.avatar_url ? (
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {filePreviews.map((preview, index) => (
+              <div key={index} className="relative group shrink-0">
+                {preview.type === "image" ? (
+                  <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-border">
                     <img
-                      src={member.profile.avatar_url || "/placeholder.svg"}
-                      alt=""
-                      className="w-full h-full rounded-full object-cover"
+                      src={preview.url || "/placeholder.svg"}
+                      alt={preview.name}
+                      className="w-full h-full object-cover"
                     />
-                  ) : (
-                    <span className="text-sm font-medium text-primary">
-                      {(member.profile?.display_name || "U")[0].toUpperCase()}
-                    </span>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{member.profile?.display_name || "مستخدم"}</p>
-                  {member.profile?.username && (
-                    <p className="text-xs text-muted-foreground truncate">@{member.profile.username}</p>
-                  )}
-                </div>
-              </button>
+                    <button
+                      onClick={() => removeFile(index)}
+                      className="absolute top-1 right-1 bg-destructive/90 hover:bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative w-20 h-20 rounded-lg border border-border bg-muted flex flex-col items-center justify-center gap-1 p-2">
+                    {preview.name.endsWith(".pdf") ? (
+                      <FileText className="w-8 h-8 text-red-500" />
+                    ) : preview.name.endsWith(".docx") ? (
+                      <FileText className="w-8 h-8 text-blue-500" />
+                    ) : (
+                      <File className="w-8 h-8 text-muted-foreground" />
+                    )}
+                    <p className="text-[10px] text-center text-muted-foreground truncate w-full">
+                      {preview.name.split(".").pop()?.toUpperCase()}
+                    </p>
+                    <button
+                      onClick={() => removeFile(index)}
+                      className="absolute top-1 right-1 bg-destructive/90 hover:bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+              </div>
             ))}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Input row - redesigned to prevent overflow */}
+      <div className="p-3">
         <div className="flex items-center gap-2 w-full max-w-full">
           {/* Camera button */}
           <Button
@@ -479,11 +561,18 @@ export function MessageInput({
             size="icon"
             className="h-10 w-10 shrink-0 rounded-full border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-colors bg-transparent"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isUploadingImage}
+            disabled={isUploadingFiles}
           >
-            {isUploadingImage ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
+            {isUploadingFiles ? <Loader2 className="w-5 h-5 animate-spin" /> : <Paperclip className="w-5 h-5" />}
           </Button>
-          <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,.pdf,.docx,.md"
+            multiple
+            onChange={handleFileSelect}
+            className="hidden"
+          />
 
           {/* Text input container */}
           <div className="flex-1 min-w-0 flex items-center gap-1 border border-border/80 bg-muted/30 rounded-full px-3 py-1 relative">
@@ -584,7 +673,7 @@ export function MessageInput({
               {/* Send button */}
               <Button
                 onClick={handleSend}
-                disabled={(!content.trim() && !selectedImage) || isSending || isCheckingContent}
+                disabled={(!content.trim() && !selectedFiles.length) || isSending || isCheckingContent}
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 rounded-full p-0 text-primary hover:text-primary"
@@ -607,3 +696,5 @@ export function MessageInput({
     </div>
   )
 }
+
+export { MessageInput }
