@@ -1,7 +1,7 @@
-const CACHE_NAME = "synaptic-space-v2"
+const CACHE_NAME = "synaptic-space-v3"
 const OFFLINE_URL = "/offline"
 
-const STATIC_ASSETS = ["/", "/offline", "/icons/icon-192x192.png", "/icons/icon-512x512.png"]
+const STATIC_ASSETS = ["/", "/offline", "/icons/icon-192x192.png", "/icons/icon-512x512.png", "/icons/icon-72x72.png"]
 
 // Install event - cache static assets
 self.addEventListener("install", (event) => {
@@ -56,8 +56,9 @@ self.addEventListener("fetch", (event) => {
 
 // Push notification event
 self.addEventListener("push", (event) => {
-  let data = {}
+  console.log("[SW] Push received:", event.data?.text())
 
+  let data = {}
   try {
     data = event.data?.json() ?? {}
   } catch (e) {
@@ -67,53 +68,97 @@ self.addEventListener("push", (event) => {
   const title = data.title || "Synaptic Space"
   const options = {
     body: data.body || "لديك إشعار جديد",
-    icon: "/icons/icon-192x192.png",
+    icon: data.icon || "/icons/icon-192x192.png",
     badge: "/icons/icon-72x72.png",
-    vibrate: [200, 100, 200],
-    tag: data.tag || "default",
+    image: data.image,
+    vibrate: data.vibrate || [200, 100, 200],
+    tag: data.tag || `notification-${Date.now()}`,
     renotify: true,
-    requireInteraction: data.priority === "high",
+    requireInteraction: data.priority === "high" || data.requireInteraction === true,
+    silent: data.silent === true,
+    timestamp: data.timestamp || Date.now(),
     data: {
       url: data.url || data.action_url || "/chat",
-      notificationId: data.id,
+      notificationId: data.id || data.notificationId,
+      groupId: data.groupId,
+      messageId: data.messageId,
+      type: data.type,
+      ...data.data,
     },
     actions: data.actions || [
       { action: "open", title: "فتح", icon: "/icons/icon-72x72.png" },
+      { action: "reply", title: "رد سريع" },
       { action: "dismiss", title: "تجاهل" },
     ],
   }
 
-  event.waitUntil(self.registration.showNotification(title, options))
+  event.waitUntil(
+    self.registration.showNotification(title, options).then(() => {
+      if (self.registration.setAppBadge) {
+        self.registration.setAppBadge(1)
+      }
+    }),
+  )
 })
 
 // Notification click event
 self.addEventListener("notificationclick", (event) => {
+  console.log("[SW] Notification clicked:", event.action, event.notification.data)
+
   event.notification.close()
 
-  if (event.action === "dismiss") return
+  if (self.registration.clearAppBadge) {
+    self.registration.clearAppBadge()
+  }
+
+  if (event.action === "dismiss") {
+    return
+  }
+
+  if (event.action === "reply") {
+    const urlToOpen = event.notification.data?.url || "/chat"
+    event.waitUntil(self.clients.openWindow(urlToOpen))
+    return
+  }
 
   const urlToOpen = event.notification.data?.url || "/chat"
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
-      // Check if there's already a window open
       for (const client of clientList) {
         if (client.url.includes(self.location.origin) && "focus" in client) {
-          client.focus()
-          client.postMessage({
-            type: "NOTIFICATION_CLICK",
-            url: urlToOpen,
-            notificationId: event.notification.data?.notificationId,
+          return client.focus().then(() => {
+            client.postMessage({
+              type: "NOTIFICATION_CLICK",
+              url: urlToOpen,
+              notificationId: event.notification.data?.notificationId,
+              groupId: event.notification.data?.groupId,
+              messageId: event.notification.data?.messageId,
+            })
           })
-          return
         }
       }
-      // Open new window if none exists
       if (self.clients.openWindow) {
         return self.clients.openWindow(urlToOpen)
       }
     }),
   )
+})
+
+// Notification close event to update badge
+self.addEventListener("notificationclose", (event) => {
+  console.log("[SW] Notification closed:", event.notification.tag)
+
+  if (event.notification.data?.notificationId) {
+    fetch("/api/notifications/track-dismiss", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        notificationId: event.notification.data.notificationId,
+        dismissed: true,
+      }),
+    }).catch((err) => console.log("[SW] Failed to track dismiss:", err))
+  }
 })
 
 // Background sync for offline notifications

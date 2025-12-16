@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { useRouter } from "next/navigation"
 
 interface PushNotificationManagerProps {
   userId: string
@@ -22,17 +23,17 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray
 }
 
-// No UI is rendered - it's purely for background functionality
 export function PushNotificationManager({ userId }: PushNotificationManagerProps) {
   const [isSubscribed, setIsSubscribed] = useState(false)
   const supabase = createClient()
+  const router = useRouter()
 
   useEffect(() => {
     if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+      console.log("[Push] Push notifications not supported")
       return
     }
 
-    // Auto-subscribe if permission already granted
     if (Notification.permission === "granted") {
       autoSubscribe()
     }
@@ -40,12 +41,13 @@ export function PushNotificationManager({ userId }: PushNotificationManagerProps
 
   const autoSubscribe = async () => {
     try {
-      const registration = await navigator.serviceWorker.register("/sw.js")
-      await navigator.serviceWorker.ready
+      const registration = await navigator.serviceWorker.ready
 
       const existingSubscription = await registration.pushManager.getSubscription()
       if (existingSubscription) {
+        console.log("[Push] Already subscribed")
         setIsSubscribed(true)
+        await saveSubscription(existingSubscription)
         return
       }
 
@@ -54,28 +56,31 @@ export function PushNotificationManager({ userId }: PushNotificationManagerProps
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       })
 
-      const subscriptionJson = subscription.toJSON()
-
-      await supabase.from("push_subscriptions").upsert(
-        {
-          user_id: userId,
-          endpoint: subscriptionJson.endpoint,
-          p256dh: subscriptionJson.keys?.p256dh,
-          auth: subscriptionJson.keys?.auth,
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: "user_id",
-        },
-      )
-
+      console.log("[Push] New subscription created")
+      await saveSubscription(subscription)
       setIsSubscribed(true)
     } catch (error) {
-      console.error("Error auto-subscribing to push:", error)
+      console.error("[Push] Error auto-subscribing:", error)
     }
   }
 
-  // Listen for new notifications via Supabase Realtime
+  const saveSubscription = async (subscription: PushSubscription) => {
+    const subscriptionJson = subscription.toJSON()
+
+    await supabase.from("push_subscriptions").upsert(
+      {
+        user_id: userId,
+        endpoint: subscriptionJson.endpoint,
+        p256dh: subscriptionJson.keys?.p256dh,
+        auth: subscriptionJson.keys?.auth,
+        updated_at: new Date().toISOString(),
+      },
+      {
+        onConflict: "user_id,endpoint",
+      },
+    )
+  }
+
   useEffect(() => {
     const channel = supabase
       .channel(`notifications-${userId}`)
@@ -88,30 +93,44 @@ export function PushNotificationManager({ userId }: PushNotificationManagerProps
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
+          console.log("[Push] New notification received:", payload)
+
           const notif = payload.new as {
             id: string
             title: string
             body: string
             type: string
+            group_id?: string
+            message_id?: string
+            data?: any
           }
 
           if (Notification.permission === "granted" && document.visibilityState === "visible") {
-            const browserNotif = new Notification(notif.title || "Synaptic Space", {
+            const notification = new Notification(notif.title || "Synaptic Space", {
               body: notif.body || "لديك إشعار جديد",
               icon: "/icons/icon-192x192.png",
+              badge: "/icons/icon-72x72.png",
               tag: `notif-${notif.id}`,
+              data: {
+                url: notif.group_id ? `/chat/${notif.group_id}` : "/chat/notifications",
+                notificationId: notif.id,
+              },
             })
 
-            browserNotif.onclick = () => {
+            notification.onclick = () => {
               window.focus()
-              browserNotif.close()
+              if (notif.group_id) {
+                router.push(`/chat/${notif.group_id}`)
+              } else {
+                router.push("/chat/notifications")
+              }
+              notification.close()
             }
+
+            setTimeout(() => notification.close(), 10000)
           }
 
-          // Update app badge
-          if ("setAppBadge" in navigator) {
-            ;(navigator as Navigator & { setAppBadge: (count: number) => void }).setAppBadge(1)
-          }
+          updateBadgeCount()
         },
       )
       .subscribe()
@@ -119,7 +138,74 @@ export function PushNotificationManager({ userId }: PushNotificationManagerProps
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [userId, supabase])
+  }, [userId, supabase, router])
+
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return
+
+    const handleMessage = (event: MessageEvent) => {
+      console.log("[Push] Message from SW:", event.data)
+
+      if (event.data && event.data.type === "NOTIFICATION_CLICK") {
+        const { url, groupId, notificationId } = event.data
+
+        if (notificationId) {
+          supabase
+            .from("notifications")
+            .update({ is_read: true, read_at: new Date().toISOString() })
+            .eq("id", notificationId)
+            .then(() => {
+              updateBadgeCount()
+            })
+        }
+
+        if (url) {
+          router.push(url)
+        } else if (groupId) {
+          router.push(`/chat/${groupId}`)
+        }
+
+        clearBadge()
+      }
+    }
+
+    navigator.serviceWorker.addEventListener("message", handleMessage)
+
+    return () => {
+      navigator.serviceWorker.removeEventListener("message", handleMessage)
+    }
+  }, [router, supabase])
+
+  const updateBadgeCount = async () => {
+    try {
+      const { count } = await supabase
+        .from("notifications")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("is_read", false)
+
+      if ("setAppBadge" in navigator) {
+        const badge = count || 0
+        if (badge > 0) {
+          ;(navigator as any).setAppBadge(badge)
+        } else {
+          ;(navigator as any).clearAppBadge()
+        }
+      }
+    } catch (error) {
+      console.error("[Push] Error updating badge:", error)
+    }
+  }
+
+  const clearBadge = () => {
+    if ("clearAppBadge" in navigator) {
+      ;(navigator as any).clearAppBadge()
+    }
+  }
+
+  useEffect(() => {
+    updateBadgeCount()
+  }, [])
 
   return null
 }
