@@ -68,6 +68,10 @@ export function MessageInput({
   const [isCorrectingText, setIsCorrectingText] = useState(false)
   const [showCorrectionHint, setShowCorrectionHint] = useState(false)
   const [mentionedUsers, setMentionedUsers] = useState<string[]>([])
+  const [showMentionSuggestions, setShowMentionSuggestions] = useState(false)
+  const [mentionSearch, setMentionSearch] = useState("")
+  const [mentionSuggestions, setMentionSuggestions] = useState<GroupMember[]>([])
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -127,6 +131,40 @@ export function MessageInput({
     const newContent = e.target.value
     setContent(newContent)
 
+    const cursorPosition = e.target.selectionStart
+    const textBeforeCursor = newContent.slice(0, cursorPosition)
+    const lastAtSymbol = textBeforeCursor.lastIndexOf("@")
+
+    if (lastAtSymbol !== -1 && lastAtSymbol === cursorPosition - 1) {
+      // User just typed @
+      setShowMentionSuggestions(true)
+      setMentionSearch("")
+      setMentionSuggestions(otherMembers)
+      setSelectedSuggestionIndex(0)
+    } else if (lastAtSymbol !== -1) {
+      // User is typing after @
+      const searchText = textBeforeCursor.slice(lastAtSymbol + 1)
+      if (/^[a-zA-Z0-9_]*$/.test(searchText) && searchText.length < 20) {
+        setShowMentionSuggestions(true)
+        setMentionSearch(searchText)
+
+        // Filter members by username or display name
+        const filtered = otherMembers.filter((m) => {
+          const username = m.profile?.username?.toLowerCase() || ""
+          const displayName = m.profile?.display_name?.toLowerCase() || ""
+          const search = searchText.toLowerCase()
+          return username.includes(search) || displayName.includes(search)
+        })
+
+        setMentionSuggestions(filtered)
+        setSelectedSuggestionIndex(0)
+      } else {
+        setShowMentionSuggestions(false)
+      }
+    } else {
+      setShowMentionSuggestions(false)
+    }
+
     const mentions = parseMentions(newContent)
     setMentionedUsers(mentions)
 
@@ -143,35 +181,58 @@ export function MessageInput({
     }
   }
 
-  const handleCorrectArabic = async () => {
-    if (!content.trim()) return
+  const selectMention = (member: GroupMember) => {
+    const username = member.profile?.username || member.profile?.display_name?.replace(/\s+/g, "") || "user"
+    const cursorPosition = textareaRef.current?.selectionStart || 0
+    const textBeforeCursor = content.slice(0, cursorPosition)
+    const lastAtSymbol = textBeforeCursor.lastIndexOf("@")
 
-    setIsCorrectingText(true)
-    try {
-      const response = await fetch("/api/ai/correct-arabic", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: content }),
-      })
+    if (lastAtSymbol !== -1) {
+      const newContent = content.slice(0, lastAtSymbol) + `@${username} ` + content.slice(cursorPosition)
 
-      if (response.ok) {
-        const { corrected } = await response.json()
-        if (corrected && corrected !== content) {
-          setContent(corrected)
-        }
+      setContent(newContent)
+      setShowMentionSuggestions(false)
+
+      // Focus back on textarea
+      setTimeout(() => {
+        textareaRef.current?.focus()
+        const newCursorPos = lastAtSymbol + username.length + 2
+        textareaRef.current?.setSelectionRange(newCursorPos, newCursorPos)
+      }, 0)
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (showMentionSuggestions && mentionSuggestions.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault()
+        setSelectedSuggestionIndex((prev) => (prev < mentionSuggestions.length - 1 ? prev + 1 : prev))
+        return
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault()
+        setSelectedSuggestionIndex((prev) => (prev > 0 ? prev - 1 : 0))
+        return
+      } else if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey) {
+        e.preventDefault()
+        selectMention(mentionSuggestions[selectedSuggestionIndex])
+        return
+      } else if (e.key === "Escape") {
+        setShowMentionSuggestions(false)
+        return
       }
-    } catch (error) {
-      console.error("Correction error:", error)
-    } finally {
-      setIsCorrectingText(false)
-      setShowCorrectionHint(false)
+    }
+
+    if (e.key === "Enter") {
+      if (e.shiftKey || e.ctrlKey) {
+        e.preventDefault()
+        handleSend()
+      }
     }
   }
 
   const handleSend = async () => {
     if ((!content.trim() && !selectedImage) || isSending) return
 
-    // Check content for inappropriate material
     if (content.trim()) {
       setIsCheckingContent(true)
       try {
@@ -183,7 +244,8 @@ export function MessageInput({
 
         if (moderationResponse.ok) {
           const { isAppropriate, reason } = await moderationResponse.json()
-          if (!isAppropriate) {
+          // Only block if it's really inappropriate
+          if (!isAppropriate && reason.includes("خطير")) {
             alert(`تنبيه: ${reason}\n\nيرجى مراجعة محتوى رسالتك.`)
             setIsCheckingContent(false)
             return
@@ -191,35 +253,9 @@ export function MessageInput({
         }
       } catch (error) {
         console.error("Content moderation error:", error)
+        // Continue sending even if moderation fails
       }
       setIsCheckingContent(false)
-    }
-
-    if (content.trim()) {
-      try {
-        const classifyResponse = await fetch("/api/ai/classify-message", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: content.trim() }),
-        })
-
-        if (classifyResponse.ok) {
-          const { category, tasks } = await classifyResponse.json()
-
-          console.log("[v0] Message classified as:", category)
-
-          // Save extracted tasks to database
-          if (tasks && tasks.length > 0) {
-            console.log("[v0] Extracted tasks:", tasks)
-
-            // We'll send the message first, then save tasks with the message_id
-            // Store tasks temporarily to save after message is sent
-            ;(window as any).__pendingTasks = { tasks, category }
-          }
-        }
-      } catch (error) {
-        console.error("Classification error:", error)
-      }
     }
 
     setIsSending(true)
@@ -308,23 +344,39 @@ export function MessageInput({
     }
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      if (e.shiftKey || e.ctrlKey) {
-        e.preventDefault()
-        handleSend()
-      }
-    }
-  }
-
   const toggleVisibleTo = (userId: string) => {
     setVisibleTo((prev) => (prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]))
   }
 
   const hasMentions = mentionedUsers.length > 0
 
+  const handleCorrectArabic = async () => {
+    if (!content.trim()) return
+
+    setIsCorrectingText(true)
+    try {
+      const response = await fetch("/api/ai/correct-arabic", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: content }),
+      })
+
+      if (response.ok) {
+        const { corrected } = await response.json()
+        if (corrected && corrected !== content) {
+          setContent(corrected)
+        }
+      }
+    } catch (error) {
+      console.error("Correction error:", error)
+    } finally {
+      setIsCorrectingText(false)
+      setShowCorrectionHint(false)
+    }
+  }
+
   return (
-    <div className="shrink-0 border-t border-border/50 bg-background w-full max-w-full overflow-hidden">
+    <div className="shrink-0 border-t border-border/50 bg-background w-full max-w-full overflow-hidden relative">
       {/* Reply preview */}
       {replyingTo && (
         <div className="px-3 py-1.5 bg-muted/50 border-b border-border/50 flex items-center justify-between animate-in slide-in-from-bottom-2 duration-200">
@@ -384,6 +436,41 @@ export function MessageInput({
           </div>
         )}
 
+        {showMentionSuggestions && mentionSuggestions.length > 0 && (
+          <div className="absolute bottom-full left-2 right-2 mb-1 bg-card border border-border rounded-xl shadow-lg overflow-hidden animate-in slide-in-from-bottom-2 duration-200 max-h-48 overflow-y-auto z-50">
+            {mentionSuggestions.map((member, index) => (
+              <button
+                key={member.id}
+                className={cn(
+                  "w-full px-3 py-2 flex items-center gap-2 hover:bg-muted transition-colors text-left",
+                  index === selectedSuggestionIndex && "bg-muted",
+                )}
+                onClick={() => selectMention(member)}
+              >
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  {member.profile?.avatar_url ? (
+                    <img
+                      src={member.profile.avatar_url || "/placeholder.svg"}
+                      alt=""
+                      className="w-full h-full rounded-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-sm font-medium text-primary">
+                      {(member.profile?.display_name || "U")[0].toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{member.profile?.display_name || "مستخدم"}</p>
+                  {member.profile?.username && (
+                    <p className="text-xs text-muted-foreground truncate">@{member.profile.username}</p>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Input row - redesigned to prevent overflow */}
         <div className="flex items-center gap-2 w-full max-w-full">
           {/* Camera button */}
@@ -399,7 +486,7 @@ export function MessageInput({
           <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
 
           {/* Text input container */}
-          <div className="flex-1 min-w-0 flex items-center gap-1 border border-border/80 bg-muted/30 rounded-full px-3 py-1">
+          <div className="flex-1 min-w-0 flex items-center gap-1 border border-border/80 bg-muted/30 rounded-full px-3 py-1 relative">
             {/* Layer picker */}
             <Popover open={isLayerOpen} onOpenChange={setIsLayerOpen}>
               <PopoverTrigger asChild>

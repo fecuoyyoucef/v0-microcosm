@@ -45,12 +45,12 @@ const getAvatarColor = (str: string) => {
 }
 
 const quickReactions = [
-  { id: "neutral", image: "/images/1.webp", name: "محايد" },
-  { id: "harmony", image: "/images/2.webp", name: "توازن" },
-  { id: "achievement", image: "/images/3.webp", name: "انجاز" },
-  { id: "creativity", image: "/images/4.webp", name: "ابداع" },
-  { id: "challenge", image: "/images/5.webp", name: "تحدي" },
-  { id: "support", image: "/images/6.webp", name: "دعم" },
+  { id: "neutral", emoji: "محايد", image: "/images/1.webp", name: "محايد" },
+  { id: "harmony", emoji: "توازن", image: "/images/2.webp", name: "توازن" },
+  { id: "achievement", emoji: "انجاز", image: "/images/3.webp", name: "انجاز" },
+  { id: "creativity", emoji: "ابداع", image: "/images/4.webp", name: "ابداع" },
+  { id: "challenge", emoji: "تحدي", image: "/images/5.webp", name: "تحدي" },
+  { id: "support", emoji: "دعم", image: "/images/6.webp", name: "دعم" },
 ]
 
 interface MessageListProps {
@@ -108,6 +108,8 @@ export function MessageList({
   const longPressTimer = useRef<NodeJS.Timeout | null>(null)
   const reactionPickerRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const [longPressActive, setLongPressActive] = useState<string | null>(null)
+  const [pressTimer, setPressTimer] = useState<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -233,16 +235,34 @@ export function MessageList({
     setMessageToDelete(null)
   }
 
-  const handleTouchStart = (messageId: string) => {
-    longPressTimer.current = setTimeout(() => {
-      setActiveMessageId(messageId)
-    }, 500)
+  const handleTouchStart = (messageId: string, e: React.TouchEvent) => {
+    e.stopPropagation()
+    const timer = setTimeout(() => {
+      setLongPressActive(messageId)
+      setShowReactionsFor(messageId)
+      // Haptic feedback if available
+      if (navigator.vibrate) {
+        navigator.vibrate(50)
+      }
+    }, 300) // Reduced from 500ms to 300ms for faster response
+    setPressTimer(timer)
   }
 
-  const handleTouchEnd = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current)
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    e.stopPropagation()
+    if (pressTimer) {
+      clearTimeout(pressTimer)
+      setPressTimer(null)
     }
+    setLongPressActive(null)
+  }
+
+  const handleTouchMove = () => {
+    if (pressTimer) {
+      clearTimeout(pressTimer)
+      setPressTimer(null)
+    }
+    setLongPressActive(null)
   }
 
   const handleTranslate = async (messageId: string, content: string) => {
@@ -408,16 +428,10 @@ export function MessageList({
                 return (
                   <div
                     key={message.id}
-                    className={cn(
-                      "group relative flex items-end gap-2",
-                      isOwn ? "flex-row-reverse" : "flex-row",
-                      !isSameSenderAsPrev && "mt-3",
-                      isMentioned && !isOwn && "animate-pulse-subtle", // Subtle highlight for mentions
-                    )}
-                    onMouseEnter={() => setActiveMessageId(message.id)}
-                    onMouseLeave={() => setActiveMessageId(null)}
-                    onTouchStart={() => handleTouchStart(message.id)}
+                    className={cn("flex items-end gap-2 px-2 group", isOwn ? "flex-row-reverse" : "flex-row")}
+                    onTouchStart={(e) => handleTouchStart(message.id, e)}
                     onTouchEnd={handleTouchEnd}
+                    onTouchMove={handleTouchMove}
                   >
                     {!isOwn && (
                       <div className="w-7 shrink-0">
@@ -585,6 +599,97 @@ export function MessageList({
                         </div>
                       )}
                     </div>
+
+                    <div
+                      className={cn(
+                        "absolute top-0 hidden md:flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity animate-in fade-in duration-150",
+                        isOwn ? "left-0 -translate-x-full pr-1" : "right-0 translate-x-full pl-1",
+                      )}
+                    >
+                      <div className="relative" ref={reactionPickerRef}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 rounded-full hover:bg-muted"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setShowReactionsFor(showReactionsFor === message.id ? null : message.id)
+                          }}
+                        >
+                          <span className="text-xs">😊</span>
+                        </Button>
+
+                        {showReactionsFor === message.id && (
+                          <div
+                            className={cn(
+                              "absolute z-50 flex items-center gap-0.5 p-1.5 bg-card rounded-full shadow-lg border animate-in fade-in zoom-in-95 duration-150",
+                              "bottom-full mb-1",
+                              isOwn ? "right-0" : "left-0",
+                            )}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {quickReactions.map((reaction) => {
+                              const hasReacted = reactions[message.id]?.some(
+                                (r) => r.user_id === currentUserId && r.reaction === reaction.id,
+                              )
+                              return (
+                                <button
+                                  key={reaction.id}
+                                  title={reaction.name}
+                                  className={cn(
+                                    "w-8 h-8 flex items-center justify-center rounded-full transition-all hover:scale-110 p-0.5",
+                                    hasReacted ? "bg-primary/20 ring-1 ring-primary" : "hover:bg-muted",
+                                  )}
+                                  onClick={() => toggleReaction(message.id, reaction.id)}
+                                >
+                                  <span className="text-base">{reaction.emoji}</span>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {longPressActive === message.id && (
+                      <div
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 md:hidden animate-in fade-in duration-150"
+                        onClick={() => {
+                          setLongPressActive(null)
+                          setShowReactionsFor(null)
+                        }}
+                      >
+                        <div
+                          className="bg-card rounded-2xl shadow-2xl p-4 m-4 animate-in zoom-in-95 slide-in-from-bottom-4 duration-200"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <p className="text-xs text-muted-foreground text-center mb-3">اختر تفاعلاً</p>
+                          <div className="flex items-center gap-2 flex-wrap justify-center">
+                            {quickReactions.map((reaction) => {
+                              const hasReacted = reactions[message.id]?.some(
+                                (r) => r.user_id === currentUserId && r.reaction === reaction.id,
+                              )
+                              return (
+                                <button
+                                  key={reaction.id}
+                                  className={cn(
+                                    "w-14 h-14 flex items-center justify-center rounded-2xl transition-all active:scale-95",
+                                    hasReacted ? "bg-primary/20 ring-2 ring-primary" : "bg-muted hover:bg-muted/80",
+                                  )}
+                                  onClick={() => {
+                                    toggleReaction(message.id, reaction.id)
+                                    setLongPressActive(null)
+                                    setShowReactionsFor(null)
+                                  }}
+                                >
+                                  <span className="text-2xl">{reaction.emoji}</span>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {isActive && !isDeleted && (
                       <div
