@@ -34,16 +34,16 @@ export async function GET() {
         user_id,
         issue_detected,
         escalated_to_admin,
+        admin_reviewed,
         created_at,
         updated_at,
         conversation_data,
         profiles:user_id (display_name)
       `)
-      .not("issue_detected", "is", null)
       .order("created_at", { ascending: false })
-      .limit(50)
+      .limit(100)
 
-    console.log("[v0] Conversations:", conversations?.length, "Error:", convError)
+    console.log("[v0] Conversations fetched:", conversations?.length, "Error:", convError)
 
     const { data: reports, error: reportsError } = await supabase
       .from("user_issue_reports")
@@ -61,22 +61,65 @@ export async function GET() {
       .order("created_at", { ascending: false })
       .limit(50)
 
-    console.log("[v0] Reports:", reports?.length, "Error:", reportsError)
+    console.log("[v0] Reports fetched:", reports?.length, "Error:", reportsError)
 
     const tickets = []
 
     if (!convError && conversations) {
       conversations.forEach((conv: any) => {
+        // استخراج أول رسالة من المستخدم كعنوان
+        let title = "محادثة دعم"
+        let description = ""
+
+        if (conv.conversation_data && Array.isArray(conv.conversation_data)) {
+          const userMessages = conv.conversation_data.filter((m: any) => m.role === "user")
+          if (userMessages.length > 0) {
+            title = userMessages[0].content.substring(0, 100)
+            description = userMessages.map((m: any) => m.content).join(" | ")
+          }
+        }
+
+        // تحديد نوع التذكرة بناءً على المحتوى
+        let type: "bug" | "feature" | "question" | "feedback" = "question"
+        const contentLower = (title + description).toLowerCase()
+        if (
+          contentLower.includes("خطأ") ||
+          contentLower.includes("مشكلة") ||
+          contentLower.includes("لا يعمل") ||
+          contentLower.includes("عطل")
+        ) {
+          type = "bug"
+        } else if (contentLower.includes("اقتراح") || contentLower.includes("أضف") || contentLower.includes("ميزة")) {
+          type = "feature"
+        } else if (contentLower.includes("رأي") || contentLower.includes("تقييم")) {
+          type = "feedback"
+        }
+
+        // تحديد الحالة
+        let status: "open" | "in_progress" | "resolved" = "open"
+        if (conv.admin_reviewed) {
+          status = "resolved"
+        } else if (conv.escalated_to_admin) {
+          status = "in_progress"
+        }
+
+        // تحديد الأولوية بناءً على issue_detected
+        let priority: "low" | "normal" | "high" = "normal"
+        if (conv.issue_detected) {
+          priority = "high"
+        }
+
         tickets.push({
           id: `conv-${conv.id}`,
           user_id: conv.user_id,
           user_name: conv.profiles?.display_name || "مستخدم",
-          type: "question",
-          title: conv.issue_detected.substring(0, 100),
-          description: conv.issue_detected,
-          status: conv.escalated_to_admin ? "in_progress" : "open",
-          priority: "normal",
+          type,
+          title: conv.issue_detected || title,
+          description: description || conv.issue_detected || "",
+          status,
+          priority,
           created_at: conv.created_at,
+          conversation_data: conv.conversation_data,
         })
       })
     }
@@ -99,7 +142,7 @@ export async function GET() {
 
     tickets.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
-    console.log("[v0] Total tickets:", tickets.length)
+    console.log("[v0] Total tickets returned:", tickets.length)
 
     return NextResponse.json({ tickets })
   } catch (error) {

@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { generateText } from "ai"
+import { getAIModel } from "@/lib/ai"
 
 async function verifyAdmin() {
   const cookieStore = await cookies()
@@ -75,24 +76,24 @@ export async function GET() {
   ]
 }`
 
-    console.log("[v0] Calling AI model...")
+    console.log("[v0] Calling AI model with getAIModel()...")
 
     const { text } = await generateText({
-      model: "xai/grok-2-1212",
+      model: getAIModel(),
       prompt,
     })
 
-    console.log("[v0] AI Response:", text.substring(0, 200))
+    console.log("[v0] AI Response received:", text.substring(0, 200))
 
     // Parse JSON from response
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
       const data = JSON.parse(jsonMatch[0])
-      console.log("[v0] Suggestions generated:", data.suggestions?.length)
+      console.log("[v0] Suggestions generated successfully:", data.suggestions?.length)
       return NextResponse.json(data)
     }
 
-    console.log("[v0] JSON parsing failed, returning fallback")
+    console.log("[v0] JSON parsing failed, returning fallback suggestions")
     return NextResponse.json({
       suggestions: [
         {
@@ -111,6 +112,20 @@ export async function GET() {
     })
   } catch (error) {
     console.error("[v0] AI Suggestions error:", error)
-    return NextResponse.json({ error: "فشل في توليد الاقتراحات", details: String(error) }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: "فشل في توليد الاقتراحات",
+        details: String(error),
+        suggestions: [
+          {
+            title: "مراجعة إعدادات AI",
+            description: "تحقق من إعدادات الذكاء الاصطناعي والاتصال بالخدمة",
+            priority: "high",
+            category: "تقني",
+          },
+        ],
+      },
+      { status: 200 },
+    ) // إرجاع 200 مع suggestions افتراضية بدلاً من 500
   }
 }
