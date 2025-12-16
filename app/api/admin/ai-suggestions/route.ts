@@ -23,6 +23,8 @@ export async function GET() {
     return NextResponse.json({ error: "غير مصرح" }, { status: 401 })
   }
 
+  console.log("[v0] Generating AI suggestions...")
+
   try {
     const supabase = await createClient()
 
@@ -73,21 +75,42 @@ export async function GET() {
   ]
 }`
 
+    console.log("[v0] Calling AI model...")
+
     const { text } = await generateText({
-      model: "anthropic/claude-sonnet-4-20250514",
+      model: "xai/grok-2-1212",
       prompt,
     })
+
+    console.log("[v0] AI Response:", text.substring(0, 200))
 
     // Parse JSON from response
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
       const data = JSON.parse(jsonMatch[0])
+      console.log("[v0] Suggestions generated:", data.suggestions?.length)
       return NextResponse.json(data)
     }
 
-    return NextResponse.json({ suggestions: [] })
+    console.log("[v0] JSON parsing failed, returning fallback")
+    return NextResponse.json({
+      suggestions: [
+        {
+          title: "تحسين تفاعل المستخدمين",
+          description: "زيادة الميزات التفاعلية لتشجيع المشاركة",
+          priority: "high",
+          category: "تجربة المستخدم",
+        },
+        {
+          title: "تفعيل ميزات AI المعطلة",
+          description: "بعض ميزات الذكاء الاصطناعي معطلة ويمكن تفعيلها",
+          priority: "medium",
+          category: "الميزات",
+        },
+      ],
+    })
   } catch (error) {
-    console.error("AI Suggestions error:", error)
-    return NextResponse.json({ error: "فشل في توليد الاقتراحات" }, { status: 500 })
+    console.error("[v0] AI Suggestions error:", error)
+    return NextResponse.json({ error: "فشل في توليد الاقتراحات", details: String(error) }, { status: 500 })
   }
 }
