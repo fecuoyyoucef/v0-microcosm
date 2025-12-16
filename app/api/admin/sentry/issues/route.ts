@@ -2,12 +2,24 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { cookies } from "next/headers"
 
+async function verifyAdmin() {
+  const cookieStore = await cookies()
+  const token = cookieStore.get("admin_session")?.value
+  if (!token) return null
+
+  try {
+    const decoded = JSON.parse(Buffer.from(token, "base64").toString())
+    if (decoded.exp < Date.now()) return null
+    return decoded
+  } catch {
+    return null
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const adminToken = cookieStore.get("admin_token")
-
-    if (!adminToken) {
+    const admin = await verifyAdmin()
+    if (!admin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -15,11 +27,14 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status") || "unresolved"
     const level = searchParams.get("level") || "all"
 
+    console.log("[v0] Fetching Sentry issues with status:", status, "level:", level)
+
     const sentryOrg = process.env.SENTRY_ORG
     const sentryProject = process.env.SENTRY_PROJECT
     const sentryToken = process.env.SENTRY_AUTH_TOKEN
 
     if (sentryOrg && sentryProject && sentryToken) {
+      console.log("[v0] Attempting to fetch from Sentry API...")
       try {
         let query = ""
         if (status !== "all") {
@@ -41,6 +56,7 @@ export async function GET(request: NextRequest) {
 
         if (response.ok) {
           const sentryIssues = await response.json()
+          console.log("[v0] Sentry API returned", sentryIssues.length, "issues")
 
           const issues = sentryIssues.map((issue: any) => ({
             id: issue.id,
@@ -68,12 +84,17 @@ export async function GET(request: NextRequest) {
           }
 
           return NextResponse.json({ issues, stats })
+        } else {
+          console.log("[v0] Sentry API failed with status:", response.status)
         }
       } catch (sentryError) {
-        console.error("Sentry API error, falling back to local data:", sentryError)
+        console.error("[v0] Sentry API error, falling back to local data:", sentryError)
       }
+    } else {
+      console.log("[v0] Sentry env vars not configured, using local data")
     }
 
+    console.log("[v0] Using local monitoring_events as fallback")
     const supabase = await createClient()
 
     const { data: events, error } = await supabase
@@ -84,7 +105,7 @@ export async function GET(request: NextRequest) {
       .limit(100)
 
     if (error) {
-      console.error("Error fetching monitoring events:", error)
+      console.error("[v0] Error fetching monitoring events:", error)
       return NextResponse.json(
         {
           issues: [],
@@ -93,6 +114,8 @@ export async function GET(request: NextRequest) {
         { status: 200 },
       )
     }
+
+    console.log("[v0] Found", events?.length || 0, "monitoring events")
 
     const errorGroups = new Map<string, any>()
 
@@ -145,9 +168,11 @@ export async function GET(request: NextRequest) {
       unresolved: filteredIssues.length,
     }
 
+    console.log("[v0] Returning", filteredIssues.length, "issues with stats:", stats)
+
     return NextResponse.json({ issues: filteredIssues, stats })
   } catch (error) {
-    console.error("Sentry issues API error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("[v0] Sentry issues API error:", error)
+    return NextResponse.json({ error: "Internal server error", details: String(error) }, { status: 500 })
   }
 }

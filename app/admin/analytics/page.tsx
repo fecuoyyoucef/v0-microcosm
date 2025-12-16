@@ -153,37 +153,48 @@ export default function AnalyticsPage() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 gap-4">
-                {[
-                  { key: "social", label: "اجتماعية", color: "emerald", value: data?.layerDistribution?.social || 0 },
-                  {
-                    key: "coordination",
-                    label: "تنسيقية",
-                    color: "blue",
-                    value: data?.layerDistribution?.coordination || 0,
-                  },
-                  {
-                    key: "knowledge",
-                    label: "معرفية",
-                    color: "purple",
-                    value: data?.layerDistribution?.knowledge || 0,
-                  },
-                ].map((layer) => {
-                  const total =
-                    (data?.layerDistribution?.social || 0) +
-                    (data?.layerDistribution?.coordination || 0) +
-                    (data?.layerDistribution?.knowledge || 0)
-                  const percent = total > 0 ? ((layer.value / total) * 100).toFixed(1) : "0"
-                  return (
-                    <div
-                      key={layer.key}
-                      className={`p-4 rounded-xl bg-${layer.color}-500/10 border border-${layer.color}-500/20 text-center`}
-                    >
-                      <p className={`text-${layer.color}-400 font-medium`}>{layer.label}</p>
-                      <p className="text-3xl font-bold text-white mt-2">{layer.value}</p>
-                      <p className="text-sm text-slate-400">{percent}%</p>
-                    </div>
-                  )
-                })}
+                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
+                  <p className="text-emerald-400 font-medium">اجتماعية</p>
+                  <p className="text-3xl font-bold text-white mt-2">{data?.layerDistribution?.social || 0}</p>
+                  <p className="text-sm text-slate-400">
+                    {(
+                      ((data?.layerDistribution?.social || 0) /
+                        ((data?.layerDistribution?.social || 0) +
+                          (data?.layerDistribution?.coordination || 0) +
+                          (data?.layerDistribution?.knowledge || 0))) *
+                        100 || 0
+                    ).toFixed(1)}
+                    %
+                  </p>
+                </div>
+                <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-center">
+                  <p className="text-blue-400 font-medium">تنسيقية</p>
+                  <p className="text-3xl font-bold text-white mt-2">{data?.layerDistribution?.coordination || 0}</p>
+                  <p className="text-sm text-slate-400">
+                    {(
+                      ((data?.layerDistribution?.coordination || 0) /
+                        ((data?.layerDistribution?.social || 0) +
+                          (data?.layerDistribution?.coordination || 0) +
+                          (data?.layerDistribution?.knowledge || 0))) *
+                        100 || 0
+                    ).toFixed(1)}
+                    %
+                  </p>
+                </div>
+                <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 text-center">
+                  <p className="text-purple-400 font-medium">معرفية</p>
+                  <p className="text-3xl font-bold text-white mt-2">{data?.layerDistribution?.knowledge || 0}</p>
+                  <p className="text-sm text-slate-400">
+                    {(
+                      ((data?.layerDistribution?.knowledge || 0) /
+                        ((data?.layerDistribution?.social || 0) +
+                          (data?.layerDistribution?.coordination || 0) +
+                          (data?.layerDistribution?.knowledge || 0))) *
+                        100 || 0
+                    ).toFixed(1)}
+                    %
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
