@@ -24,6 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { toast } from "sonner" // Import toast
 
 const avatarColors = [
   "bg-gradient-to-br from-blue-400 to-blue-600",
@@ -45,18 +46,19 @@ const getAvatarColor = (str: string) => {
 }
 
 const quickReactions = [
-  { id: "neutral", emoji: "محايد", image: "/images/1.webp", name: "محايد" },
-  { id: "harmony", emoji: "توازن", image: "/images/2.webp", name: "توازن" },
-  { id: "achievement", emoji: "انجاز", image: "/images/3.webp", name: "انجاز" },
-  { id: "creativity", emoji: "ابداع", image: "/images/4.webp", name: "ابداع" },
-  { id: "challenge", emoji: "تحدي", image: "/images/5.webp", name: "تحدي" },
-  { id: "support", emoji: "دعم", image: "/images/6.webp", name: "دعم" },
+  { id: "neutral", emoji: "😐", image: "/images/1.webp", name: "محايد" },
+  { id: "harmony", emoji: "☯️", image: "/images/2.webp", name: "توازن" },
+  { id: "achievement", emoji: "🏆", image: "/images/3.webp", name: "إنجاز" },
+  { id: "creativity", emoji: "💡", image: "/images/4.webp", name: "إبداع" },
+  { id: "challenge", emoji: "⚡", image: "/images/5.webp", name: "تحدي" },
+  { id: "support", emoji: "❤️", image: "/images/6.webp", name: "دعم" },
 ]
 
 interface MessageListProps {
   messages: Message[]
+  groupId?: string // Assuming groupId is relevant for fetching members or context
   currentUserId: string
-  members: GroupMember[]
+  members?: GroupMember[] // Make members optional and default to empty array
   isLoading: boolean
   messagesEndRef: React.RefObject<HTMLDivElement>
   nodes: ConversationNode[]
@@ -89,13 +91,16 @@ const layerStyles: Record<string, { bg: string; ownBg: string; icon: string }> =
 export function MessageList({
   messages,
   currentUserId,
-  members,
+  members = [], // Default members to empty array
   isLoading,
   messagesEndRef,
   nodes,
   onReply,
   onDelete,
 }: MessageListProps) {
+  const supabase = createClient()
+  const containerRef = useRef<HTMLDivElement>(null)
+  const reactionPickerRef = useRef<HTMLDivElement>(null)
   const [reactions, setReactions] = useState<Record<string, Reaction[]>>({})
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null)
   const [showReactionsFor, setShowReactionsFor] = useState<string | null>(null)
@@ -104,25 +109,29 @@ export function MessageList({
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null)
   const [translatedMessages, setTranslatedMessages] = useState<Record<string, string>>({})
   const [translatingMessages, setTranslatingMessages] = useState<Set<string>>(new Set())
-  const supabase = createClient()
-  const longPressTimer = useRef<NodeJS.Timeout | null>(null)
-  const reactionPickerRef = useRef<HTMLDivElement>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [longPressActive, setLongPressActive] = useState<string | null>(null)
-  const [pressTimer, setPressTimer] = useState<NodeJS.Timeout | null>(null)
+  const [showActionsFor, setShowActionsFor] = useState<string | null>(null)
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null) // Changed from useRef<NodeJS.Timeout | null>(null) to useRef<NodeJS.Timeout | null>(null)
+  const [longPressActive, setLongPressActive] = useState<string | null>(null) // Removed unused pressTimer state
+  // const [pressTimer, setPressTimer] = useState<NodeJS.Timeout | null>(null) // Removed unused pressTimer state
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (reactionPickerRef.current && !reactionPickerRef.current.contains(event.target as Node)) {
         setShowReactionsFor(null)
       }
+      // Close actions menu when clicking outside
+      if (showActionsFor && !event.target!.closest(".actions-menu-container")) {
+        // Assuming a class for the actions menu container
+        setShowActionsFor(null)
+        setLongPressActive(null)
+      }
     }
 
-    if (showReactionsFor) {
-      document.addEventListener("mousedown", handleClickOutside)
-      return () => document.removeEventListener("mousedown", handleClickOutside)
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
     }
-  }, [showReactionsFor])
+  }, [showReactionsFor, showActionsFor]) // Added showActionsFor dependency
 
   useEffect(() => {
     if (messages.length === 0) return
@@ -181,6 +190,8 @@ export function MessageList({
       })
     }
     setShowReactionsFor(null)
+    setLongPressActive(null)
+    setShowActionsFor(null)
   }
 
   const getReplyPreview = (replyToId: string) => {
@@ -237,30 +248,30 @@ export function MessageList({
 
   const handleTouchStart = (messageId: string, e: React.TouchEvent) => {
     e.stopPropagation()
-    const timer = setTimeout(() => {
+    longPressTimerRef.current = setTimeout(() => {
       setLongPressActive(messageId)
-      setShowReactionsFor(messageId)
-      // Haptic feedback if available
+      // إظهار قائمة الخيارات بدلاً من قائمة التفاعلات فقط
+      setShowActionsFor(messageId)
       if (navigator.vibrate) {
         navigator.vibrate(50)
       }
-    }, 300) // Reduced from 500ms to 300ms for faster response
-    setPressTimer(timer)
+    }, 400) // تقليل الوقت من 500 إلى 400ms
   }
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     e.stopPropagation()
-    if (pressTimer) {
-      clearTimeout(pressTimer)
-      setPressTimer(null)
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
     }
-    setLongPressActive(null)
+    // Remove this line as we want the menu to stay open on touch end until clicked outside
+    // setLongPressActive(null)
   }
 
   const handleTouchMove = () => {
-    if (pressTimer) {
-      clearTimeout(pressTimer)
-      setPressTimer(null)
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
     }
     setLongPressActive(null)
   }
@@ -345,6 +356,51 @@ export function MessageList({
     }
 
     return parts.length > 0 ? parts : content
+  }
+
+  const handleCopyMessage = (content: string) => {
+    navigator.clipboard.writeText(content)
+    toast.success("تم نسخ الرسالة")
+    setShowActionsFor(null)
+    setLongPressActive(null)
+  }
+
+  const handleDeleteMessage = async (messageId: string) => {
+    if (confirm("هل أنت متأكد من حذف هذه الرسالة؟")) {
+      // Assuming you have a way to delete messages via Supabase, similar to how reactions are handled
+      const { error } = await supabase.from("messages").delete().eq("id", messageId)
+      if (error) {
+        console.error("Error deleting message:", error)
+        toast.error("فشل حذف الرسالة")
+        return
+      }
+      toast.success("تم حذف الرسالة")
+    }
+    setShowActionsFor(null)
+    setLongPressActive(null)
+  }
+
+  const handleEditMessage = (messageId: string) => {
+    // سيتم تنفيذه لاحقاً
+    toast.info("ميزة التعديل قريباً")
+    setShowActionsFor(null)
+    setLongPressActive(null)
+  }
+
+  const handlePinMessage = async (messageId: string) => {
+    // Assuming you have an 'is_pinned' and 'pinned_by'/'pinned_at' field in your messages table
+    const { error } = await supabase
+      .from("messages")
+      .update({ is_pinned: true, pinned_by: currentUserId, pinned_at: new Date().toISOString() })
+      .eq("id", messageId)
+    if (error) {
+      console.error("Error pinning message:", error)
+      toast.error("فشل تثبيت الرسالة")
+      return
+    }
+    toast.success("تم تثبيت الرسالة")
+    setShowActionsFor(null)
+    setLongPressActive(null)
   }
 
   if (isLoading) {
@@ -432,6 +488,11 @@ export function MessageList({
                     onTouchStart={(e) => handleTouchStart(message.id, e)}
                     onTouchEnd={handleTouchEnd}
                     onTouchMove={handleTouchMove}
+                    onMouseEnter={() => setActiveMessageId(message.id)}
+                    onMouseLeave={() => {
+                      setActiveMessageId(null)
+                      setShowReactionsFor(null)
+                    }}
                   >
                     {!isOwn && (
                       <div className="w-7 shrink-0">
@@ -642,7 +703,11 @@ export function MessageList({
                                   )}
                                   onClick={() => toggleReaction(message.id, reaction.id)}
                                 >
-                                  <span className="text-base">{reaction.emoji}</span>
+                                  <img
+                                    src={reaction.image || "/placeholder.svg"}
+                                    alt={reaction.name}
+                                    className="w-3.5 h-3.5"
+                                  />
                                 </button>
                               )
                             })}
