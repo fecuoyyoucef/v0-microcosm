@@ -296,3 +296,124 @@ export interface Notification {
   sender?: Profile | null
   group?: Group | null
 }
+
+// إضافة أنواع نظام الوكلاء الذكاء
+
+export type AgentType =
+  | "chief"
+  | "content_guardian"
+  | "user_manager"
+  | "system_monitor"
+  | "analytics"
+  | "community_manager"
+
+export type AgentStatus = "active" | "paused" | "disabled"
+
+export type ActionStatus = "active" | "undone" | "overridden" | "failed"
+
+export type OwnerDecision = "approve" | "undo" | "override"
+
+export type ErrorSeverity = "low" | "medium" | "high" | "critical"
+
+export type ErrorReportStatus = "pending" | "investigating" | "fixed" | "wont_fix"
+
+export type ScheduleType = "once" | "hourly" | "daily" | "weekly"
+
+export interface AIAgent {
+  id: string
+  agent_name: string
+  agent_type: AgentType
+  description: string | null
+  capabilities: string[]
+  permissions: Record<string, boolean>
+  status: AgentStatus
+  confidence_threshold: number
+  parent_agent_id: string | null
+  model_config: {
+    model: string
+    temperature: number
+    max_tokens: number
+  }
+  created_at: string
+  updated_at: string
+}
+
+export interface AgentAction {
+  id: string
+  agent_id: string
+  action_type: string
+  target_type: string
+  target_id: string | null
+  reasoning: string
+  confidence: number
+  snapshot_before: Record<string, unknown> | null
+  snapshot_after: Record<string, unknown> | null
+  status: ActionStatus
+  undo_data: Record<string, unknown> | null
+  created_at: string
+  undone_at: string | null
+  undone_by: string | null
+  agent?: AIAgent
+}
+
+export interface OwnerDecisionRecord {
+  id: string
+  action_id: string
+  decision: OwnerDecision
+  reason: string | null
+  created_at: string
+}
+
+export interface AgentLearning {
+  id: string
+  agent_id: string
+  scenario_type: string
+  context_data: Record<string, unknown>
+  action_taken: string
+  owner_feedback: "approved" | "undone" | "overridden" | null
+  learning_points: Record<string, unknown> | null
+  created_at: string
+}
+
+export interface AgentStatusRecord {
+  id: string
+  agent_id: string
+  is_active: boolean
+  last_action_at: string | null
+  actions_today: number
+  actions_this_week: number
+  accuracy_rate: number | null
+  total_undos: number
+  updated_at: string
+}
+
+export interface V0ErrorReport {
+  id: string
+  agent_id: string
+  severity: ErrorSeverity
+  error_type: string
+  error_message: string
+  stack_trace: string | null
+  context_data: Record<string, unknown> | null
+  attempted_fixes: Array<{
+    fix_description: string
+    timestamp: string
+    success: boolean
+  }>
+  status: ErrorReportStatus
+  v0_response: Record<string, unknown> | null
+  created_at: string
+  resolved_at: string | null
+}
+
+export interface AgentScheduledAction {
+  id: string
+  agent_id: string
+  action_type: string
+  schedule_type: ScheduleType
+  schedule_config: Record<string, unknown>
+  next_run_at: string
+  last_run_at: string | null
+  is_active: boolean
+  created_at: string
+}
