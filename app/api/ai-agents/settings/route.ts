@@ -18,8 +18,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Only owner can access settings" }, { status: 403 })
     }
 
-    console.log("[v0] Fetching Chief Agent settings")
-
     // Get Chief Agent settings
     const { data: agent, error: agentError } = await supabase
       .from("ai_agents")
@@ -34,17 +32,14 @@ export async function GET(request: NextRequest) {
 
     const { data: agentStatus } = await supabase.from("agent_status").select("*").eq("agent_id", agent.id).single()
 
-    console.log("[v0] Agent fetched:", agent)
-    console.log("[v0] Agent status fetched:", agentStatus)
-
-    // Merge data and convert status to is_active
-    const agentData = {
-      ...agent,
-      is_active: agent.status === "active",
-      ...agentStatus,
-    }
-
-    return NextResponse.json({ agent: agentData })
+    return NextResponse.json({
+      agent: {
+        ...agent,
+        is_active: agentStatus?.is_active ?? agent.status === "active",
+        actions_today: agentStatus?.actions_today || 0,
+        accuracy_rate: agentStatus?.accuracy_rate || 100,
+      },
+    })
   } catch (error: any) {
     console.error("[v0] Error fetching agent settings:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -70,10 +65,13 @@ export async function POST(request: NextRequest) {
 
     const { is_active, capabilities, confidence_threshold } = await request.json()
 
-    console.log("[v0] Updating Chief Agent settings:", { is_active, capabilities, confidence_threshold })
+    const { data: agent } = await supabase.from("ai_agents").select("id").eq("agent_type", "chief").single()
 
-    // Update ai_agents table with status
-    const { data, error } = await supabase
+    if (!agent) {
+      return NextResponse.json({ error: "Agent not found" }, { status: 404 })
+    }
+
+    const { error: agentError } = await supabase
       .from("ai_agents")
       .update({
         status: is_active ? "active" : "paused",
@@ -81,32 +79,32 @@ export async function POST(request: NextRequest) {
         confidence_threshold: confidence_threshold || 0.85,
         updated_at: new Date().toISOString(),
       })
-      .eq("agent_type", "chief")
-      .select()
-      .single()
+      .eq("id", agent.id)
 
-    if (error) {
-      console.error("[v0] Error updating agent:", error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    if (agentError) {
+      console.error("[v0] Error updating ai_agents:", agentError)
+      return NextResponse.json({ error: agentError.message }, { status: 500 })
     }
 
-    // Update agent_status table as well
-    await supabase
+    const { error: statusError } = await supabase
       .from("agent_status")
       .update({
         is_active: is_active,
         updated_at: new Date().toISOString(),
       })
-      .eq("agent_id", data.id)
+      .eq("agent_id", agent.id)
 
-    console.log("[v0] Agent updated successfully:", data)
+    if (statusError) {
+      console.error("[v0] Error updating agent_status:", statusError)
+    }
 
-    // Return data with is_active converted
+    const { data: updatedAgent } = await supabase.from("ai_agents").select("*").eq("id", agent.id).single()
+
     return NextResponse.json({
       success: true,
       agent: {
-        ...data,
-        is_active: data.status === "active",
+        ...updatedAgent,
+        is_active: is_active,
       },
     })
   } catch (error: any) {

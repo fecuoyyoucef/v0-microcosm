@@ -29,6 +29,7 @@ export default function ChiefAgentPage() {
   const [actions, setActions] = useState<any[]>([])
   const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [isToggling, setIsToggling] = useState(false)
   const [chatMessages, setChatMessages] = useState<{ role: string; content: string }[]>([])
   const [chatInput, setChatInput] = useState("")
   const [isChatting, setIsChatting] = useState(false)
@@ -44,23 +45,20 @@ export default function ChiefAgentPage() {
   }, [chatMessages])
 
   const loadData = async () => {
+    if (isToggling) return
+
     try {
-      // Load agent settings
       const settingsRes = await fetch("/api/ai-agents/settings")
       const settingsData = await settingsRes.json()
 
       if (settingsData.agent) {
-        settingsData.agent.is_active = settingsData.agent.status === "active"
+        setAgent(settingsData.agent)
       }
 
-      setAgent(settingsData.agent)
-
-      // Load recent actions
       const actionsRes = await fetch("/api/ai-agents/undo?list=true")
       const actionsData = await actionsRes.json()
       setActions(actionsData.actions || [])
 
-      // Load stats
       const statsRes = await fetch("/api/ai-agents/stats")
       const statsData = await statsRes.json()
       setStats(statsData)
@@ -72,44 +70,49 @@ export default function ChiefAgentPage() {
   }
 
   const toggleAgent = async (enabled: boolean) => {
+    if (isToggling) return
+
+    setIsToggling(true)
+    const previousState = agent?.is_active
+
+    setAgent((prev: any) => ({ ...prev, is_active: enabled }))
+
     try {
-      setAgent((prev: any) => ({ ...prev, is_active: enabled }))
-
-      console.log("[v0] Toggling agent to:", enabled)
-
       const res = await fetch("/api/ai-agents/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           is_active: enabled,
           capabilities: agent?.capabilities || [],
-          confidence_threshold: agent?.config?.confidence_threshold || 80,
+          confidence_threshold: agent?.confidence_threshold || 0.85,
         }),
       })
 
       const data = await res.json()
 
-      console.log("[v0] Toggle response:", data)
-
       if (res.ok && data.success) {
         setAgent(data.agent)
-
         toast({
           title: enabled ? "تم تفعيل الوكيل الرئيسي" : "تم إيقاف الوكيل الرئيسي",
           description: enabled ? "الوكيل الآن نشط ويراقب النظام" : "الوكيل متوقف مؤقتاً",
         })
       } else {
-        setAgent((prev: any) => ({ ...prev, is_active: !enabled }))
-        throw new Error(data.error || "فشل التحديث")
+        setAgent((prev: any) => ({ ...prev, is_active: previousState }))
+        toast({
+          title: "خطأ",
+          description: data.error || "فشل تحديث إعدادات الوكيل",
+          variant: "destructive",
+        })
       }
     } catch (error) {
-      console.error("[v0] Toggle agent error:", error)
-      setAgent((prev: any) => ({ ...prev, is_active: !enabled }))
+      setAgent((prev: any) => ({ ...prev, is_active: previousState }))
       toast({
         title: "خطأ",
-        description: "فشل تحديث إعدادات الوكيل",
+        description: "فشل الاتصال بالخادم",
         variant: "destructive",
       })
+    } finally {
+      setIsToggling(false)
     }
   }
 
@@ -121,8 +124,6 @@ export default function ChiefAgentPage() {
     setChatMessages((prev) => [...prev, { role: "user", content: userMessage }])
     setIsChatting(true)
 
-    console.log("[v0] Sending message to agent:", userMessage)
-
     try {
       const res = await fetch("/api/ai-agents/chat", {
         method: "POST",
@@ -132,32 +133,21 @@ export default function ChiefAgentPage() {
 
       const data = await res.json()
 
-      console.log("[v0] Chat response:", data)
+      const agentResponse = data.response || data.error || "عذراً، حدث خطأ غير متوقع."
+      setChatMessages((prev) => [...prev, { role: "agent", content: agentResponse }])
 
-      if (data.response) {
-        setChatMessages((prev) => [...prev, { role: "agent", content: data.response }])
-      } else {
-        setChatMessages((prev) => [
-          ...prev,
-          { role: "agent", content: "عذراً، حدث خطأ أثناء معالجة رسالتك. يرجى المحاولة مرة أخرى." },
-        ])
+      if (!data.success && data.error) {
         toast({
-          title: "خطأ",
-          description: data.error || "فشل التواصل مع الوكيل",
+          title: "تحذير",
+          description: "حدثت مشكلة في الرد",
           variant: "destructive",
         })
       }
     } catch (error) {
-      console.error("[v0] Chat error:", error)
       setChatMessages((prev) => [
         ...prev,
-        { role: "agent", content: "عذراً، فشل الاتصال. يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى." },
+        { role: "agent", content: "عذراً، فشل الاتصال بالخادم. تأكد من اتصالك بالإنترنت." },
       ])
-      toast({
-        title: "خطأ",
-        description: "فشل إرسال الرسالة",
-        variant: "destructive",
-      })
     } finally {
       setIsChatting(false)
     }
@@ -229,9 +219,9 @@ export default function ChiefAgentPage() {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <span className="text-sm">الحالة:</span>
-            <Switch checked={agent?.is_active} onCheckedChange={toggleAgent} />
+            <Switch checked={agent?.is_active ?? false} onCheckedChange={toggleAgent} disabled={isToggling} />
             <span className={agent?.is_active ? "text-green-500" : "text-red-500"}>
-              {agent?.is_active ? "نشط" : "متوقف"}
+              {isToggling ? "جاري..." : agent?.is_active ? "نشط" : "متوقف"}
             </span>
           </div>
         </div>
@@ -366,67 +356,58 @@ export default function ChiefAgentPage() {
       <Card className="p-6">
         <h2 className="text-xl font-bold mb-4">آخر القرارات</h2>
         <div className="space-y-4">
-          {actions.slice(0, 10).map((action) => (
-            <div
-              key={action.id}
-              className="flex items-start justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-            >
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  {action.status === "completed" && (
-                    <Badge variant="default" className="bg-green-500">
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      مكتمل
-                    </Badge>
-                  )}
-                  {action.status === "undone" && (
-                    <Badge variant="secondary">
-                      <RotateCcw className="w-3 h-3 mr-1" />
-                      تم التراجع
-                    </Badge>
-                  )}
-                  <Badge variant="outline">ثقة {action.confidence}%</Badge>
-                  <Badge
-                    variant={
-                      action.severity === "critical"
-                        ? "destructive"
-                        : action.severity === "high"
-                          ? "default"
-                          : "secondary"
-                    }
-                  >
-                    {action.severity}
-                  </Badge>
+          {actions.length === 0 ? (
+            <div className="p-4 border rounded-lg bg-muted/30">
+              <p className="text-sm text-muted-foreground">لا توجد قرارات حتى الآن</p>
+            </div>
+          ) : (
+            actions.slice(0, 10).map((action) => (
+              <div
+                key={action.id}
+                className="flex items-start justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    {action.status === "completed" && (
+                      <Badge variant="default" className="bg-green-500">
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        مكتمل
+                      </Badge>
+                    )}
+                    {action.status === "undone" && (
+                      <Badge variant="secondary">
+                        <RotateCcw className="w-3 h-3 mr-1" />
+                        تم التراجع
+                      </Badge>
+                    )}
+                    <Badge variant="outline">ثقة {action.confidence}%</Badge>
+                  </div>
+
+                  <p className="font-semibold mb-1">{getActionTitle(action.action_type)}</p>
+                  <p className="text-sm text-muted-foreground mb-2">{action.reasoning}</p>
+                  <p className="text-xs text-muted-foreground">{new Date(action.created_at).toLocaleString("ar-SA")}</p>
                 </div>
 
-                <p className="font-semibold mb-1">{getActionTitle(action.action_type)}</p>
-                <p className="text-sm text-muted-foreground mb-2">{action.reasoning}</p>
-                <p className="text-xs text-muted-foreground">{new Date(action.created_at).toLocaleString("ar-SA")}</p>
+                <div className="flex gap-2">
+                  {action.status === "completed" && !action.approved_by && (
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => undoAction(action.id)}>
+                        <RotateCcw className="w-4 h-4 ml-2" />
+                        تراجع
+                      </Button>
+                      <Button size="sm" variant="default" onClick={() => approveAction(action.id)}>
+                        <CheckCircle className="w-4 h-4 ml-2" />
+                        موافق
+                      </Button>
+                    </>
+                  )}
+                  <Button size="sm" variant="ghost">
+                    <Eye className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
-
-              <div className="flex gap-2">
-                {action.status === "completed" && !action.approved_by && (
-                  <>
-                    <Button size="sm" variant="outline" onClick={() => undoAction(action.id)}>
-                      <RotateCcw className="w-4 h-4 ml-2" />
-                      تراجع
-                    </Button>
-                    <Button size="sm" variant="default" onClick={() => approveAction(action.id)}>
-                      <CheckCircle className="w-4 h-4 ml-2" />
-                      موافق
-                    </Button>
-                  </>
-                )}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => window.open(`/admin/chief-agent/action/${action.id}`, "_blank")}
-                >
-                  <Eye className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </Card>
 
@@ -440,7 +421,6 @@ export default function ChiefAgentPage() {
           عند اكتشاف أخطاء معقدة، سيطلب الوكيل موافقتك قبل إرسال الطلب إلى v0 للإصلاح
         </p>
         <div className="space-y-3">
-          {/* This would be populated with actual pending requests */}
           <div className="p-4 border rounded-lg bg-muted/30">
             <p className="text-sm text-muted-foreground">لا توجد طلبات معلقة حالياً</p>
           </div>

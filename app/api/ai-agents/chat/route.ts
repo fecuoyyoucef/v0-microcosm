@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
-import Grok from "groq-sdk"
+import Groq from "groq-sdk"
 
-const grok = new Grok({
-  apiKey: process.env.XAI_API_KEY,
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
 })
 
 export async function POST(request: NextRequest) {
@@ -29,8 +29,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 })
     }
 
-    console.log("[v0] Chief Agent chat - User message:", message)
-
     const { data: agentStatus } = await supabase.from("agent_status").select("*").limit(1).single()
 
     const { data: recentActions } = await supabase
@@ -42,18 +40,15 @@ export async function POST(request: NextRequest) {
     const stats = {
       actions_today: agentStatus?.actions_today || 0,
       accuracy_rate: agentStatus?.accuracy_rate || 100,
-      is_active: agentStatus?.is_active || true,
+      is_active: agentStatus?.is_active ?? true,
     }
 
-    console.log("[v0] Stats fetched:", stats)
-
-    try {
-      const completion = await grok.chat.completions.create({
-        model: "grok-beta",
-        messages: [
-          {
-            role: "system",
-            content: `أنت الوكيل الرئيسي (Chief AI Agent) لتطبيق Synaptic Space.
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [
+        {
+          role: "system",
+          content: `أنت الوكيل الرئيسي (Chief AI Agent) لتطبيق Synaptic Space.
 أنت نائب المالك ولديك صلاحيات كاملة لإدارة المنصة.
 
 دورك:
@@ -67,50 +62,40 @@ export async function POST(request: NextRequest) {
 - آخر الإجراءات: ${JSON.stringify(recentActions || [])}
 
 تحدث بالعربية دائماً، كن محترفاً ومباشراً.`,
-          },
-          {
-            role: "user",
-            content: message,
-          },
-        ],
-        temperature: 0.7,
-        max_tokens: 1000,
-      })
-
-      const response = completion.choices[0]?.message?.content || "عذراً، لم أتمكن من الرد."
-
-      console.log("[v0] Grok response:", response)
-
-      await supabase.from("agent_chat_logs").insert([
-        {
-          user_id: user.id,
-          message: message,
-          sender: "owner",
         },
         {
-          user_id: user.id,
-          message: response,
-          sender: "agent",
+          role: "user",
+          content: message,
         },
-      ])
+      ],
+      temperature: 0.7,
+      max_tokens: 1000,
+    })
 
-      return NextResponse.json({ success: true, response })
-    } catch (grokError: any) {
-      console.error("[v0] Grok API error:", grokError)
+    const response = completion.choices[0]?.message?.content || "عذراً، لم أتمكن من الرد."
 
-      const fallbackResponse = "عذراً، أواجه صعوبة في الاتصال حالياً. يرجى المحاولة مرة أخرى."
+    // حفظ المحادثة
+    await supabase.from("agent_chat_logs").insert([
+      {
+        user_id: user.id,
+        message: message,
+        sender: "owner",
+      },
+      {
+        user_id: user.id,
+        message: response,
+        sender: "agent",
+      },
+    ])
 
-      return NextResponse.json({
-        success: true,
-        response: fallbackResponse,
-      })
-    }
-  } catch (error) {
+    return NextResponse.json({ success: true, response })
+  } catch (error: any) {
     console.error("[v0] Chief Agent chat error:", error)
 
     return NextResponse.json({
-      success: true,
-      response: "عذراً، حدث خطأ غير متوقع. يرجى المحاولة لاحقاً.",
+      success: false,
+      response: `عذراً، حدث خطأ: ${error.message || "خطأ غير معروف"}`,
+      error: error.message,
     })
   }
 }
