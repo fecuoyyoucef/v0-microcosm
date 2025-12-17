@@ -21,16 +21,30 @@ export async function GET(request: NextRequest) {
     console.log("[v0] Fetching Chief Agent settings")
 
     // Get Chief Agent settings
-    const { data: agent, error } = await supabase.from("ai_agents").select("*").eq("agent_type", "chief").single()
+    const { data: agent, error: agentError } = await supabase
+      .from("ai_agents")
+      .select("*")
+      .eq("agent_type", "chief")
+      .single()
 
-    if (error) {
-      console.error("[v0] Error fetching agent:", error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    if (agentError) {
+      console.error("[v0] Error fetching agent:", agentError)
+      return NextResponse.json({ error: agentError.message }, { status: 500 })
     }
 
-    console.log("[v0] Agent fetched:", agent)
+    const { data: agentStatus } = await supabase.from("agent_status").select("*").eq("agent_id", agent.id).single()
 
-    return NextResponse.json({ agent })
+    console.log("[v0] Agent fetched:", agent)
+    console.log("[v0] Agent status fetched:", agentStatus)
+
+    // Merge data and convert status to is_active
+    const agentData = {
+      ...agent,
+      is_active: agent.status === "active",
+      ...agentStatus,
+    }
+
+    return NextResponse.json({ agent: agentData })
   } catch (error: any) {
     console.error("[v0] Error fetching agent settings:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -58,6 +72,7 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Updating Chief Agent settings:", { is_active, capabilities, confidence_threshold })
 
+    // Update ai_agents table with status
     const { data, error } = await supabase
       .from("ai_agents")
       .update({
@@ -75,8 +90,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    // Update agent_status table as well
+    await supabase
+      .from("agent_status")
+      .update({
+        is_active: is_active,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("agent_id", data.id)
+
     console.log("[v0] Agent updated successfully:", data)
 
+    // Return data with is_active converted
     return NextResponse.json({
       success: true,
       agent: {
