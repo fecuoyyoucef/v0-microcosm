@@ -75,16 +75,18 @@ export async function POST(request: NextRequest) {
 
       console.log("[v0] Grok response:", response)
 
-      // حفظ المحادثة
-      const { error: insertError } = await supabase.from("agent_chat_logs").insert({
-        user_id: user.id,
-        message: message,
-        response: response,
-      })
-
-      if (insertError) {
-        console.error("[v0] Error saving chat:", insertError)
-      }
+      await supabase.from("agent_chat_logs").insert([
+        {
+          user_id: user.id,
+          message: message,
+          sender: "owner",
+        },
+        {
+          user_id: user.id,
+          message: response,
+          sender: "agent",
+        },
+      ])
 
       return NextResponse.json({ success: true, response })
     } catch (grokError: any) {

@@ -61,9 +61,9 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from("ai_agents")
       .update({
-        is_active,
+        status: is_active ? "active" : "paused",
         capabilities: capabilities || [],
-        config: { confidence_threshold: confidence_threshold || 80 },
+        confidence_threshold: confidence_threshold || 0.85,
         updated_at: new Date().toISOString(),
       })
       .eq("agent_type", "chief")
@@ -77,7 +77,13 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Agent updated successfully:", data)
 
-    return NextResponse.json({ success: true, agent: data })
+    return NextResponse.json({
+      success: true,
+      agent: {
+        ...data,
+        is_active: data.status === "active",
+      },
+    })
   } catch (error: any) {
     console.error("[v0] Error updating agent settings:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })

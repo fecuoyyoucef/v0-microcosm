@@ -48,6 +48,11 @@ export default function ChiefAgentPage() {
       // Load agent settings
       const settingsRes = await fetch("/api/ai-agents/settings")
       const settingsData = await settingsRes.json()
+
+      if (settingsData.agent) {
+        settingsData.agent.is_active = settingsData.agent.status === "active"
+      }
+
       setAgent(settingsData.agent)
 
       // Load recent actions
