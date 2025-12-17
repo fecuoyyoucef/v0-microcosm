@@ -17,12 +17,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: admin } = await supabase.from("admins").select("role").eq("id", user.id).single()
-
-    if (!admin || admin.role !== "super_admin") {
-      return NextResponse.json({ error: "Forbidden - Owner only" }, { status: 403 })
-    }
-
     const { message } = await request.json()
 
     if (!message?.trim()) {

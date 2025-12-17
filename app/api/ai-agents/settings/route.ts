@@ -12,12 +12,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: admin } = await supabase.from("admins").select("role").eq("id", user.id).single()
-
-    if (!admin || admin.role !== "super_admin") {
-      return NextResponse.json({ error: "Only owner can access settings" }, { status: 403 })
-    }
-
     // Get Chief Agent settings
     const { data: agent, error: agentError } = await supabase
       .from("ai_agents")
@@ -55,12 +49,6 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const { data: admin } = await supabase.from("admins").select("role").eq("id", user.id).single()
-
-    if (!admin || admin.role !== "super_admin") {
-      return NextResponse.json({ error: "Only owner can update settings" }, { status: 403 })
     }
 
     const { is_active, capabilities, confidence_threshold } = await request.json()
