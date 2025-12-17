@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
-import Groq from "groq-sdk"
+import { generateAIText } from "@/lib/ai"
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,19 +26,6 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Message received:", message)
 
-    // التحقق من وجود GROQ_API_KEY
-    if (!process.env.GROQ_API_KEY) {
-      console.error("[v0] GROQ_API_KEY is missing!")
-      return NextResponse.json({
-        success: false,
-        response: "عذراً، مفتاح API الخاص بـ Groq غير مُعرّف. يرجى إضافته في إعدادات المشروع.",
-      })
-    }
-
-    const groq = new Groq({
-      apiKey: process.env.GROQ_API_KEY,
-    })
-
     const { data: agentStatus } = await supabase.from("agent_status").select("*").limit(1).single()
 
     const { data: recentActions } = await supabase
@@ -53,14 +40,9 @@ export async function POST(request: NextRequest) {
       is_active: agentStatus?.is_active ?? true,
     }
 
-    console.log("[v0] Calling Groq API...")
+    console.log("[v0] Building AI prompt...")
 
-    const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [
-        {
-          role: "system",
-          content: `أنت الوكيل الرئيسي (Chief AI Agent) لتطبيق Synaptic Space.
+    const prompt = `أنت الوكيل الرئيسي (Chief AI Agent) لتطبيق Synaptic Space.
 أنت نائب المالك ولديك صلاحيات كاملة لإدارة المنصة.
 
 دورك:
@@ -70,25 +52,25 @@ export async function POST(request: NextRequest) {
 - اقتراح تحسينات
 
 المعلومات الحالية:
-- إحصائيات: ${JSON.stringify(stats)}
-- آخر الإجراءات: ${JSON.stringify(recentActions || [])}
+- عدد الإجراءات اليوم: ${stats.actions_today}
+- نسبة الدقة: ${stats.accuracy_rate}%
+- حالة التفعيل: ${stats.is_active ? "نشط" : "متوقف"}
+- آخر الإجراءات: ${recentActions?.length || 0} إجراء
 
-تحدث بالعربية دائماً، كن محترفاً ومباشراً.`,
-        },
-        {
-          role: "user",
-          content: message,
-        },
-      ],
+آخر الإجراءات المنفذة:
+${recentActions?.map((a: any) => `- ${a.action_type}: ${a.reasoning?.substring(0, 100)}`).join("\n") || "لا توجد إجراءات"}
+
+سؤال المالك: ${message}
+
+تحدث بالعربية دائماً، كن محترفاً ومباشراً، وقدم إجابات مفيدة ودقيقة.`
+
+    console.log("[v0] Calling AI SDK...")
+    const response = await generateAIText(prompt, {
+      maxTokens: 1000,
       temperature: 0.7,
-      max_tokens: 1000,
     })
+    console.log("[v0] AI responded successfully")
 
-    console.log("[v0] Groq API responded successfully")
-
-    const response = completion.choices[0]?.message?.content || "عذراً، لم أتمكن من الرد."
-
-    // حفظ المحادثة
     console.log("[v0] Saving chat to database...")
     const { error: saveError } = await supabase.from("agent_chat_logs").insert([
       {
@@ -114,10 +96,18 @@ export async function POST(request: NextRequest) {
     console.error("[v0] Chief Agent chat error:", error)
     console.error("[v0] Error stack:", error.stack)
 
+    let errorMessage = "عذراً، حدث خطأ غير متوقع. يرجى المحاولة لاحقاً."
+
+    if (error.message?.includes("API key")) {
+      errorMessage = "عذراً، مفتاح API الخاص بـ Groq غير مُعرّف. يرجى إضافته في إعدادات المشروع."
+    } else if (error.message?.includes("حدث خطأ في خدمة الذكاء الاصطناعي")) {
+      errorMessage = "عذراً، خدمة الذكاء الاصطناعي غير متاحة حالياً. يرجى المحاولة لاحقاً."
+    }
+
     return NextResponse.json(
       {
         success: false,
-        response: `عذراً، حدث خطأ: ${error.message || "خطأ غير معروف"}. يرجى المحاولة لاحقاً.`,
+        response: errorMessage,
         error: error.message,
       },
       { status: 500 },
