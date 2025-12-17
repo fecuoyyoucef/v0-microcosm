@@ -45,8 +45,6 @@ export default function ChiefAgentPage() {
   }, [chatMessages])
 
   const loadData = async () => {
-    if (isToggling) return
-
     try {
       const settingsRes = await fetch("/api/ai-agents/settings")
       const settingsData = await settingsRes.json()

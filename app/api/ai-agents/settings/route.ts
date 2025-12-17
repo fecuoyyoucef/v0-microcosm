@@ -84,6 +84,7 @@ export async function POST(request: NextRequest) {
 
     if (statusError) {
       console.error("[v0] Error updating agent_status:", statusError)
+      return NextResponse.json({ error: statusError.message }, { status: 500 })
     }
 
     const { data: updatedAgent } = await supabase.from("ai_agents").select("*").eq("id", agent.id).single()
