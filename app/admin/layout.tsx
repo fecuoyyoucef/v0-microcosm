@@ -22,7 +22,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <Button
         variant="ghost"
         size="icon"
-        className="fixed top-4 right-4 z-50 md:hidden bg-slate-900/80 backdrop-blur-sm text-white hover:bg-slate-800"
+        className="fixed top-4 right-4 z-[60] md:hidden bg-slate-900/80 backdrop-blur-sm text-white hover:bg-slate-800"
         onClick={(e) => {
           e.stopPropagation()
           setIsMobileMenuOpen(!isMobileMenuOpen)
@@ -32,15 +32,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </Button>
 
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setIsMobileMenuOpen(false)} />
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[45] md:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
       )}
 
+      {/* Sidebar للشاشات الكبيرة */}
       <div className="hidden md:block">
         <AdminSidebar />
       </div>
 
       <div
-        className={`fixed top-0 right-0 h-full z-50 md:hidden transition-transform duration-300 ${
+        className={`fixed top-0 right-0 h-full w-72 bg-slate-900 z-[50] md:hidden transition-transform duration-300 shadow-2xl ${
           isMobileMenuOpen ? "translate-x-0" : "translate-x-full"
         }`}
         onClick={(e) => e.stopPropagation()}
