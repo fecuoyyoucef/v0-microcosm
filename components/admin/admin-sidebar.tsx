@@ -21,12 +21,14 @@ import {
   ChevronRight,
   ChevronLeft,
   AlertTriangle,
+  Bot,
 } from "lucide-react"
 import Image from "next/image"
 import { useState } from "react"
 
 const menuItems = [
   { href: "/admin", icon: LayoutDashboard, label: "لوحة التحكم", exact: true },
+  { href: "/admin/chief-agent", icon: Bot, label: "الوكيل الرئيسي", highlight: true },
   { href: "/admin/users", icon: Users, label: "المستخدمين" },
   { href: "/admin/cells", icon: FolderOpen, label: "الخلايا" },
   { href: "/admin/features", icon: Layers, label: "الميزات" },
@@ -103,6 +105,8 @@ export function AdminSidebar() {
                   "w-full h-10 px-3 text-slate-400 hover:text-white hover:bg-slate-800",
                   isCollapsed ? "justify-center px-0" : "justify-start gap-3",
                   isActive(item.href, item.exact) && "bg-slate-800 text-white",
+                  item.highlight && "text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10",
+                  item.highlight && isActive(item.href, item.exact) && "bg-cyan-500/20 text-cyan-300",
                 )}
                 title={isCollapsed ? item.label : undefined}
               >

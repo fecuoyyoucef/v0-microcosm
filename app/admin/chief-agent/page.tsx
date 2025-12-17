@@ -1,11 +1,27 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
-import { Activity, Brain, Shield, AlertTriangle, CheckCircle, RotateCcw, Eye, Settings, TrendingUp } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Activity,
+  Brain,
+  Shield,
+  AlertTriangle,
+  CheckCircle,
+  RotateCcw,
+  Eye,
+  Settings,
+  TrendingUp,
+  MessageSquare,
+  Send,
+  Bot,
+  User,
+} from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 export default function ChiefAgentPage() {
@@ -13,11 +29,19 @@ export default function ChiefAgentPage() {
   const [actions, setActions] = useState<any[]>([])
   const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [chatMessages, setChatMessages] = useState<{ role: string; content: string }[]>([])
+  const [chatInput, setChatInput] = useState("")
+  const [isChatting, setIsChatting] = useState(false)
+  const chatEndRef = useRef<HTMLDivElement>(null)
   const { toast } = useToast()
 
   useEffect(() => {
     loadData()
   }, [])
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [chatMessages])
 
   const loadData = async () => {
     try {
@@ -67,6 +91,43 @@ export default function ChiefAgentPage() {
         description: "فشل تحديث إعدادات الوكيل",
         variant: "destructive",
       })
+    }
+  }
+
+  const sendChatMessage = async () => {
+    if (!chatInput.trim() || isChatting) return
+
+    const userMessage = chatInput.trim()
+    setChatInput("")
+    setChatMessages((prev) => [...prev, { role: "user", content: userMessage }])
+    setIsChatting(true)
+
+    try {
+      const res = await fetch("/api/ai-agents/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: userMessage }),
+      })
+
+      const data = await res.json()
+
+      if (data.success) {
+        setChatMessages((prev) => [...prev, { role: "agent", content: data.response }])
+      } else {
+        toast({
+          title: "خطأ",
+          description: "فشل التواصل مع الوكيل",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "خطأ",
+        description: "فشل إرسال الرسالة",
+        variant: "destructive",
+      })
+    } finally {
+      setIsChatting(false)
     }
   }
 
@@ -143,6 +204,72 @@ export default function ChiefAgentPage() {
           </div>
         </div>
       </div>
+
+      <Card className="p-6">
+        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+          <MessageSquare className="w-5 h-5" />
+          تحدث مع الوكيل الرئيسي
+        </h2>
+        <div className="space-y-4">
+          <ScrollArea className="h-96 border rounded-lg p-4">
+            {chatMessages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
+                <Bot className="w-12 h-12 mb-3 text-cyan-500" />
+                <p>مرحباً! أنا الوكيل الرئيسي</p>
+                <p className="text-sm">اسألني عن أي شيء متعلق بالمنصة</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {chatMessages.map((msg, idx) => (
+                  <div key={idx} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                    {msg.role === "agent" && (
+                      <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center flex-shrink-0">
+                        <Bot className="w-5 h-5 text-cyan-500" />
+                      </div>
+                    )}
+                    <div
+                      className={`p-3 rounded-lg max-w-[70%] ${
+                        msg.role === "user" ? "bg-cyan-500 text-white" : "bg-muted"
+                      }`}
+                    >
+                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    </div>
+                    {msg.role === "user" && (
+                      <div className="w-8 h-8 rounded-full bg-slate-500/20 flex items-center justify-center flex-shrink-0">
+                        <User className="w-5 h-5 text-slate-400" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {isChatting && (
+                  <div className="flex gap-3 justify-start">
+                    <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center flex-shrink-0">
+                      <Bot className="w-5 h-5 text-cyan-500 animate-pulse" />
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted">
+                      <p className="text-sm text-muted-foreground">يكتب...</p>
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+            )}
+          </ScrollArea>
+          <div className="flex gap-2">
+            <Input
+              placeholder="اكتب رسالتك هنا..."
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyPress={(e) => e.key === "Enter" && sendChatMessage()}
+              disabled={isChatting}
+              className="flex-1"
+            />
+            <Button onClick={sendChatMessage} disabled={isChatting || !chatInput.trim()}>
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      </Card>
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
