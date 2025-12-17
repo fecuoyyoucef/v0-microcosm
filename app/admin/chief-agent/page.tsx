@@ -68,24 +68,38 @@ export default function ChiefAgentPage() {
 
   const toggleAgent = async (enabled: boolean) => {
     try {
+      setAgent((prev: any) => ({ ...prev, is_active: enabled }))
+
+      console.log("[v0] Toggling agent to:", enabled)
+
       const res = await fetch("/api/ai-agents/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           is_active: enabled,
-          capabilities: agent.capabilities,
-          confidence_threshold: agent.config?.confidence_threshold || 80,
+          capabilities: agent?.capabilities || [],
+          confidence_threshold: agent?.config?.confidence_threshold || 80,
         }),
       })
 
-      if (res.ok) {
+      const data = await res.json()
+
+      console.log("[v0] Toggle response:", data)
+
+      if (res.ok && data.success) {
+        setAgent(data.agent)
+
         toast({
           title: enabled ? "تم تفعيل الوكيل الرئيسي" : "تم إيقاف الوكيل الرئيسي",
           description: enabled ? "الوكيل الآن نشط ويراقب النظام" : "الوكيل متوقف مؤقتاً",
         })
-        loadData()
+      } else {
+        setAgent((prev: any) => ({ ...prev, is_active: !enabled }))
+        throw new Error(data.error || "فشل التحديث")
       }
     } catch (error) {
+      console.error("[v0] Toggle agent error:", error)
+      setAgent((prev: any) => ({ ...prev, is_active: !enabled }))
       toast({
         title: "خطأ",
         description: "فشل تحديث إعدادات الوكيل",
@@ -102,6 +116,8 @@ export default function ChiefAgentPage() {
     setChatMessages((prev) => [...prev, { role: "user", content: userMessage }])
     setIsChatting(true)
 
+    console.log("[v0] Sending message to agent:", userMessage)
+
     try {
       const res = await fetch("/api/ai-agents/chat", {
         method: "POST",
@@ -111,16 +127,27 @@ export default function ChiefAgentPage() {
 
       const data = await res.json()
 
-      if (data.success) {
+      console.log("[v0] Chat response:", data)
+
+      if (data.response) {
         setChatMessages((prev) => [...prev, { role: "agent", content: data.response }])
       } else {
+        setChatMessages((prev) => [
+          ...prev,
+          { role: "agent", content: "عذراً، حدث خطأ أثناء معالجة رسالتك. يرجى المحاولة مرة أخرى." },
+        ])
         toast({
           title: "خطأ",
-          description: "فشل التواصل مع الوكيل",
+          description: data.error || "فشل التواصل مع الوكيل",
           variant: "destructive",
         })
       }
     } catch (error) {
+      console.error("[v0] Chat error:", error)
+      setChatMessages((prev) => [
+        ...prev,
+        { role: "agent", content: "عذراً، فشل الاتصال. يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى." },
+      ])
       toast({
         title: "خطأ",
         description: "فشل إرسال الرسالة",

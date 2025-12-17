@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const {
       data: { user },
@@ -18,8 +18,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Only owner can access settings" }, { status: 403 })
     }
 
+    console.log("[v0] Fetching Chief Agent settings")
+
     // Get Chief Agent settings
-    const { data: agent } = await supabase.from("ai_agents").select("*").eq("agent_type", "chief").single()
+    const { data: agent, error } = await supabase.from("ai_agents").select("*").eq("agent_type", "chief").single()
+
+    if (error) {
+      console.error("[v0] Error fetching agent:", error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    console.log("[v0] Agent fetched:", agent)
 
     return NextResponse.json({ agent })
   } catch (error: any) {
@@ -30,7 +39,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const {
       data: { user },
@@ -47,20 +56,26 @@ export async function POST(request: NextRequest) {
 
     const { is_active, capabilities, confidence_threshold } = await request.json()
 
+    console.log("[v0] Updating Chief Agent settings:", { is_active, capabilities, confidence_threshold })
+
     const { data, error } = await supabase
       .from("ai_agents")
       .update({
         is_active,
-        capabilities,
-        config: { confidence_threshold },
+        capabilities: capabilities || [],
+        config: { confidence_threshold: confidence_threshold || 80 },
+        updated_at: new Date().toISOString(),
       })
       .eq("agent_type", "chief")
       .select()
       .single()
 
     if (error) {
+      console.error("[v0] Error updating agent:", error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
+
+    console.log("[v0] Agent updated successfully:", data)
 
     return NextResponse.json({ success: true, agent: data })
   } catch (error: any) {
