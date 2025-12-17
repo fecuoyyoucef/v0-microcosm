@@ -10,6 +10,7 @@ import { AnimatedBackground, type BackgroundStyle } from "@/components/backgroun
 import { useRealtimePresence } from "@/hooks/use-realtime-presence"
 import { TypingIndicator } from "./typing-indicator"
 import { OnlineIndicator } from "./online-indicator"
+import { ImportantMessageToast } from "./important-message-toast"
 import type { Group, GroupMember, Message, MessageLayer, ConversationNode, GroupSettings } from "@/lib/types"
 
 interface ChatContainerProps {
@@ -34,6 +35,7 @@ export function ChatContainer({
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
+  const [importantMessageToasts, setImportantMessageToasts] = useState<Message[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
   const isMounted = useRef(true)
@@ -181,6 +183,17 @@ export function ChatContainer({
           if (pendingMessageIds.current.has(newMsg.id)) {
             pendingMessageIds.current.delete(newMsg.id)
             return
+          }
+
+          if (newMsg.layer === "upper" && newMsg.sender_id !== currentUserId) {
+            const { data: senderProfile } = await supabase
+              .from("profiles")
+              .select("id, display_name, avatar_url")
+              .eq("id", newMsg.sender_id)
+              .single()
+
+            const messageWithSender = { ...newMsg, sender: senderProfile } as Message
+            setImportantMessageToasts((prev) => [...prev, messageWithSender])
           }
 
           if (newMsg.sender_id === currentUserId) {
@@ -388,8 +401,16 @@ export function ChatContainer({
     allow_smart_summary: true,
   }
 
+  const removeImportantToast = (messageId: string) => {
+    setImportantMessageToasts((prev) => prev.filter((m) => m.id !== messageId))
+  }
+
   return (
     <div className="relative flex flex-col h-full w-full overflow-hidden">
+      {importantMessageToasts.map((message) => (
+        <ImportantMessageToast key={message.id} message={message} onClose={() => removeImportantToast(message.id)} />
+      ))}
+
       {group.background_style && group.background_style !== "none" && (
         <div className="absolute inset-0 z-0 pointer-events-none">
           <AnimatedBackground style={(group.background_style as BackgroundStyle) || "neural_mesh"} />
