@@ -1,30 +1,54 @@
+"use client"
+
 import type React from "react"
-import { createClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
 import { AdminSidebar } from "@/components/admin/admin-sidebar"
+import { useState, useEffect } from "react"
+import { Button } from "@/components/ui/button"
+import { Menu, X } from "lucide-react"
 
-export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
-  if (!user) {
-    redirect("/auth/login")
-  }
-
-  const { data: adminData } = await supabase.from("admins").select("role, is_active").eq("email", user.email).single()
-
-  if (!adminData || !adminData.is_active || (adminData.role !== "super_admin" && adminData.role !== "admin")) {
-    redirect("/chat")
-  }
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      const handleClickOutside = () => setIsMobileMenuOpen(false)
+      document.addEventListener("click", handleClickOutside)
+      return () => document.removeEventListener("click", handleClickOutside)
+    }
+  }, [isMobileMenuOpen])
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col md:flex-row" dir="rtl">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="fixed top-4 right-4 z-50 md:hidden bg-slate-900/80 backdrop-blur-sm text-white hover:bg-slate-800"
+        onClick={(e) => {
+          e.stopPropagation()
+          setIsMobileMenuOpen(!isMobileMenuOpen)
+        }}
+      >
+        {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+      </Button>
+
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setIsMobileMenuOpen(false)} />
+      )}
+
       <div className="hidden md:block">
         <AdminSidebar />
       </div>
-      <main className="flex-1 min-h-screen overflow-auto w-full">{children}</main>
+
+      <div
+        className={`fixed top-0 right-0 h-full z-50 md:hidden transition-transform duration-300 ${
+          isMobileMenuOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <AdminSidebar />
+      </div>
+
+      <main className="flex-1 min-h-screen overflow-auto w-full pt-16 md:pt-0">{children}</main>
     </div>
   )
 }
