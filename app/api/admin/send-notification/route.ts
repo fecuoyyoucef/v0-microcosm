@@ -1,24 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
-
-let webpushConfigured = false
-
-async function getWebPush() {
-  const webpush = (await import("web-push")).default
-
-  if (!webpushConfigured && process.env.VAPID_PRIVATE_KEY) {
-    const vapidPublicKey =
-      process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
-      "BDj8yhVUy0-Ued2Dw4joucx73R8-0HOjAcL5XeUGwxvp_KPrp1uBeFxvmGVXN2pvCnKtR_MG5pSPv0wx3f_OKzs"
-    const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY.trim()
-
-    webpush.setVapidDetails("mailto:youcef192837@gmail.com", vapidPublicKey, vapidPrivateKey)
-    webpushConfigured = true
-  }
-
-  return webpush
-}
+import { sendPushNotification } from "@/lib/firebase-admin-server"
 
 async function verifyAdmin() {
   const cookieStore = await cookies()
@@ -81,49 +64,52 @@ export async function POST(request: Request) {
     }
 
     let pushSentCount = 0
+    let pushFailedCount = 0
 
-    if (process.env.VAPID_PRIVATE_KEY) {
-      try {
-        const webpush = await getWebPush()
+    try {
+      // Get all FCM tokens
+      const { data: fcmTokens, error: tokensError } = await supabase.from("fcm_tokens").select("token, user_id")
 
-        // Get all push subscriptions
-        const { data: allSubscriptions } = await supabase.from("push_subscriptions").select("*")
+      if (tokensError) {
+        console.error("[Admin] Error fetching FCM tokens:", tokensError)
+      }
 
-        if (allSubscriptions && allSubscriptions.length > 0) {
-          const payload = JSON.stringify({
-            title: title || "Synaptic Space",
-            body: body || "لديك إشعار جديد",
-            icon: "/icons/icon-192x192.png",
-            badge: "/icons/icon-72x72.png",
-            url: actionUrl || "/chat/notifications",
-            tag: "admin-notification",
-            priority: priority || "normal",
-          })
+      if (fcmTokens && fcmTokens.length > 0) {
+        console.log(`[Admin] Sending push to ${fcmTokens.length} FCM tokens`)
 
-          for (const sub of allSubscriptions) {
-            try {
-              await webpush.sendNotification(
-                {
-                  endpoint: sub.endpoint,
-                  keys: {
-                    p256dh: sub.p256dh,
-                    auth: sub.auth,
-                  },
-                },
-                payload,
-              )
+        // Send to each token
+        for (const { token, user_id } of fcmTokens) {
+          try {
+            const result = await sendPushNotification(token, {
+              title: title || "Synaptic Space",
+              body: body || "لديك إشعار جديد",
+              data: {
+                url: actionUrl || "/chat/notifications",
+                priority: priority || "normal",
+                type: "admin_notification",
+              },
+            })
+
+            if (result.success) {
               pushSentCount++
-            } catch (err: any) {
-              // Remove invalid subscriptions
-              if (err.statusCode === 410 || err.statusCode === 404) {
-                await supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint)
+            } else {
+              pushFailedCount++
+              // Remove invalid token
+              if (result.error?.includes("not-registered") || result.error?.includes("invalid")) {
+                await supabase.from("fcm_tokens").delete().eq("token", token)
+                console.log(`[Admin] Removed invalid FCM token for user ${user_id}`)
               }
             }
+          } catch (err) {
+            console.error(`[Admin] FCM send error for user ${user_id}:`, err)
+            pushFailedCount++
           }
         }
-      } catch (pushError) {
-        console.error("[Admin] Push notification error:", pushError)
+      } else {
+        console.log("[Admin] No FCM tokens found")
       }
+    } catch (pushError) {
+      console.error("[Admin] Push notification error:", pushError)
     }
 
     // Log admin activity
@@ -132,7 +118,13 @@ export async function POST(request: Request) {
         admin_id: admin.id,
         action_type: "send_notification",
         description: `إرسال إشعار: ${title}`,
-        metadata: { recipients: users.length, pushSent: pushSentCount, target, priority },
+        metadata: {
+          recipients: users.length,
+          pushSent: pushSentCount,
+          pushFailed: pushFailedCount,
+          target,
+          priority,
+        },
       })
     } catch (e) {
       // Table may not exist
@@ -142,6 +134,7 @@ export async function POST(request: Request) {
       success: true,
       recipientsCount: users.length,
       pushSentCount,
+      pushFailedCount,
     })
   } catch (error) {
     console.error("[Admin] Send notification error:", error)
