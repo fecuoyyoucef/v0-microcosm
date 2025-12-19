@@ -1,7 +1,7 @@
 importScripts("https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js")
 importScripts("https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js")
 
-const firebase = self.firebase // Declare the firebase variable
+const firebase = self.firebase
 
 firebase.initializeApp({
   apiKey: "AIzaSyDGnypzhn6NjY4g6LtQY3DBv05BfQgOcow",
@@ -14,7 +14,28 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging()
 
-// معالجة الرسائل في background
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close()
+
+  const urlToOpen = event.notification.data?.url || "/"
+
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      // Check if there is already a window/tab open with the target URL
+      for (let i = 0; i < windowClients.length; i++) {
+        const client = windowClients[i]
+        if (client.url === urlToOpen && "focus" in client) {
+          return client.focus()
+        }
+      }
+      // If not, open a new window/tab
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen)
+      }
+    }),
+  )
+})
+
 messaging.onBackgroundMessage((payload) => {
   console.log("[FCM SW] Background message received:", payload)
 
