@@ -3,7 +3,9 @@ import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: Request) {
   try {
-    const { token, platform } = await request.json()
+    const { token, device_info } = await request.json()
+
+    console.log("[v0] [FCM API] Subscription request received")
 
     if (!token) {
       return NextResponse.json({ error: "Token required" }, { status: 400 })
@@ -16,27 +18,34 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser()
 
     if (!user) {
+      console.log("[v0] [FCM API] Unauthorized - no user")
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // حفظ FCM token في database
+    console.log("[v0] [FCM API] Saving token for user:", user.id)
+
     const { error } = await supabase.from("fcm_tokens").upsert(
       {
         user_id: user.id,
         token: token,
-        platform: platform || "web",
+        device_info: device_info || {},
         updated_at: new Date().toISOString(),
+        last_used_at: new Date().toISOString(),
       },
       {
         onConflict: "user_id,token",
       },
     )
 
-    if (error) throw error
+    if (error) {
+      console.error("[v0] [FCM API] Database error:", error)
+      throw error
+    }
 
+    console.log("[v0] [FCM API] Token saved successfully")
     return NextResponse.json({ success: true })
   } catch (error: any) {
-    console.error("[FCM] Subscription error:", error)
+    console.error("[v0] [FCM API] Subscription error:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

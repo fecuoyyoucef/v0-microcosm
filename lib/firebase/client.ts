@@ -48,25 +48,38 @@ export function getFirebaseClientMessaging() {
 
 export async function requestFCMToken(): Promise<string | null> {
   try {
-    const messaging = getFirebaseClientMessaging()
-    if (!messaging) return null
+    console.log("[v0] [FCM Client] Requesting FCM token...")
 
-    const vapidKey = await getFirebaseVapidKey()
-    if (!vapidKey) {
-      console.error("[FCM] VAPID key not configured in environment variables")
+    const messaging = getFirebaseClientMessaging()
+    if (!messaging) {
+      console.error("[v0] [FCM Client] Messaging not available")
       return null
     }
 
+    const vapidKey = await getFirebaseVapidKey()
+    if (!vapidKey) {
+      console.error("[v0] [FCM Client] VAPID key not configured")
+      return null
+    }
+
+    console.log("[v0] [FCM Client] Waiting for service worker...")
     const registration = await navigator.serviceWorker.ready
+    console.log("[v0] [FCM Client] Service worker ready, getting token...")
+
     const token = await getToken(messaging, {
       vapidKey,
       serviceWorkerRegistration: registration,
     })
 
-    console.log("[FCM] Token obtained successfully")
-    return token
+    if (token) {
+      console.log("[v0] [FCM Client] Token obtained successfully:", token.substring(0, 20) + "...")
+      return token
+    } else {
+      console.error("[v0] [FCM Client] No token received")
+      return null
+    }
   } catch (error) {
-    console.error("[FCM] Error getting token:", error)
+    console.error("[v0] [FCM Client] Error getting token:", error)
     return null
   }
 }
