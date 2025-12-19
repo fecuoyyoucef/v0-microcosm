@@ -22,7 +22,7 @@ async function getWebPush() {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { userId, userIds, title, body: messageBody, url, data } = body
+    const { userId, userIds, title, body: messageBody, url, data, useFCM } = body
 
     const targetUserIds = userIds || (userId ? [userId] : [])
 
@@ -33,6 +33,21 @@ export async function POST(request: Request) {
     if (!process.env.VAPID_PRIVATE_KEY) {
       console.error("[Push] VAPID_PRIVATE_KEY not configured")
       return NextResponse.json({ error: "Push notifications not configured" }, { status: 500 })
+    }
+
+    if (useFCM && process.env.FIREBASE_SERVICE_ACCOUNT) {
+      // إرسال عبر Firebase FCM
+      const fcmResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/push/send-fcm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+
+      if (fcmResponse.ok) {
+        return fcmResponse
+      }
+
+      console.warn("[Push] FCM failed, falling back to Web Push")
     }
 
     const webpush = await getWebPush()
