@@ -42,6 +42,11 @@ export async function POST(request: NextRequest) {
     const tokenStrings = tokens.map((t) => t.token)
     const result = await sendPushNotificationToMany(tokenStrings, title, messageBody, data)
 
+    if (result.invalidTokens && result.invalidTokens.length > 0) {
+      console.log(`[API] Deleting ${result.invalidTokens.length} invalid tokens`)
+      await supabase.from("fcm_tokens").delete().in("token", result.invalidTokens)
+    }
+
     return NextResponse.json({
       success: true,
       ...result,
