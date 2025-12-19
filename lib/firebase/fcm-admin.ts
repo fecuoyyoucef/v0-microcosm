@@ -3,6 +3,11 @@ import * as admin from "firebase-admin"
 let app: admin.app.App | undefined
 
 export function getFirebaseAdmin() {
+  // Only run on server
+  if (typeof window !== "undefined") {
+    throw new Error("Firebase Admin SDK cannot be used in client-side code")
+  }
+
   if (app) return app
 
   try {
@@ -14,6 +19,12 @@ export function getFirebaseAdmin() {
     }
 
     const serviceAccountJSON = JSON.parse(serviceAccount)
+
+    // Check if already initialized
+    if (admin.apps.length > 0) {
+      app = admin.apps[0]
+      return app
+    }
 
     app = admin.initializeApp({
       credential: admin.credential.cert(serviceAccountJSON),
@@ -37,6 +48,11 @@ export async function sendFCMNotification(
   },
   data?: Record<string, string>,
 ) {
+  // Only run on server
+  if (typeof window !== "undefined") {
+    throw new Error("sendFCMNotification can only be called from server-side code")
+  }
+
   try {
     const app = getFirebaseAdmin()
     if (!app) {

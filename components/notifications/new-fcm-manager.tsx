@@ -10,6 +10,8 @@ export function NewFCMManager() {
   const [isInitialized, setIsInitialized] = useState(false)
 
   useEffect(() => {
+    // Only run in browser
+    if (typeof window === "undefined") return
     if (!user || isInitialized) return
 
     async function initializeFCM() {
@@ -18,6 +20,11 @@ export function NewFCMManager() {
 
         // Get VAPID key from server
         const configRes = await fetch("/api/firebase-config")
+        if (!configRes.ok) {
+          console.error("[FCM Manager] Failed to fetch config")
+          return
+        }
+
         const config = await configRes.json()
 
         if (!config.vapidKey) {

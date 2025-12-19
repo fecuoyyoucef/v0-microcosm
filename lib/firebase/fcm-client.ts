@@ -15,16 +15,25 @@ const firebaseConfig = {
 let app: FirebaseApp | undefined
 let messaging: Messaging | undefined
 
-// Initialize Firebase
+// Initialize Firebase only in browser
 export function getFirebaseApp() {
-  if (!app && typeof window !== "undefined") {
-    app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
+  if (typeof window === "undefined") return null
+
+  if (!app) {
+    try {
+      app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
+    } catch (error) {
+      console.error("[FCM] Error initializing app:", error)
+      return null
+    }
   }
   return app
 }
 
 // Get FCM Token
 export async function getFCMToken(vapidKey: string): Promise<string | null> {
+  if (typeof window === "undefined") return null
+
   try {
     const app = getFirebaseApp()
     if (!app) {
@@ -32,9 +41,15 @@ export async function getFCMToken(vapidKey: string): Promise<string | null> {
       return null
     }
 
+    // Check if service worker is supported
+    if (!("serviceWorker" in navigator)) {
+      console.warn("[FCM] Service Worker not supported")
+      return null
+    }
+
     // Register service worker
     const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js")
-    console.log("[FCM] Service Worker registered:", registration)
+    console.log("[FCM] Service Worker registered")
 
     // Get messaging instance
     messaging = getMessaging(app)
@@ -64,6 +79,8 @@ export async function getFCMToken(vapidKey: string): Promise<string | null> {
 
 // Listen for foreground messages
 export function onFCMMessage(callback: (payload: any) => void) {
+  if (typeof window === "undefined") return
+
   try {
     const app = getFirebaseApp()
     if (!app) return
