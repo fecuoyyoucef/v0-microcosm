@@ -4,66 +4,109 @@
 importScripts("https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js")
 importScripts("https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js")
 
-// Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyDGnypzhn6NjY4g6LtQY3DBv05BfQgOcow",
-  authDomain: "synaptic-space-ef0ae.firebaseapp.com",
-  projectId: "synaptic-space-ef0ae",
-  storageBucket: "synaptic-space-ef0ae.firebasestorage.app",
-  messagingSenderId: "368632292580",
-  appId: "1:368632292580:web:eb15c15a4f41dda0b4b8f1",
-}
+const firebase = self.firebase // Declare the firebase variable
 
-// Declare Firebase variable
-const firebase = self.firebase
+let messaging = null
+let isInitialized = false
 
 // Initialize Firebase
-firebase.initializeApp(firebaseConfig)
+async function initializeFirebase() {
+  if (isInitialized) return
 
-// Get messaging instance
-const messaging = firebase.messaging()
+  try {
+    console.log("[SW] Fetching Firebase config...")
 
-// Handle background messages
-messaging.onBackgroundMessage((payload) => {
-  console.log("[SW] Background message received:", payload)
+    // جلب Firebase config من API
+    const response = await fetch("/api/firebase/config")
+    if (!response.ok) {
+      throw new Error(`Failed to fetch config: ${response.status}`)
+    }
 
-  const notificationTitle = payload.notification?.title || "إشعار جديد"
-  const notificationOptions = {
-    body: payload.notification?.body || "",
-    icon: "/icons/icon-192x192.png",
-    badge: "/icons/icon-72x72.png",
-    vibrate: [200, 100, 200],
-    data: payload.data || {},
-    requireInteraction: true,
-    tag: payload.data?.tag || "default",
+    const config = await response.json()
+    console.log("[SW] Firebase config loaded:", { projectId: config.projectId })
+
+    // Initialize Firebase
+    firebase.initializeApp(config)
+    messaging = firebase.messaging()
+    isInitialized = true
+
+    console.log("[SW] Firebase initialized successfully")
+
+    // Handle background messages
+    messaging.onBackgroundMessage((payload) => {
+      console.log("[SW] Background message received:", payload)
+
+      const notificationTitle = payload.notification?.title || payload.data?.title || "إشعار جديد"
+      const notificationBody = payload.notification?.body || payload.data?.body || ""
+
+      const notificationOptions = {
+        body: notificationBody,
+        icon: "/icons/icon-192x192.png", // أيقونة كبيرة ملونة
+        badge: "/icons/icon-96x96.png", // شارة صغيرة
+        image: payload.data?.image || undefined, // صورة إضافية إن وجدت
+        vibrate: [200, 100, 200],
+        data: payload.data || {},
+        requireInteraction: false, // السماح بإخفاء الإشعار تلقائياً
+        tag: payload.data?.tag || `notification-${Date.now()}`,
+        // إضافة actions للإشعارات
+        actions: [
+          {
+            action: "open",
+            title: "فتح",
+            icon: "/icons/icon-72x72.png",
+          },
+        ],
+      }
+
+      console.log("[SW] Showing notification:", notificationTitle)
+      return self.registration.showNotification(notificationTitle, notificationOptions)
+    })
+  } catch (error) {
+    console.error("[SW] Firebase initialization error:", error)
   }
+}
 
-  self.registration.showNotification(notificationTitle, notificationOptions)
+// Initialize on activate
+self.addEventListener("activate", (event) => {
+  console.log("[SW] Service Worker activated")
+  event.waitUntil(initializeFirebase())
+})
+
+// Initialize on install
+self.addEventListener("install", (event) => {
+  console.log("[SW] Service Worker installed")
+  event.waitUntil(self.skipWaiting())
 })
 
 // Handle notification click
 self.addEventListener("notificationclick", (event) => {
-  console.log("[SW] Notification clicked:", event)
+  console.log("[SW] Notification clicked:", event.action)
 
   event.notification.close()
 
-  const url = event.notification.data?.url || "/"
+  // التعامل مع action buttons
+  if (event.action === "open" || !event.action) {
+    const url = event.notification.data?.url || "/"
+    const fullUrl = url.startsWith("http") ? url : self.location.origin + url
 
-  event.waitUntil(
-    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
-      // Check if there's already a window open
-      for (const client of clientList) {
-        if (client.url.includes(self.location.origin) && "focus" in client) {
-          client.navigate(url)
-          return client.focus()
+    event.waitUntil(
+      clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+        for (const client of clientList) {
+          if (client.url.startsWith(self.location.origin)) {
+            client.navigate(fullUrl)
+            return client.focus()
+          }
         }
-      }
-      // Open new window if no existing window
-      if (clients.openWindow) {
-        return clients.openWindow(url)
-      }
-    }),
-  )
+
+        if (clients.openWindow) {
+          return clients.openWindow(fullUrl)
+        }
+      }),
+    )
+  }
 })
+
+// Try to initialize immediately
+initializeFirebase()
 
 console.log("[SW] Firebase Messaging Service Worker loaded")

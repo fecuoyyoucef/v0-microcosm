@@ -397,25 +397,27 @@ export function ChatContainer({
           const recipientIds = members.filter((m) => m.user_id !== currentUserId).map((m) => m.user_id)
 
           if (recipientIds.length > 0) {
-            fetch("/api/push/send-fcm", {
+            fetch("/api/notifications/send-push", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 userIds: recipientIds,
                 title: `${currentProfile?.display_name || "مستخدم"} في ${group.name}`,
-                body: content.substring(0, 100),
+                body: content.substring(0, 150),
                 data: {
                   url: `/chat/${groupId}`,
                   groupId,
                   groupName: group.name,
+                  senderId: currentUserId,
+                  senderName: currentProfile?.display_name || "مستخدم",
+                  messageId: data.id,
                   type: "new_message",
-                  priority: layer === "upper" ? "high" : "normal",
                 },
               }),
-            }).catch((err) => console.error("Failed to send FCM:", err))
+            }).catch((err) => console.error("Failed to send push notification:", err))
           }
         } catch (err) {
-          console.error("FCM send error:", err)
+          console.error("Push notification error:", err)
         }
       }
     }
