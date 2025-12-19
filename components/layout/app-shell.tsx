@@ -43,7 +43,7 @@ import type { Group, Profile } from "@/lib/types"
 import { useTheme } from "next-themes"
 import { useSettings } from "@/components/settings-provider"
 import { PushNotificationManager } from "@/components/notifications/push-notification-manager"
-import { FCMNotificationManager } from "@/components/notifications/fcm-notification-manager"
+import { FirebasePushManager } from "@/components/notifications/firebase-push-manager"
 
 interface AppShellProps {
   children: React.ReactNode
@@ -417,7 +417,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
   return (
     <TooltipProvider delayDuration={0}>
       <PushNotificationManager userId={userId} />
-      <FCMNotificationManager userId={userId} />
+      <FirebasePushManager userId={userId} />
 
       <div
         className="relative h-dvh flex bg-background overflow-hidden"
