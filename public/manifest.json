@@ -54,7 +54,7 @@
   "screenshots": [
     {
       "src": "/screenshots/mobile-chat.png",
-      "sizes": "1080x2400",
+      "sizes": "720x1600",
       "type": "image/png",
       "form_factor": "narrow",
       "label": "المحادثات - الموبايل"
