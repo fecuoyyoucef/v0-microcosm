@@ -38,6 +38,26 @@ export async function sendNotification(params: SendNotificationParams) {
     return { success: false, error: error.message }
   }
 
+  try {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://v0-synaptic-space.vercel.app"
+    const pushResponse = await fetch(`${appUrl}/api/notifications/send-push`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userIds: recipients,
+        title: params.title,
+        body: params.body || "",
+        data: params.data || {},
+      }),
+    })
+
+    if (!pushResponse.ok) {
+      console.error("Push notification failed:", await pushResponse.text())
+    }
+  } catch (error) {
+    console.error("Push notification error:", error)
+  }
+
   return { success: true, count: data.length }
 }
 

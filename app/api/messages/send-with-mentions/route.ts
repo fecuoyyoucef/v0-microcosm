@@ -49,29 +49,27 @@ export async function POST(request: Request) {
         console.log("[v0] Created", notifications.length, "mention notifications")
       }
 
-      // Try to send push notifications
       try {
-        const pushResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/push/send`, {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://v0-synaptic-space.vercel.app"
+        const pushResponse = await fetch(`${appUrl}/api/notifications/send-push`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             userIds: mentionedUsers,
             title: `${senderProfile?.display_name || "Someone"} أشار إليك في ${groupData?.name || "مجموعة"}`,
-            body: content.substring(0, 100),
+            body: content.substring(0, 150),
             data: {
               url: `/chat/${groupId}`,
               groupId,
               type: "mention",
             },
-            badge: "/images/logo.png",
-            icon: "/images/logo.png",
           }),
         })
 
         if (!pushResponse.ok) {
           console.error("[v0] Push notification failed:", await pushResponse.text())
         } else {
-          console.log("[v0] Push notifications sent successfully")
+          console.log("[v0] Firebase push notifications sent successfully")
         }
       } catch (error) {
         console.error("[v0] Push notification error:", error)
