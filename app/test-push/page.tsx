@@ -148,6 +148,7 @@ export default function TestPushPage() {
   const sendTestNotification = async () => {
     setLoading(true)
     try {
+      console.log("[Test] Sending test notification...")
       const response = await fetch("/api/admin/send-notification", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -159,8 +160,10 @@ export default function TestPushPage() {
       })
 
       const data = await response.json()
+      console.log("[Test] Response:", data)
       setStatus((prev) => ({ ...prev, testSendResult: data }))
     } catch (error: any) {
+      console.error("[Test] Error:", error)
       setStatus((prev) => ({ ...prev, testSendError: error.message }))
     }
     setLoading(false)
@@ -276,6 +279,12 @@ export default function TestPushPage() {
             <div className="p-3 bg-muted rounded-md">
               <strong>نتيجة الإرسال:</strong>
               <pre className="text-xs mt-2">{JSON.stringify(status.testSendResult, null, 2)}</pre>
+            </div>
+          )}
+
+          {status.testSendError && (
+            <div className="p-3 bg-destructive/10 text-destructive rounded-md">
+              <strong>خطأ في الإرسال:</strong> {status.testSendError}
             </div>
           )}
 

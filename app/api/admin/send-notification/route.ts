@@ -80,25 +80,20 @@ export async function POST(request: Request) {
         // Send to each token
         for (const { token, user_id } of fcmTokens) {
           try {
-            const result = await sendPushNotification(token, {
-              title: title || "Synaptic Space",
-              body: body || "لديك إشعار جديد",
-              data: {
-                url: actionUrl || "/chat/notifications",
-                priority: priority || "normal",
-                type: "admin_notification",
-              },
+            const result = await sendPushNotification(token, title || "Synaptic Space", body || "لديك إشعار جديد", {
+              url: actionUrl || "/chat/notifications",
+              priority: priority || "normal",
+              type: "admin_notification",
             })
 
-            if (result.success) {
+            if (result) {
               pushSentCount++
+              console.log(`[Admin] FCM sent successfully to user ${user_id}`)
             } else {
               pushFailedCount++
               // Remove invalid token
-              if (result.error?.includes("not-registered") || result.error?.includes("invalid")) {
-                await supabase.from("fcm_tokens").delete().eq("token", token)
-                console.log(`[Admin] Removed invalid FCM token for user ${user_id}`)
-              }
+              await supabase.from("fcm_tokens").delete().eq("token", token)
+              console.log(`[Admin] Removed invalid FCM token for user ${user_id}`)
             }
           } catch (err) {
             console.error(`[Admin] FCM send error for user ${user_id}:`, err)
