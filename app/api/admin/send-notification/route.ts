@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
-import { sendPushNotification } from "@/lib/firebase-admin-server"
+import { sendPushNotificationToMany } from "@/lib/firebase-admin-server"
 
 async function verifyAdmin() {
   const cookieStore = await cookies()
@@ -67,7 +67,6 @@ export async function POST(request: Request) {
     let pushFailedCount = 0
 
     try {
-      // Get all FCM tokens
       const { data: fcmTokens, error: tokensError } = await supabase.from("fcm_tokens").select("token, user_id")
 
       if (tokensError) {
@@ -77,29 +76,23 @@ export async function POST(request: Request) {
       if (fcmTokens && fcmTokens.length > 0) {
         console.log(`[Admin] Sending push to ${fcmTokens.length} FCM tokens`)
 
-        // Send to each token
-        for (const { token, user_id } of fcmTokens) {
-          try {
-            const result = await sendPushNotification(token, title || "Synaptic Space", body || "لديك إشعار جديد", {
-              url: actionUrl || "/chat/notifications",
-              priority: priority || "normal",
-              type: "admin_notification",
-            })
+        const tokens = fcmTokens.map((t) => t.token)
 
-            if (result) {
-              pushSentCount++
-              console.log(`[Admin] FCM sent successfully to user ${user_id}`)
-            } else {
-              pushFailedCount++
-              // Remove invalid token
-              await supabase.from("fcm_tokens").delete().eq("token", token)
-              console.log(`[Admin] Removed invalid FCM token for user ${user_id}`)
-            }
-          } catch (err) {
-            console.error(`[Admin] FCM send error for user ${user_id}:`, err)
-            pushFailedCount++
-          }
+        const result = await sendPushNotificationToMany(tokens, title || "Synaptic Space", body || "لديك إشعار جديد", {
+          url: actionUrl || "/chat/notifications",
+          priority: priority || "normal",
+          type: "admin_notification",
+        })
+
+        pushSentCount = result.success
+        pushFailedCount = result.failure
+
+        if (result.invalidTokens && result.invalidTokens.length > 0) {
+          await supabase.from("fcm_tokens").delete().in("token", result.invalidTokens)
+          console.log(`[Admin] Removed ${result.invalidTokens.length} invalid tokens`)
         }
+
+        console.log(`[Admin] Push sent: ${pushSentCount} success, ${pushFailedCount} failed`)
       } else {
         console.log("[Admin] No FCM tokens found")
       }
