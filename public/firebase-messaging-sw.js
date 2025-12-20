@@ -38,17 +38,38 @@ async function initializeFirebase() {
 
       const notificationTitle = payload.notification?.title || payload.data?.title || "إشعار جديد"
       const notificationBody = payload.notification?.body || payload.data?.body || ""
+      const notificationType = payload.data?.type || "system"
+
+      const iconMap = {
+        new_message: "💬",
+        mention: "@",
+        reaction: "❤️",
+        group_invite: "👥",
+        group_join: "✅",
+        group_leave: "👋",
+        decision_created: "🗳️",
+        decision_closed: "✅",
+        memory_generated: "🧠",
+        system: "📢",
+      }
 
       const notificationOptions = {
         body: notificationBody,
-        icon: "/icons/icon-192x192.png", // أيقونة كبيرة ملونة
-        badge: "/icons/icon-96x96.png", // شارة صغيرة
-        image: payload.data?.image || undefined, // صورة إضافية إن وجدت
+        icon: "/icons/icon-192x192.png",
+        badge: "/icons/icon-96x96.png",
+        image: payload.data?.image || undefined,
         vibrate: [200, 100, 200],
-        data: payload.data || {},
-        requireInteraction: false, // السماح بإخفاء الإشعار تلقائياً
+        data: {
+          ...payload.data,
+          url:
+            payload.data?.action_url ||
+            (payload.data?.group_id ? `/chat/${payload.data.group_id}` : "/chat/notifications"),
+          notificationId: payload.data?.notification_id,
+          type: notificationType,
+        },
+        requireInteraction: payload.data?.priority === "high",
         tag: payload.data?.tag || `notification-${Date.now()}`,
-        // إضافة actions للإشعارات
+        body: `${iconMap[notificationType] || "🔔"} ${notificationBody}`,
         actions: [
           {
             action: "open",
@@ -58,7 +79,7 @@ async function initializeFirebase() {
         ],
       }
 
-      console.log("[SW] Showing notification:", notificationTitle)
+      console.log("[SW] Showing notification with type:", notificationType)
       return self.registration.showNotification(notificationTitle, notificationOptions)
     })
   } catch (error) {

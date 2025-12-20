@@ -75,7 +75,6 @@ export default function NotificationsPage() {
   useEffect(() => {
     checkUser()
 
-    // Check notification permission
     if ("Notification" in window) {
       setNotificationPermission(Notification.permission)
     }
@@ -99,7 +98,11 @@ export default function NotificationsPage() {
 
     const { data, error } = await supabase
       .from("notifications")
-      .select("*")
+      .select(`
+        *,
+        sender:profiles!sender_id(id, display_name, avatar_url),
+        group:groups!group_id(id, name, avatar_url)
+      `)
       .eq("user_id", uid)
       .order("created_at", { ascending: false })
 
@@ -108,39 +111,10 @@ export default function NotificationsPage() {
       return
     }
 
-    console.log("[v0] Page: Fetched notifications:", data?.length || 0, data)
+    console.log("[v0] Page: Fetched notifications:", data?.length || 0, "notifications of various types")
 
     if (data) {
-      // Fetch related data separately to handle nulls
-      const notificationsWithRelations = await Promise.all(
-        data.map(async (notif) => {
-          let sender = null
-          let group = null
-
-          if (notif.sender_id) {
-            const { data: senderData } = await supabase
-              .from("profiles")
-              .select("id, display_name, avatar_url")
-              .eq("id", notif.sender_id)
-              .single()
-            sender = senderData
-          }
-
-          if (notif.group_id) {
-            const { data: groupData } = await supabase
-              .from("groups")
-              .select("id, name, avatar_url")
-              .eq("id", notif.group_id)
-              .single()
-            group = groupData
-          }
-
-          return { ...notif, sender, group }
-        }),
-      )
-
-      console.log("[v0] Page: Notifications with relations:", notificationsWithRelations)
-      setNotifications(notificationsWithRelations)
+      setNotifications(data)
     }
   }
 
@@ -200,7 +174,6 @@ export default function NotificationsPage() {
 
   return (
     <div className="h-screen flex flex-col bg-background" dir={isRTL ? "rtl" : "ltr"}>
-      {/* Header */}
       <div className="flex items-center gap-3 p-4 border-b bg-card">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowRight className={`h-5 w-5 ${!isRTL && "rotate-180"}`} />
@@ -216,7 +189,6 @@ export default function NotificationsPage() {
         )}
       </div>
 
-      {/* Notification Permission Banner */}
       {notificationPermission !== "granted" && (
         <div className="p-3 bg-primary/10 border-b flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -233,7 +205,6 @@ export default function NotificationsPage() {
         </div>
       )}
 
-      {/* Actions */}
       <div className="flex items-center gap-2 p-3 border-b">
         <Button
           variant="outline"
@@ -257,7 +228,6 @@ export default function NotificationsPage() {
         </Button>
       </div>
 
-      {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
         <TabsList className="w-full justify-start rounded-none border-b bg-transparent p-0">
           <TabsTrigger

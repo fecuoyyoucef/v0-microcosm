@@ -34,6 +34,38 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    if (result && result.length > 0 && process.env.FIREBASE_SERVICE_ACCOUNT) {
+      try {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+        const pushResponse = await fetch(`${appUrl}/api/notifications/send-push`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userIds,
+            title,
+            body: notificationBody || title,
+            data: {
+              type,
+              notification_id: result[0].id,
+              action_url: data?.action_url,
+              group_id: groupId,
+              message_id: messageId,
+              priority: data?.priority || "normal",
+              ...data,
+            },
+          }),
+        })
+
+        if (pushResponse.ok) {
+          console.log("[Notifications] Firebase push sent successfully")
+        } else {
+          console.error("[Notifications] Firebase push failed:", await pushResponse.text())
+        }
+      } catch (pushError) {
+        console.error("[Notifications] Push notification error:", pushError)
+      }
+    }
+
     return NextResponse.json({ success: true, count: result.length })
   } catch (error: any) {
     console.error("Notifications API error:", error)
