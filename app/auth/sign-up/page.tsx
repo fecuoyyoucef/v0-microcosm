@@ -12,6 +12,7 @@ import { useState, useEffect } from "react"
 import { Loader2, Check, X, AtSign } from "lucide-react"
 import { useDebouncedCallback } from "use-debounce"
 import Image from "next/image"
+import { LegalConsentCheckbox } from "@/components/auth/legal-consent-checkbox"
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -49,6 +50,8 @@ export default function SignUpPage() {
   const [isCheckingUsername, setIsCheckingUsername] = useState(false)
   const [nameAvailable, setNameAvailable] = useState<boolean | null>(null)
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null)
+  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [privacyAccepted, setPrivacyAccepted] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -157,8 +160,14 @@ export default function SignUpPage() {
       return
     }
 
+    if (!termsAccepted || !privacyAccepted) {
+      setError("يجب الموافقة على الشروط وسياسة الخصوصية")
+      setIsLoading(false)
+      return
+    }
+
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -171,6 +180,19 @@ export default function SignUpPage() {
         },
       })
       if (error) throw error
+
+      if (data.user) {
+        await fetch("/api/legal/consent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: data.user.id,
+            termsAccepted,
+            privacyAccepted,
+          }),
+        })
+      }
+
       router.push("/auth/sign-up-success")
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "حدث خطأ")
@@ -405,6 +427,12 @@ export default function SignUpPage() {
                     </div>
                   )}
                 </div>
+                <LegalConsentCheckbox
+                  termsAccepted={termsAccepted}
+                  privacyAccepted={privacyAccepted}
+                  onTermsChange={setTermsAccepted}
+                  onPrivacyChange={setPrivacyAccepted}
+                />
                 {error && <p className="text-sm text-destructive bg-destructive/10 p-3 rounded-lg">{error}</p>}
                 <Button
                   type="submit"
@@ -418,7 +446,9 @@ export default function SignUpPage() {
                     isCheckingName ||
                     !allUsernameRequirementsMet ||
                     usernameAvailable === false ||
-                    isCheckingUsername
+                    isCheckingUsername ||
+                    !termsAccepted ||
+                    !privacyAccepted
                   }
                 >
                   {isLoading ? (

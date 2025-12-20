@@ -26,6 +26,7 @@ import {
   CheckCircle2,
   XCircle,
   AlertTriangle,
+  Shield,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -341,6 +342,20 @@ export default function AdminDashboard() {
               <div className="text-center md:text-left">
                 <span className="font-medium text-white block text-xs md:text-sm">إدارة الميزات</span>
                 <span className="text-xs text-slate-400 line-clamp-1">{featureStatus.total} ميزة</span>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/admin/legal">
+          <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/10 border-blue-500/20 hover:border-blue-500/40 transition-all cursor-pointer hover:scale-105 h-full">
+            <CardContent className="p-3 md:p-4 flex flex-col items-center md:flex-row md:items-center gap-2 md:gap-3">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                <Shield className="w-5 h-5 md:w-6 md:h-6 text-blue-400" />
+              </div>
+              <div className="text-center md:text-left">
+                <span className="font-medium text-white block text-xs md:text-sm">المستندات القانونية</span>
+                <span className="text-xs text-slate-400">الخصوصية والشروط</span>
               </div>
             </CardContent>
           </Card>
