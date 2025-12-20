@@ -129,14 +129,18 @@ async function saveTokenToDatabase(userId: string, token: string) {
           userAgent: navigator.userAgent,
           platform: navigator.platform,
           language: navigator.language,
+          timestamp: new Date().toISOString(),
         },
         last_used_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       },
-      { onConflict: "user_id,token" },
+      {
+        onConflict: "token",
+      },
     )
 
     if (error) throw error
-    console.log("[Firebase] Token saved to database")
+    console.log("[Firebase] Token saved to database for user:", userId)
   } catch (error) {
     console.error("[Firebase] Error saving token:", error)
   }

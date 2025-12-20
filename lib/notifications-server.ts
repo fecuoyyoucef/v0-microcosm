@@ -39,11 +39,12 @@ export async function sendNotification(params: SendNotificationParams) {
   }
 
   try {
-    // Get FCM tokens for recipients
-    const { data: tokens } = await supabase.from("fcm_tokens").select("token").in("user_id", recipients)
+    const { data: tokens } = await supabase.from("fcm_tokens").select("token, user_id").in("user_id", recipients)
 
     if (tokens && tokens.length > 0) {
       const tokenStrings = tokens.map((t) => t.token)
+
+      console.log(`[Notifications] Sending push to ${tokenStrings.length} tokens for ${recipients.length} users`)
 
       const pushData: Record<string, string> = {
         type: params.type,
@@ -66,7 +67,11 @@ export async function sendNotification(params: SendNotificationParams) {
         await supabase.from("fcm_tokens").delete().in("token", result.invalidTokens)
       }
 
-      console.log(`[Notifications] Push sent: ${result.success} success, ${result.failure} failed`)
+      console.log(
+        `[Notifications] Push results: ${result.success} success, ${result.failure} failed out of ${tokenStrings.length} total`,
+      )
+    } else {
+      console.log("[Notifications] No FCM tokens found for recipients")
     }
   } catch (error) {
     console.error("[Notifications] Push error:", error)

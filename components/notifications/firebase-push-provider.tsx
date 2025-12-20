@@ -12,6 +12,7 @@ interface FirebasePushProviderProps {
 export function FirebasePushProvider({ userId }: FirebasePushProviderProps) {
   const [isSupported, setIsSupported] = useState(false)
   const [permissionState, setPermissionState] = useState<NotificationPermission | null>(null)
+  const [isRegistered, setIsRegistered] = useState(false)
   const router = useRouter()
 
   // التحقق من دعم المتصفح
@@ -37,17 +38,30 @@ export function FirebasePushProvider({ userId }: FirebasePushProviderProps) {
     }
   }, [isSupported, userId])
 
-  // تسجيل تلقائي عند التحميل
   useEffect(() => {
-    if (isSupported && permissionState !== "denied") {
-      // تأخير قصير لضمان تحميل الصفحة
-      const timer = setTimeout(() => {
-        registerForPush()
-      }, 2000)
-
-      return () => clearTimeout(timer)
+    if (isSupported && !isRegistered && permissionState !== "denied" && userId) {
+      console.log("[FirebasePush] Auto-registering for push notifications...")
+      registerForPush()
+        .then(() => setIsRegistered(true))
+        .catch((err) => console.error("[FirebasePush] Auto-registration failed:", err))
     }
-  }, [isSupported, permissionState, registerForPush])
+  }, [isSupported, isRegistered, permissionState, userId, registerForPush])
+
+  useEffect(() => {
+    if (!isSupported || !userId) return
+
+    const intervalId = setInterval(
+      () => {
+        if (permissionState === "granted") {
+          console.log("[FirebasePush] Refreshing token...")
+          registerForPush().catch((err) => console.error("[FirebasePush] Token refresh failed:", err))
+        }
+      },
+      60 * 60 * 1000,
+    ) // كل ساعة
+
+    return () => clearInterval(intervalId)
+  }, [isSupported, permissionState, userId, registerForPush])
 
   // الاستماع للإشعارات في foreground
   useEffect(() => {

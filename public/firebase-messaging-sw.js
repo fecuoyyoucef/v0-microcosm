@@ -36,7 +36,6 @@ async function initializeFirebase() {
     messaging.onBackgroundMessage((payload) => {
       console.log("[SW] Background message received:", payload)
 
-      // Use notification field directly from FCM
       const notificationTitle = payload.notification?.title || "إشعار جديد"
       const notificationBody = payload.notification?.body || ""
       const notificationType = payload.data?.type || "system"
@@ -62,6 +61,8 @@ async function initializeFirebase() {
         data: {
           url: payload.fcmOptions?.link || payload.data?.action_url || payload.data?.url || "/chat/notifications",
           type: notificationType,
+          groupId: payload.data?.group_id,
+          messageId: payload.data?.message_id,
           ...payload.data,
         },
         requireInteraction: payload.data?.priority === "high",
@@ -70,11 +71,12 @@ async function initializeFirebase() {
           {
             action: "open",
             title: "فتح",
+            icon: "/icons/icon-72x72.png",
           },
         ],
       }
 
-      console.log("[SW] Showing notification:", notificationTitle)
+      console.log("[SW] Showing notification:", notificationTitle, "with options:", notificationOptions)
       return self.registration.showNotification(notificationTitle, notificationOptions)
     })
   } catch (error) {
