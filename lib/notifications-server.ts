@@ -46,13 +46,22 @@ export async function sendNotification(params: SendNotificationParams) {
       body: JSON.stringify({
         userIds: recipients,
         title: params.title,
-        body: params.body || "",
-        data: params.data || {},
+        body: params.body || params.title,
+        data: {
+          type: params.type,
+          notification_id: data?.[0]?.id,
+          group_id: params.groupId,
+          message_id: params.messageId,
+          priority: params.type === "mention" ? "high" : "normal",
+          ...params.data,
+        },
       }),
     })
 
     if (!pushResponse.ok) {
       console.error("Push notification failed:", await pushResponse.text())
+    } else {
+      console.log(`[Notifications] Push sent for type: ${params.type}`)
     }
   } catch (error) {
     console.error("Push notification error:", error)

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+import { sendNotification } from "@/lib/notifications-server"
 
 export async function POST(request: Request) {
   try {
@@ -16,7 +17,6 @@ export async function POST(request: Request) {
 
     console.log("[v0] Processing mentions:", { groupId, mentionedUsers: mentionedUsers?.length })
 
-    // Send notifications to mentioned users
     if (mentionedUsers && mentionedUsers.length > 0) {
       const { data: groupData } = await supabase.from("groups").select("name").eq("id", groupId).single()
 
@@ -26,11 +26,8 @@ export async function POST(request: Request) {
         .eq("id", user.id)
         .single()
 
-      // Create notifications for each mentioned user
-      const notifications = mentionedUsers.map((userId: string) => ({
-        user_id: userId,
-        sender_id: user.id,
-        group_id: groupId,
+      await sendNotification({
+        userIds: mentionedUsers,
         type: "mention",
         title: `${senderProfile?.display_name || "Someone"} أشار إليك`,
         body: content.substring(0, 100),
@@ -39,41 +36,11 @@ export async function POST(request: Request) {
           groupName: groupData?.name,
           url: `/chat/${groupId}`,
         },
-      }))
+        groupId,
+        senderId: user.id,
+      })
 
-      const { error: notifError } = await supabase.from("notifications").insert(notifications)
-
-      if (notifError) {
-        console.error("[v0] Notification insert error:", notifError)
-      } else {
-        console.log("[v0] Created", notifications.length, "mention notifications")
-      }
-
-      try {
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://v0-synaptic-space.vercel.app"
-        const pushResponse = await fetch(`${appUrl}/api/notifications/send-push`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userIds: mentionedUsers,
-            title: `${senderProfile?.display_name || "Someone"} أشار إليك في ${groupData?.name || "مجموعة"}`,
-            body: content.substring(0, 150),
-            data: {
-              url: `/chat/${groupId}`,
-              groupId,
-              type: "mention",
-            },
-          }),
-        })
-
-        if (!pushResponse.ok) {
-          console.error("[v0] Push notification failed:", await pushResponse.text())
-        } else {
-          console.log("[v0] Firebase push notifications sent successfully")
-        }
-      } catch (error) {
-        console.error("[v0] Push notification error:", error)
-      }
+      console.log("[v0] Mention notifications sent to", mentionedUsers.length, "users")
     }
 
     return NextResponse.json({ success: true })

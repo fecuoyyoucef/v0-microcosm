@@ -94,24 +94,18 @@ export default function NotificationsPage() {
   }
 
   const fetchNotifications = async (uid: string) => {
-    console.log("[v0] Page: Fetching notifications for user:", uid)
-
     const { data, error } = await supabase
       .from("notifications")
-      .select(`
-        *,
-        sender:profiles!sender_id(id, display_name, avatar_url),
-        group:groups!group_id(id, name, avatar_url)
-      `)
+      .select("*")
       .eq("user_id", uid)
       .order("created_at", { ascending: false })
 
     if (error) {
-      console.error("[v0] Page: Error fetching notifications:", error)
+      console.error("[v0] Error fetching notifications:", error)
       return
     }
 
-    console.log("[v0] Page: Fetched notifications:", data?.length || 0, "notifications of various types")
+    console.log("[v0] Fetched notifications count:", data?.length || 0)
 
     if (data) {
       setNotifications(data)
