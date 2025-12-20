@@ -183,6 +183,10 @@ export function MessageList({
           user_id: currentUserId,
           reaction: reactionEmoji,
         })
+        const message = messages.find((m) => m.id === messageId)
+        if (message && message.sender_id !== currentUserId) {
+          await sendReactionNotification(message, reactionEmoji)
+        }
       }
     } else {
       await supabase.from("message_reactions").insert({
@@ -190,10 +194,43 @@ export function MessageList({
         user_id: currentUserId,
         reaction: reactionEmoji,
       })
+      const message = messages.find((m) => m.id === messageId)
+      if (message && message.sender_id !== currentUserId) {
+        await sendReactionNotification(message, reactionEmoji)
+      }
     }
     setShowReactionsFor(null)
     setLongPressActive(null)
     setShowActionsFor(null)
+  }
+
+  const sendReactionNotification = async (message: Message, emoji: string) => {
+    try {
+      const currentMember = members.find((m) => m.user_id === currentUserId)
+      const senderName = currentMember?.profile?.display_name || "مستخدم"
+
+      await fetch("/api/notifications/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: message.sender_id,
+          type: "reaction",
+          title: `${senderName} تفاعل مع رسالتك`,
+          body: `تفاعل بـ ${emoji} على: ${message.content.substring(0, 50)}...`,
+          priority: "normal",
+          data: {
+            url: `/chat/${message.group_id}`,
+            messageId: message.id,
+            emoji,
+          },
+          groupId: message.group_id,
+          actorId: currentUserId,
+          relatedId: message.id,
+        }),
+      })
+    } catch (error) {
+      console.error("Error sending reaction notification:", error)
+    }
   }
 
   const getReplyPreview = (replyToId: string) => {
