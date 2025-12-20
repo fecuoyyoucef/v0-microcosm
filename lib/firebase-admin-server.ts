@@ -48,12 +48,29 @@ export async function sendPushNotification(
       return false
     }
 
-    const stringData: Record<string, string> = {}
-    if (data) {
-      Object.keys(data).forEach((key) => {
-        stringData[key] = String(data[key])
-      })
+    const webpushNotification: any = {
+      title,
+      body,
+      icon: "/icons/icon-192x192.png",
+      badge: "/icons/icon-96x96.png",
+      vibrate: [200, 100, 200],
+      requireInteraction: data?.priority === "high" || false,
+      tag: data?.tag || `notification-${Date.now()}`,
     }
+
+    // Add image if provided
+    if (data?.image) {
+      webpushNotification.image = data.image
+    }
+
+    // Add actions for user interaction
+    webpushNotification.actions = [
+      {
+        action: "open",
+        title: "فتح",
+        icon: "/icons/icon-72x72.png",
+      },
+    ]
 
     const message = {
       token,
@@ -61,31 +78,24 @@ export async function sendPushNotification(
         title,
         body,
       },
-      data: stringData,
       webpush: {
-        notification: {
-          icon: "/icons/icon-192x192.png",
-          badge: "/icons/icon-72x72.png",
-          vibrate: [200, 100, 200],
-          requireInteraction: true,
-        },
+        notification: webpushNotification,
         fcmOptions: {
-          link: stringData?.url || "/",
+          link: data?.action_url || data?.url || "/",
         },
       },
     }
 
-    console.log("[Firebase Admin] Sending to token:", token.substring(0, 20) + "...")
+    console.log("[Firebase Admin] Sending notification-only message to token:", token.substring(0, 20) + "...")
     const result = await adminInstance.messaging().send(message)
     console.log("[Firebase Admin] Notification sent successfully, messageId:", result)
     return true
   } catch (error: any) {
-    // Token غير صالح - يجب حذفه
     if (
       error.code === "messaging/registration-token-not-registered" ||
       error.code === "messaging/invalid-registration-token"
     ) {
-      console.log("[Firebase Admin] Invalid token:", token.substring(0, 20))
+      console.log("[Firebase Admin] Invalid token, should be removed from database:", token.substring(0, 20))
       return false
     } else {
       console.error("[Firebase Admin] Send error:", error.code, error.message)
@@ -112,12 +122,27 @@ export async function sendPushNotificationToMany(
       return { success: 0, failure: tokens.length, invalidTokens: [] }
     }
 
-    const stringData: Record<string, string> = {}
-    if (data) {
-      Object.keys(data).forEach((key) => {
-        stringData[key] = String(data[key])
-      })
+    const webpushNotification: any = {
+      title,
+      body,
+      icon: "/icons/icon-192x192.png",
+      badge: "/icons/icon-96x96.png",
+      vibrate: [200, 100, 200],
+      requireInteraction: data?.priority === "high" || false,
+      tag: data?.tag || `notification-${Date.now()}`,
     }
+
+    if (data?.image) {
+      webpushNotification.image = data.image
+    }
+
+    webpushNotification.actions = [
+      {
+        action: "open",
+        title: "فتح",
+        icon: "/icons/icon-72x72.png",
+      },
+    ]
 
     const message = {
       tokens,
@@ -125,20 +150,15 @@ export async function sendPushNotificationToMany(
         title,
         body,
       },
-      data: stringData,
       webpush: {
-        notification: {
-          icon: "/icons/icon-192x192.png",
-          badge: "/icons/icon-72x72.png",
-          vibrate: [200, 100, 200],
-        },
+        notification: webpushNotification,
         fcmOptions: {
-          link: stringData?.url || "/",
+          link: data?.action_url || data?.url || "/",
         },
       },
     }
 
-    console.log(`[Firebase Admin] Sending to ${tokens.length} tokens`)
+    console.log(`[Firebase Admin] Sending notification-only to ${tokens.length} tokens`)
     const response = await adminInstance.messaging().sendEachForMulticast(message)
     console.log(`[Firebase Admin] Results: ${response.successCount} success, ${response.failureCount} failure`)
 

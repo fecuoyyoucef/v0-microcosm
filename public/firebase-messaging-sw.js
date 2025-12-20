@@ -36,50 +36,45 @@ async function initializeFirebase() {
     messaging.onBackgroundMessage((payload) => {
       console.log("[SW] Background message received:", payload)
 
-      const notificationTitle = payload.notification?.title || payload.data?.title || "إشعار جديد"
-      const notificationBody = payload.notification?.body || payload.data?.body || ""
+      // Use notification field directly from FCM
+      const notificationTitle = payload.notification?.title || "إشعار جديد"
+      const notificationBody = payload.notification?.body || ""
       const notificationType = payload.data?.type || "system"
 
+      // Icon mapping for different notification types
       const iconMap = {
         new_message: "💬",
         mention: "@",
         reaction: "❤️",
         group_invite: "👥",
         group_join: "✅",
-        group_leave: "👋",
         decision_created: "🗳️",
-        decision_closed: "✅",
         memory_generated: "🧠",
         system: "📢",
       }
 
       const notificationOptions = {
-        body: notificationBody,
+        body: `${iconMap[notificationType] || "🔔"} ${notificationBody}`,
         icon: "/icons/icon-192x192.png",
         badge: "/icons/icon-96x96.png",
         image: payload.data?.image || undefined,
         vibrate: [200, 100, 200],
         data: {
-          ...payload.data,
-          url:
-            payload.data?.action_url ||
-            (payload.data?.group_id ? `/chat/${payload.data.group_id}` : "/chat/notifications"),
-          notificationId: payload.data?.notification_id,
+          url: payload.fcmOptions?.link || payload.data?.action_url || payload.data?.url || "/chat/notifications",
           type: notificationType,
+          ...payload.data,
         },
         requireInteraction: payload.data?.priority === "high",
-        tag: payload.data?.tag || `notification-${Date.now()}`,
-        body: `${iconMap[notificationType] || "🔔"} ${notificationBody}`,
+        tag: `notif-${notificationType}-${Date.now()}`,
         actions: [
           {
             action: "open",
             title: "فتح",
-            icon: "/icons/icon-72x72.png",
           },
         ],
       }
 
-      console.log("[SW] Showing notification with type:", notificationType)
+      console.log("[SW] Showing notification:", notificationTitle)
       return self.registration.showNotification(notificationTitle, notificationOptions)
     })
   } catch (error) {
@@ -107,7 +102,12 @@ self.addEventListener("notificationclick", (event) => {
 
   // التعامل مع action buttons
   if (event.action === "open" || !event.action) {
-    const url = event.notification.data?.url || "/"
+    const url =
+      event.notification.data?.action_url ||
+      event.notification.data?.url ||
+      (event.notification.data?.group_id ? `/chat/${event.notification.data.group_id}` : "/chat/notifications") ||
+      "/"
+
     const fullUrl = url.startsWith("http") ? url : self.location.origin + url
 
     event.waitUntil(

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import type { NotificationType } from "@/lib/types"
+import { sendPushNotificationToMany } from "@/lib/firebase-admin-server"
 
 interface SendNotificationParams {
   userIds: string[]
@@ -15,7 +16,6 @@ interface SendNotificationParams {
 export async function sendNotification(params: SendNotificationParams) {
   const supabase = await createClient()
 
-  // Filter out the sender from recipients
   const recipients = params.senderId ? params.userIds.filter((id) => id !== params.senderId) : params.userIds
 
   if (recipients.length === 0) return { success: true, count: 0 }
@@ -34,37 +34,42 @@ export async function sendNotification(params: SendNotificationParams) {
   const { data, error } = await supabase.from("notifications").insert(notifications).select()
 
   if (error) {
-    console.error("Error sending notifications:", error)
+    console.error("[Notifications] DB insert error:", error)
     return { success: false, error: error.message }
   }
 
   try {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://v0-synaptic-space.vercel.app"
-    const pushResponse = await fetch(`${appUrl}/api/notifications/send-push`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userIds: recipients,
-        title: params.title,
-        body: params.body || params.title,
-        data: {
-          type: params.type,
-          notification_id: data?.[0]?.id,
-          group_id: params.groupId,
-          message_id: params.messageId,
-          priority: params.type === "mention" ? "high" : "normal",
-          ...params.data,
-        },
-      }),
-    })
+    // Get FCM tokens for recipients
+    const { data: tokens } = await supabase.from("fcm_tokens").select("token").in("user_id", recipients)
 
-    if (!pushResponse.ok) {
-      console.error("Push notification failed:", await pushResponse.text())
-    } else {
-      console.log(`[Notifications] Push sent for type: ${params.type}`)
+    if (tokens && tokens.length > 0) {
+      const tokenStrings = tokens.map((t) => t.token)
+
+      const pushData: Record<string, string> = {
+        type: params.type,
+        notification_id: data?.[0]?.id || "",
+        priority: params.type === "mention" || params.type === "new_message" ? "high" : "normal",
+      }
+
+      if (params.groupId) pushData.group_id = params.groupId
+      if (params.messageId) pushData.message_id = params.messageId
+      if (params.data) {
+        Object.entries(params.data).forEach(([key, value]) => {
+          pushData[key] = String(value)
+        })
+      }
+
+      const result = await sendPushNotificationToMany(tokenStrings, params.title, params.body || params.title, pushData)
+
+      if (result.invalidTokens && result.invalidTokens.length > 0) {
+        console.log(`[Notifications] Removing ${result.invalidTokens.length} invalid tokens`)
+        await supabase.from("fcm_tokens").delete().in("token", result.invalidTokens)
+      }
+
+      console.log(`[Notifications] Push sent: ${result.success} success, ${result.failure} failed`)
     }
   } catch (error) {
-    console.error("Push notification error:", error)
+    console.error("[Notifications] Push error:", error)
   }
 
   return { success: true, count: data.length }

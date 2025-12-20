@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { requestNotificationPermission, onForegroundMessage } from "@/lib/firebase-push"
 import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 
 interface FirebasePushProviderProps {
   userId: string
@@ -11,6 +12,7 @@ interface FirebasePushProviderProps {
 export function FirebasePushProvider({ userId }: FirebasePushProviderProps) {
   const [isSupported, setIsSupported] = useState(false)
   const [permissionState, setPermissionState] = useState<NotificationPermission | null>(null)
+  const router = useRouter()
 
   // التحقق من دعم المتصفح
   useEffect(() => {
@@ -52,20 +54,23 @@ export function FirebasePushProvider({ userId }: FirebasePushProviderProps) {
     if (!isSupported || permissionState !== "granted") return
 
     onForegroundMessage((payload) => {
-      const { notification, data } = payload
+      const { notification, data, fcmOptions } = payload
+
+      const notificationUrl = fcmOptions?.link || data?.action_url || data?.url || "/chat/notifications"
 
       // عرض toast للإشعار
       toast(notification?.title || "إشعار جديد", {
         description: notification?.body,
-        action: data?.url
-          ? {
-              label: "عرض",
-              onClick: () => (window.location.href = data.url),
-            }
-          : undefined,
+        duration: 5000,
+        action: {
+          label: "عرض",
+          onClick: () => router.push(notificationUrl),
+        },
       })
+
+      console.log("[FirebasePush] Foreground notification received:", notification?.title)
     })
-  }, [isSupported, permissionState])
+  }, [isSupported, permissionState, router])
 
   // هذا المكون لا يعرض شيئاً - يعمل في الخلفية
   return null
