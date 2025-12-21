@@ -62,7 +62,6 @@ function showNotificationFromPayload(payload) {
   const notificationOptions = {
     body: `${iconMap[notificationType] || "🔔"} ${notificationBody}`,
     icon: "/icons/icon-192x192.png",
-    badge: "/icons/icon-96x96.png",
     image: payload.data?.image || undefined,
     vibrate: [200, 100, 200],
     data: {
@@ -78,7 +77,6 @@ function showNotificationFromPayload(payload) {
       {
         action: "open",
         title: "فتح",
-        icon: "/icons/icon-72x72.png",
       },
     ],
   }

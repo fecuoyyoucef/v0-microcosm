@@ -111,7 +111,6 @@ export function NotificationBell({ userId }: NotificationBellProps) {
       const browserNotif = new Notification(notification.title || "Synaptic Space", {
         body: notification.body || "لديك إشعار جديد",
         icon: "/icons/icon-192x192.png",
-        badge: "/icons/icon-72x72.png",
         tag: notification.id,
         requireInteraction: notification.data?.priority === "high",
       })

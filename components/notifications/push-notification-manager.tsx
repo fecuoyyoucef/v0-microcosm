@@ -122,7 +122,6 @@ export function PushNotificationManager({ userId }: PushNotificationManagerProps
             const notification = new Notification(notif.title || "Synaptic Space", {
               body: `${iconMap[notif.type] || "🔔"} ${notif.body || "لديك إشعار جديد"}`,
               icon: "/icons/icon-192x192.png",
-              badge: "/icons/icon-72x72.png",
               tag: `notif-${notif.id}`,
               data: {
                 url: notif.data?.action_url || (notif.group_id ? `/chat/${notif.group_id}` : "/chat/notifications"),

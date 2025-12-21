@@ -67,7 +67,7 @@ export async function sendPushNotification(
       {
         action: "open",
         title: "فتح",
-        icon: "/icons/icon-72x72.png",
+        icon: "/icons/icon-48x48.png",
       },
     ]
 
@@ -103,6 +103,7 @@ export async function sendPushNotification(
   }
 }
 
+// إرسال إشعار لعدة مستخدمين
 export async function sendPushNotificationToMany(
   tokens: string[],
   title: string,
@@ -144,7 +145,7 @@ export async function sendPushNotificationToMany(
       {
         action: "open",
         title: "فتح",
-        icon: "/icons/icon-72x72.png",
+        icon: "/icons/icon-48x48.png",
       },
     ]
 
