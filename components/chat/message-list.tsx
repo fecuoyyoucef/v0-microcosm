@@ -209,23 +209,21 @@ export function MessageList({
       const currentMember = members.find((m) => m.user_id === currentUserId)
       const senderName = currentMember?.profile?.display_name || "مستخدم"
 
-      await fetch("/api/notifications/create", {
+      await fetch("/api/notifications/send-push", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: message.sender_id,
-          type: "reaction",
+          userIds: [message.sender_id],
           title: `${senderName} تفاعل مع رسالتك`,
-          body: `تفاعل بـ ${emoji} على: ${message.content.substring(0, 50)}...`,
-          priority: "normal",
+          body: `تفاعل بـ ${emoji}`,
           data: {
+            type: "reaction",
             url: `/chat/${message.group_id}`,
             messageId: message.id,
             emoji,
+            groupId: message.group_id,
+            senderName,
           },
-          groupId: message.group_id,
-          actorId: currentUserId,
-          relatedId: message.id,
         }),
       })
     } catch (error) {
