@@ -61,7 +61,7 @@ function showNotificationFromPayload(payload) {
 
   const notificationOptions = {
     body: `${iconMap[notificationType] || "🔔"} ${notificationBody}`,
-    icon: "/icons/icon-192x192.png",
+    icon: "/icons/notification-icon.svg",
     image: payload.data?.image || undefined,
     vibrate: [200, 100, 200],
     data: {

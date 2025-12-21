@@ -68,8 +68,7 @@ self.addEventListener("push", (event) => {
   const title = data.title || "Synaptic Space"
   const options = {
     body: data.body || "لديك إشعار جديد",
-    icon: data.icon || "/icons/icon-192x192.png",
-    badge: "/icons/icon-72x72.png",
+    icon: data.icon || "/icons/notification-icon.svg",
     image: data.image,
     vibrate: data.vibrate || [200, 100, 200],
     tag: data.tag || `notification-${Date.now()}`,
@@ -86,7 +85,7 @@ self.addEventListener("push", (event) => {
       ...data.data,
     },
     actions: data.actions || [
-      { action: "open", title: "فتح", icon: "/icons/icon-72x72.png" },
+      { action: "open", title: "فتح" },
       { action: "reply", title: "رد سريع" },
       { action: "dismiss", title: "تجاهل" },
     ],
