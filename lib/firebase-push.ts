@@ -16,36 +16,41 @@ const firebaseConfig = {
 let firebaseApp: any = null
 let messaging: any = null
 
-// تهيئة Firebase فقط على المتصفح
+function getDeviceId(): string {
+  if (typeof window === "undefined") return ""
+
+  let deviceId = localStorage.getItem("fcm_device_id")
+  if (!deviceId) {
+    deviceId = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}-${navigator.userAgent.length}`
+    localStorage.setItem("fcm_device_id", deviceId)
+  }
+  return deviceId
+}
+
 export async function initializeFirebase() {
   if (typeof window === "undefined") return null
 
   try {
-    // التحقق من وجود المتغيرات
     if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
       console.warn("[Firebase] Missing configuration")
       return null
     }
 
-    // استيراد Firebase ديناميكياً
     const { initializeApp, getApps } = await import("firebase/app")
     const { getMessaging, isSupported } = await import("firebase/messaging")
 
-    // التحقق من دعم المتصفح
     const supported = await isSupported()
     if (!supported) {
       console.warn("[Firebase] Messaging not supported in this browser")
       return null
     }
 
-    // تهيئة Firebase App
     if (getApps().length === 0) {
       firebaseApp = initializeApp(firebaseConfig)
     } else {
       firebaseApp = getApps()[0]
     }
 
-    // الحصول على Messaging instance
     messaging = getMessaging(firebaseApp)
 
     console.log("[Firebase] Initialized successfully")
@@ -68,25 +73,33 @@ async function fetchVapidKey(): Promise<string | null> {
   }
 }
 
-// تسجيل Service Worker والحصول على Token
-export async function requestNotificationPermission(userId: string): Promise<string | null> {
+export async function requestNotificationPermission(userId: string, forceRefresh = false): Promise<string | null> {
   if (typeof window === "undefined") return null
 
   try {
-    // طلب إذن الإشعارات
     const permission = await Notification.requestPermission()
     if (permission !== "granted") {
       console.log("[Firebase] Notification permission denied")
       return null
     }
 
-    // تهيئة Firebase
     const messagingInstance = await initializeFirebase()
     if (!messagingInstance) return null
 
-    // تسجيل Service Worker
+    if (forceRefresh) {
+      console.log("[Firebase] Force refreshing token...")
+      const registrations = await navigator.serviceWorker.getRegistrations()
+      for (const reg of registrations) {
+        if (reg.active?.scriptURL.includes("firebase-messaging-sw.js")) {
+          console.log("[Firebase] Updating service worker...")
+          await reg.update()
+        }
+      }
+    }
+
     const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js")
-    console.log("[Firebase] Service Worker registered")
+    await navigator.serviceWorker.ready
+    console.log("[Firebase] Service Worker registered and ready")
 
     const vapidKey = await fetchVapidKey()
     if (!vapidKey) {
@@ -94,8 +107,16 @@ export async function requestNotificationPermission(userId: string): Promise<str
       return null
     }
 
-    // الحصول على Token
-    const { getToken } = await import("firebase/messaging")
+    const { getToken, deleteToken } = await import("firebase/messaging")
+
+    if (forceRefresh) {
+      try {
+        await deleteToken(messagingInstance)
+        console.log("[Firebase] Old token deleted for refresh")
+      } catch (e) {
+        // Token may not exist, ignore
+      }
+    }
 
     const token = await getToken(messagingInstance, {
       vapidKey,
@@ -103,8 +124,7 @@ export async function requestNotificationPermission(userId: string): Promise<str
     })
 
     if (token) {
-      console.log("[Firebase] FCM Token obtained")
-      // حفظ Token في database
+      console.log("[Firebase] FCM Token obtained:", token.substring(0, 30) + "...")
       await saveTokenToDatabase(userId, token)
       return token
     }
@@ -116,16 +136,27 @@ export async function requestNotificationPermission(userId: string): Promise<str
   }
 }
 
-// حفظ Token في database
 async function saveTokenToDatabase(userId: string, token: string) {
   try {
     const supabase = createClient()
+    const deviceId = getDeviceId()
 
+    // This ensures we only have one active token per user per device
+    const { error: deleteError } = await supabase.from("fcm_tokens").delete().eq("user_id", userId).neq("token", token)
+
+    if (deleteError) {
+      console.warn("[Firebase] Error cleaning old tokens:", deleteError)
+    } else {
+      console.log("[Firebase] Cleaned old tokens for user:", userId)
+    }
+
+    // Now upsert the new token
     const { error } = await supabase.from("fcm_tokens").upsert(
       {
         user_id: userId,
         token: token,
         device_info: {
+          device_id: deviceId,
           userAgent: navigator.userAgent,
           platform: navigator.platform,
           language: navigator.language,
@@ -140,13 +171,12 @@ async function saveTokenToDatabase(userId: string, token: string) {
     )
 
     if (error) throw error
-    console.log("[Firebase] Token saved to database for user:", userId)
+    console.log("[Firebase] Token saved - user:", userId, "device:", deviceId)
   } catch (error) {
     console.error("[Firebase] Error saving token:", error)
   }
 }
 
-// الاستماع للإشعارات في foreground
 export async function onForegroundMessage(callback: (payload: any) => void) {
   if (typeof window === "undefined") return
 

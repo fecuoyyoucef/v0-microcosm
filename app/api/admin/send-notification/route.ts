@@ -65,18 +65,44 @@ export async function POST(request: Request) {
 
     let pushSentCount = 0
     let pushFailedCount = 0
+    let diagnosticInfo: any = {}
 
     try {
-      const { data: fcmTokens, error: tokensError } = await supabase.from("fcm_tokens").select("token, user_id")
+      const { data: fcmTokens, error: tokensError } = await supabase
+        .from("fcm_tokens")
+        .select("token, user_id, created_at, updated_at")
 
       if (tokensError) {
         console.error("[Admin] Error fetching FCM tokens:", tokensError)
+        diagnosticInfo.tokensFetchError = tokensError.message
       }
 
       if (fcmTokens && fcmTokens.length > 0) {
-        console.log(`[Admin] Sending push to ${fcmTokens.length} FCM tokens`)
+        console.log(`[Admin] ========== DIAGNOSTIC INFO ==========`)
+        console.log(`[Admin] Total FCM tokens in DB: ${fcmTokens.length}`)
+
+        const tokensByUser: Record<string, number> = {}
+        fcmTokens.forEach((t) => {
+          tokensByUser[t.user_id] = (tokensByUser[t.user_id] || 0) + 1
+        })
+        console.log(`[Admin] Tokens per user:`, tokensByUser)
+
+        console.log(`[Admin] Token previews:`)
+        fcmTokens.forEach((t, idx) => {
+          console.log(
+            `  [${idx}] user: ${t.user_id.substring(0, 8)}..., token: ${t.token.substring(0, 30)}..., updated: ${t.updated_at}`,
+          )
+        })
 
         const tokens = fcmTokens.map((t) => t.token)
+
+        diagnosticInfo = {
+          totalTokens: fcmTokens.length,
+          uniqueUsers: Object.keys(tokensByUser).length,
+          tokensByUser,
+        }
+
+        console.log(`[Admin] Calling sendPushNotificationToMany with ${tokens.length} tokens...`)
 
         const result = await sendPushNotificationToMany(tokens, title || "Synaptic Space", body || "لديك إشعار جديد", {
           url: actionUrl || "/chat/notifications",
@@ -87,17 +113,32 @@ export async function POST(request: Request) {
         pushSentCount = result.success
         pushFailedCount = result.failure
 
-        if (result.invalidTokens && result.invalidTokens.length > 0) {
-          await supabase.from("fcm_tokens").delete().in("token", result.invalidTokens)
-          console.log(`[Admin] Removed ${result.invalidTokens.length} invalid tokens`)
+        diagnosticInfo.pushResult = {
+          success: result.success,
+          failure: result.failure,
+          invalidTokensCount: result.invalidTokens?.length || 0,
         }
 
-        console.log(`[Admin] Push sent: ${pushSentCount} success, ${pushFailedCount} failed`)
+        console.log(`[Admin] ========== PUSH RESULT ==========`)
+        console.log(`[Admin] Success: ${pushSentCount}`)
+        console.log(`[Admin] Failed: ${pushFailedCount}`)
+        console.log(`[Admin] Invalid tokens: ${result.invalidTokens?.length || 0}`)
+
+        if (result.invalidTokens && result.invalidTokens.length > 0) {
+          console.log(
+            `[Admin] Invalid tokens to remove:`,
+            result.invalidTokens.map((t) => t.substring(0, 20) + "..."),
+          )
+          await supabase.from("fcm_tokens").delete().in("token", result.invalidTokens)
+          console.log(`[Admin] Removed ${result.invalidTokens.length} invalid tokens from DB`)
+        }
       } else {
-        console.log("[Admin] No FCM tokens found")
+        console.log("[Admin] No FCM tokens found in database!")
+        diagnosticInfo.noTokens = true
       }
-    } catch (pushError) {
+    } catch (pushError: any) {
       console.error("[Admin] Push notification error:", pushError)
+      diagnosticInfo.pushError = pushError.message
     }
 
     // Log admin activity
@@ -112,6 +153,7 @@ export async function POST(request: Request) {
           pushFailed: pushFailedCount,
           target,
           priority,
+          diagnosticInfo,
         },
       })
     } catch (e) {
@@ -123,9 +165,10 @@ export async function POST(request: Request) {
       recipientsCount: users.length,
       pushSentCount,
       pushFailedCount,
+      diagnostic: diagnosticInfo,
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error("[Admin] Send notification error:", error)
-    return NextResponse.json({ error: "فشل إرسال الإشعار" }, { status: 500 })
+    return NextResponse.json({ error: "فشل إرسال الإشعار", details: error.message }, { status: 500 })
   }
 }

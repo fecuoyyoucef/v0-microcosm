@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { requestNotificationPermission, onForegroundMessage } from "@/lib/firebase-push"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
@@ -12,10 +12,9 @@ interface FirebasePushProviderProps {
 export function FirebasePushProvider({ userId }: FirebasePushProviderProps) {
   const [isSupported, setIsSupported] = useState(false)
   const [permissionState, setPermissionState] = useState<NotificationPermission | null>(null)
-  const [isRegistered, setIsRegistered] = useState(false)
+  const isRegisteredRef = useRef(false)
   const router = useRouter()
 
-  // التحقق من دعم المتصفح
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window && "serviceWorker" in navigator) {
       setIsSupported(true)
@@ -23,29 +22,32 @@ export function FirebasePushProvider({ userId }: FirebasePushProviderProps) {
     }
   }, [])
 
-  // تسجيل المستخدم للإشعارات
-  const registerForPush = useCallback(async () => {
-    if (!isSupported || !userId) return
+  const registerForPush = useCallback(
+    async (forceRefresh = false) => {
+      if (!isSupported || !userId) return
 
-    try {
-      const token = await requestNotificationPermission(userId)
-      if (token) {
-        setPermissionState("granted")
-        console.log("[FirebasePush] Registration successful")
+      try {
+        console.log("[FirebasePush] Registering with forceRefresh:", forceRefresh)
+        const token = await requestNotificationPermission(userId, forceRefresh)
+        if (token) {
+          setPermissionState("granted")
+          console.log("[FirebasePush] Registration successful, token:", token.substring(0, 20) + "...")
+        }
+      } catch (error) {
+        console.error("[FirebasePush] Registration error:", error)
       }
-    } catch (error) {
-      console.error("[FirebasePush] Registration error:", error)
-    }
-  }, [isSupported, userId])
+    },
+    [isSupported, userId],
+  )
 
   useEffect(() => {
-    if (isSupported && !isRegistered && permissionState !== "denied" && userId) {
-      console.log("[FirebasePush] Auto-registering for push notifications...")
-      registerForPush()
-        .then(() => setIsRegistered(true))
-        .catch((err) => console.error("[FirebasePush] Auto-registration failed:", err))
+    if (isSupported && !isRegisteredRef.current && permissionState !== "denied" && userId) {
+      console.log("[FirebasePush] Initial registration with force refresh...")
+      isRegisteredRef.current = true
+      // Force refresh on first load to ensure fresh token
+      registerForPush(true).catch((err) => console.error("[FirebasePush] Auto-registration failed:", err))
     }
-  }, [isSupported, isRegistered, permissionState, userId, registerForPush])
+  }, [isSupported, permissionState, userId, registerForPush])
 
   useEffect(() => {
     if (!isSupported || !userId) return
@@ -53,26 +55,37 @@ export function FirebasePushProvider({ userId }: FirebasePushProviderProps) {
     const intervalId = setInterval(
       () => {
         if (permissionState === "granted") {
-          console.log("[FirebasePush] Refreshing token...")
-          registerForPush().catch((err) => console.error("[FirebasePush] Token refresh failed:", err))
+          console.log("[FirebasePush] Periodic token refresh...")
+          registerForPush(false).catch((err) => console.error("[FirebasePush] Token refresh failed:", err))
         }
       },
-      60 * 60 * 1000,
-    ) // كل ساعة
+      30 * 60 * 1000, // كل 30 دقيقة بدلاً من ساعة
+    )
 
     return () => clearInterval(intervalId)
   }, [isSupported, permissionState, userId, registerForPush])
 
-  // الاستماع للإشعارات في foreground
+  useEffect(() => {
+    if (!isSupported || !userId) return
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && permissionState === "granted") {
+        console.log("[FirebasePush] Page visible, refreshing token...")
+        registerForPush(false).catch((err) => console.error("[FirebasePush] Visibility refresh failed:", err))
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange)
+  }, [isSupported, permissionState, userId, registerForPush])
+
   useEffect(() => {
     if (!isSupported || permissionState !== "granted") return
 
     onForegroundMessage((payload) => {
       const { notification, data, fcmOptions } = payload
-
       const notificationUrl = fcmOptions?.link || data?.action_url || data?.url || "/chat/notifications"
 
-      // عرض toast للإشعار
       toast(notification?.title || "إشعار جديد", {
         description: notification?.body,
         duration: 5000,
@@ -82,10 +95,9 @@ export function FirebasePushProvider({ userId }: FirebasePushProviderProps) {
         },
       })
 
-      console.log("[FirebasePush] Foreground notification received:", notification?.title)
+      console.log("[FirebasePush] Foreground notification:", notification?.title)
     })
   }, [isSupported, permissionState, router])
 
-  // هذا المكون لا يعرض شيئاً - يعمل في الخلفية
   return null
 }
