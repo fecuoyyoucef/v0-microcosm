@@ -35,53 +35,56 @@ async function initializeFirebase() {
     // Handle background messages
     messaging.onBackgroundMessage((payload) => {
       console.log("[SW] Background message received:", payload)
-
-      const notificationTitle = payload.notification?.title || "إشعار جديد"
-      const notificationBody = payload.notification?.body || ""
-      const notificationType = payload.data?.type || "system"
-
-      // Icon mapping for different notification types
-      const iconMap = {
-        new_message: "💬",
-        mention: "@",
-        reaction: "❤️",
-        group_invite: "👥",
-        group_join: "✅",
-        decision_created: "🗳️",
-        memory_generated: "🧠",
-        system: "📢",
-      }
-
-      const notificationOptions = {
-        body: `${iconMap[notificationType] || "🔔"} ${notificationBody}`,
-        icon: "/icons/icon-192x192.png",
-        badge: "/icons/icon-96x96.png",
-        image: payload.data?.image || undefined,
-        vibrate: [200, 100, 200],
-        data: {
-          url: payload.fcmOptions?.link || payload.data?.action_url || payload.data?.url || "/chat/notifications",
-          type: notificationType,
-          groupId: payload.data?.group_id,
-          messageId: payload.data?.message_id,
-          ...payload.data,
-        },
-        requireInteraction: payload.data?.priority === "high",
-        tag: `notif-${notificationType}-${Date.now()}`,
-        actions: [
-          {
-            action: "open",
-            title: "فتح",
-            icon: "/icons/icon-72x72.png",
-          },
-        ],
-      }
-
-      console.log("[SW] Showing notification:", notificationTitle, "with options:", notificationOptions)
-      return self.registration.showNotification(notificationTitle, notificationOptions)
+      showNotificationFromPayload(payload)
     })
   } catch (error) {
     console.error("[SW] Firebase initialization error:", error)
   }
+}
+
+// دالة لعرض الإشعار من payload
+function showNotificationFromPayload(payload) {
+  const notificationTitle = payload.notification?.title || "إشعار جديد"
+  const notificationBody = payload.notification?.body || ""
+  const notificationType = payload.data?.type || "system"
+
+  const iconMap = {
+    new_message: "💬",
+    mention: "@",
+    reaction: "❤️",
+    group_invite: "👥",
+    group_join: "✅",
+    decision_created: "🗳️",
+    memory_generated: "🧠",
+    system: "📢",
+  }
+
+  const notificationOptions = {
+    body: `${iconMap[notificationType] || "🔔"} ${notificationBody}`,
+    icon: "/icons/icon-192x192.png",
+    badge: "/icons/icon-96x96.png",
+    image: payload.data?.image || undefined,
+    vibrate: [200, 100, 200],
+    data: {
+      url: payload.fcmOptions?.link || payload.data?.action_url || payload.data?.url || "/chat/notifications",
+      type: notificationType,
+      groupId: payload.data?.group_id,
+      messageId: payload.data?.message_id,
+      ...payload.data,
+    },
+    requireInteraction: payload.data?.priority === "high",
+    tag: `notif-${notificationType}-${Date.now()}`,
+    actions: [
+      {
+        action: "open",
+        title: "فتح",
+        icon: "/icons/icon-72x72.png",
+      },
+    ],
+  }
+
+  console.log("[SW] Showing notification:", notificationTitle)
+  return self.registration.showNotification(notificationTitle, notificationOptions)
 }
 
 // Initialize on activate
@@ -126,6 +129,26 @@ self.addEventListener("notificationclick", (event) => {
         }
       }),
     )
+  }
+})
+
+// Handle push events
+self.addEventListener("push", (event) => {
+  if (!event.data) {
+    console.log("[SW] Push received with no data")
+    return
+  }
+
+  try {
+    const payload = event.data.json()
+    console.log("[SW] Push event received:", payload)
+
+    // إذا كان عندنا notification، عرضه
+    if (payload.notification || payload.data) {
+      event.waitUntil(showNotificationFromPayload(payload))
+    }
+  } catch (error) {
+    console.error("[SW] Error parsing push data:", error)
   }
 })
 
