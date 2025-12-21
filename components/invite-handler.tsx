@@ -71,12 +71,21 @@ export function InviteHandler({ group, isLoggedIn }: InviteHandlerProps) {
           .neq("user_id", user.id)
 
         if (members && members.length > 0) {
-          await fetch("/api/notifications/group-member-joined", {
+          await fetch("/api/notifications/create", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+              userId: members.map((m) => m.user_id),
+              type: "group_invite",
+              title: "عضو جديد انضم",
+              body: `انضم ${profile?.display_name || "مستخدم جديد"} إلى المجموعة`,
               groupId: group.id,
-              newUserId: user.id,
+              actorId: user.id,
+              data: {
+                groupId: group.id,
+                groupName: group.name,
+                url: `/chat/${group.id}`,
+              },
             }),
           })
         }
