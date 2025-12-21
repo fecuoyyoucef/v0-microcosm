@@ -108,6 +108,11 @@ export default function RootLayout({
                   );
                 });
               }
+              if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('portrait').catch(err => {
+                  console.log('Screen orientation lock failed:', err);
+                });
+              }
             `,
           }}
         />
