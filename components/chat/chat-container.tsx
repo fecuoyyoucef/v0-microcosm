@@ -397,11 +397,12 @@ export function ChatContainer({
           const recipientIds = members.filter((m) => m.user_id !== currentUserId).map((m) => m.user_id)
 
           if (recipientIds.length > 0) {
-            fetch("/api/notifications/send-push", {
+            fetch("/api/notifications/send", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 userIds: recipientIds,
+                type: "new_message",
                 title: `${currentProfile?.display_name || "مستخدم"} في ${group.name}`,
                 body: content.substring(0, 150),
                 data: {
@@ -411,13 +412,12 @@ export function ChatContainer({
                   senderId: currentUserId,
                   senderName: currentProfile?.display_name || "مستخدم",
                   messageId: data.id,
-                  type: "new_message",
                 },
               }),
-            }).catch((err) => console.error("Failed to send push notification:", err))
+            }).catch((err) => console.error("Failed to send notification:", err))
           }
         } catch (err) {
-          console.error("Push notification error:", err)
+          console.error("Notification error:", err)
         }
       }
     }

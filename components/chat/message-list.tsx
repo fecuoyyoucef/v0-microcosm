@@ -209,17 +209,14 @@ export function MessageList({
       const currentMember = members.find((m) => m.user_id === currentUserId)
       const senderName = currentMember?.profile?.display_name || "مستخدم"
 
-      await fetch("/api/notifications/create", {
+      await fetch("/api/notifications/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: message.sender_id,
+          userIds: [message.sender_id],
           type: "reaction",
           title: "تفاعل جديد",
           body: `تفاعل ${senderName} برسالتك بـ ${emoji}`,
-          groupId: message.group_id,
-          actorId: currentUserId,
-          relatedId: message.id,
           data: {
             messageId: message.id,
             groupId: message.group_id,
