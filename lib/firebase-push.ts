@@ -141,15 +141,6 @@ async function saveTokenToDatabase(userId: string, token: string) {
     const supabase = createClient()
     const deviceId = getDeviceId()
 
-    // This ensures we only have one active token per user per device
-    const { error: deleteError } = await supabase.from("fcm_tokens").delete().eq("user_id", userId).neq("token", token)
-
-    if (deleteError) {
-      console.warn("[Firebase] Error cleaning old tokens:", deleteError)
-    } else {
-      console.log("[Firebase] Cleaned old tokens for user:", userId)
-    }
-
     // Now upsert the new token
     const { error } = await supabase.from("fcm_tokens").upsert(
       {
