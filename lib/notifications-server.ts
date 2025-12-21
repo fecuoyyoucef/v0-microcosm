@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 import type { NotificationType } from "@/lib/types"
 import { sendPushNotificationToMany } from "@/lib/firebase-admin-server"
 
@@ -39,7 +40,8 @@ export async function sendNotification(params: SendNotificationParams) {
   }
 
   try {
-    const { data: tokens } = await supabase.from("fcm_tokens").select("token, user_id").in("user_id", recipients)
+    const serviceSupabase = createServiceClient()
+    const { data: tokens } = await serviceSupabase.from("fcm_tokens").select("token, user_id").in("user_id", recipients)
 
     if (tokens && tokens.length > 0) {
       const tokenStrings = tokens.map((t) => t.token)
