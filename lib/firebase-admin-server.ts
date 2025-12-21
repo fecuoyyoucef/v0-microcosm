@@ -53,7 +53,6 @@ export async function sendPushNotification(
       title,
       body,
       icon: "/icons/icon-192x192.png",
-      badge: "/icons/icon-96x96.png",
       vibrate: [200, 100, 200],
       requireInteraction: data?.priority === "high" || false,
       tag: data?.tag || `notification-${Date.now()}`,
@@ -67,7 +66,6 @@ export async function sendPushNotification(
       {
         action: "open",
         title: "فتح",
-        icon: "/icons/icon-48x48.png",
       },
     ]
 
@@ -131,7 +129,6 @@ export async function sendPushNotificationToMany(
       title,
       body,
       icon: "/icons/icon-192x192.png",
-      badge: "/icons/icon-96x96.png",
       vibrate: [200, 100, 200],
       requireInteraction: data?.priority === "high" || false,
       tag: data?.tag || `notification-${Date.now()}`,
@@ -145,7 +142,6 @@ export async function sendPushNotificationToMany(
       {
         action: "open",
         title: "فتح",
-        icon: "/icons/icon-48x48.png",
       },
     ]
 

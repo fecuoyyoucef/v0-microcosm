@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <!-- Background circle -->
+  <circle cx="96" cy="96" r="96" fill="#0ea5e9"/>
+  
+  <!-- Synaptic Space logo - interconnected nodes representing neural network -->
+  <g fill="white">
+    <!-- Central node -->
+    <circle cx="96" cy="96" r="12"/>
+    
+    <!-- Top nodes -->
+    <circle cx="70" cy="60" r="10"/>
+    <circle cx="122" cy="60" r="10"/>
+    
+    <!-- Bottom nodes -->
+    <circle cx="70" cy="132" r="10"/>
+    <circle cx="122" cy="132" r="10"/>
+    
+    <!-- Connection lines -->
+    <line x1="96" y1="96" x2="70" y2="60" stroke="white" stroke-width="3" opacity="0.7"/>
+    <line x1="96" y1="96" x2="122" y2="60" stroke="white" stroke-width="3" opacity="0.7"/>
+    <line x1="96" y1="96" x2="70" y2="132" stroke="white" stroke-width="3" opacity="0.7"/>
+    <line x1="96" y1="96" x2="122" y2="132" stroke="white" stroke-width="3" opacity="0.7"/>
+    
+    <!-- Connecting arcs between outer nodes -->
+    <path d="M 70 60 Q 96 40, 122 60" stroke="white" stroke-width="2" fill="none" opacity="0.5"/>
+    <path d="M 70 132 Q 96 152, 122 132" stroke="white" stroke-width="2" fill="none" opacity="0.5"/>
+  </g>
+</svg>
