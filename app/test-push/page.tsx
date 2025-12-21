@@ -5,37 +5,54 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/client"
+import { useRouter } from "next/navigation"
 
 export default function TestPushPage() {
   const [status, setStatus] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
+  const [isChecking, setIsChecking] = useState(true)
+  const router = useRouter()
 
   useEffect(() => {
-    // Get current user
-    const supabase = createClient()
-    supabase.auth.getUser().then(({ data }) => {
-      setUserId(data.user?.id || null)
-    })
+    const checkAccess = async () => {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
-    // Check initial status
-    checkStatus()
-  }, [])
+      if (!user) {
+        router.push("/auth/login?redirect=/test-push")
+        return
+      }
+
+      setUserId(user.id)
+
+      const { data: adminData } = await supabase.from("admins").select("role, is_active").eq("id", user.id).single()
+
+      if (!adminData || !adminData.is_active) {
+        router.push("/chat?error=unauthorized")
+        return
+      }
+
+      setIsChecking(false)
+      checkStatus()
+    }
+
+    checkAccess()
+  }, [router])
 
   const checkStatus = () => {
     const newStatus: Record<string, any> = {}
 
-    // 1. Check browser support
     newStatus.browserSupport = {
       notification: "Notification" in window,
       serviceWorker: "serviceWorker" in navigator,
       pushManager: "PushManager" in window,
     }
 
-    // 2. Check notification permission
     newStatus.permission = Notification.permission
 
-    // 3. Check environment variables
     newStatus.envVars = {
       apiKey: !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
       authDomain: !!process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -54,7 +71,6 @@ export default function TestPushPage() {
       setStatus((prev) => ({ ...prev, permission }))
 
       if (permission === "granted") {
-        // Try to register
         await registerForPush()
       }
     } catch (error) {
@@ -67,7 +83,6 @@ export default function TestPushPage() {
   const registerForPush = async () => {
     setLoading(true)
     try {
-      // Import and initialize Firebase
       const { initializeApp, getApps } = await import("firebase/app")
       const { getMessaging, getToken, isSupported } = await import("firebase/messaging")
 
@@ -90,19 +105,15 @@ export default function TestPushPage() {
 
       setStatus((prev) => ({ ...prev, firebaseConfig }))
 
-      // Initialize Firebase
       const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
       setStatus((prev) => ({ ...prev, firebaseInitialized: true }))
 
-      // Register service worker
       const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js")
       setStatus((prev) => ({ ...prev, serviceWorkerRegistered: true, swScope: registration.scope }))
 
-      // Get messaging
       const messaging = getMessaging(app)
       setStatus((prev) => ({ ...prev, messagingInitialized: true }))
 
-      // Get VAPID key from server
       const vapidResponse = await fetch("/api/firebase/vapid-key")
       const vapidData = await vapidResponse.json()
       setStatus((prev) => ({ ...prev, vapidKey: vapidData.vapidKey ? "Found" : "Missing" }))
@@ -112,7 +123,6 @@ export default function TestPushPage() {
         return
       }
 
-      // Get token
       const token = await getToken(messaging, {
         vapidKey: vapidData.vapidKey,
         serviceWorkerRegistration: registration,
@@ -121,7 +131,6 @@ export default function TestPushPage() {
       setStatus((prev) => ({ ...prev, fcmToken: token ? token.substring(0, 50) + "..." : "Failed" }))
 
       if (token && userId) {
-        // Save to database
         const supabase = createClient()
         const { error } = await supabase.from("fcm_tokens").upsert(
           {
@@ -169,6 +178,14 @@ export default function TestPushPage() {
     setLoading(false)
   }
 
+  if (isChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div>جاري التحقق من الصلاحيات...</div>
+      </div>
+    )
+  }
+
   return (
     <div className="container mx-auto p-4 max-w-2xl" dir="rtl">
       <Card>
@@ -177,7 +194,6 @@ export default function TestPushPage() {
           <CardDescription>صفحة تشخيص لفحص نظام Firebase Push Notifications</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* User ID */}
           <div className="flex items-center justify-between">
             <span>معرف المستخدم:</span>
             <Badge variant={userId ? "default" : "destructive"}>
@@ -185,7 +201,6 @@ export default function TestPushPage() {
             </Badge>
           </div>
 
-          {/* Browser Support */}
           <div className="space-y-2">
             <h3 className="font-semibold">دعم المتصفح:</h3>
             <div className="flex gap-2 flex-wrap">
@@ -201,7 +216,6 @@ export default function TestPushPage() {
             </div>
           </div>
 
-          {/* Permission */}
           <div className="flex items-center justify-between">
             <span>إذن الإشعارات:</span>
             <Badge
@@ -217,7 +231,6 @@ export default function TestPushPage() {
             </Badge>
           </div>
 
-          {/* Environment Variables */}
           <div className="space-y-2">
             <h3 className="font-semibold">متغيرات البيئة:</h3>
             <div className="flex gap-2 flex-wrap">
@@ -229,7 +242,6 @@ export default function TestPushPage() {
             </div>
           </div>
 
-          {/* Other Status */}
           {status.firebaseSupported !== undefined && (
             <div className="flex items-center justify-between">
               <span>دعم Firebase:</span>
@@ -288,7 +300,6 @@ export default function TestPushPage() {
             </div>
           )}
 
-          {/* Actions */}
           <div className="flex gap-2 flex-wrap pt-4">
             <Button onClick={checkStatus} variant="outline">
               تحديث الحالة

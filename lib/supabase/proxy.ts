@@ -26,6 +26,33 @@ export async function updateSession(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser()
 
+    if (request.nextUrl.pathname.startsWith("/test-push")) {
+      const adminSession = request.cookies.get("admin_session")?.value
+      if (!adminSession) {
+        const url = request.nextUrl.clone()
+        url.pathname = "/admin/login"
+        url.searchParams.set("redirect", "/test-push")
+        return NextResponse.redirect(url)
+      }
+
+      try {
+        const decoded = JSON.parse(Buffer.from(adminSession, "base64").toString())
+        if (decoded.exp < Date.now()) {
+          const url = request.nextUrl.clone()
+          url.pathname = "/admin/login"
+          url.searchParams.set("redirect", "/test-push")
+          const response = NextResponse.redirect(url)
+          response.cookies.delete("admin_session")
+          return response
+        }
+      } catch {
+        const url = request.nextUrl.clone()
+        url.pathname = "/admin/login"
+        url.searchParams.set("redirect", "/test-push")
+        return NextResponse.redirect(url)
+      }
+    }
+
     if (request.nextUrl.pathname.startsWith("/admin") && !request.nextUrl.pathname.startsWith("/admin/login")) {
       const adminSession = request.cookies.get("admin_session")?.value
       if (!adminSession) {
