@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { sendPushNotificationToMany } from "@/lib/firebase-admin-server"
@@ -68,7 +68,8 @@ export async function POST(request: Request) {
     let diagnosticInfo: any = {}
 
     try {
-      const { data: fcmTokens, error: tokensError } = await supabase
+      const serviceSupabase = createServiceClient()
+      const { data: fcmTokens, error: tokensError } = await serviceSupabase
         .from("fcm_tokens")
         .select("token, user_id, created_at, updated_at")
 
