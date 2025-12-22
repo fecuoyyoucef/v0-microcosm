@@ -81,7 +81,7 @@ export async function POST(request: Request) {
     let sentCount = 0
     const errors = []
 
-    for (const sub of subscriptions) {
+    const sendPromises = subscriptions.map(async (sub) => {
       try {
         const pushSubscription = {
           endpoint: sub.endpoint,
@@ -92,16 +92,24 @@ export async function POST(request: Request) {
         }
 
         await webpush.sendNotification(pushSubscription, payload)
-        sentCount++
+        return { success: true, userId: sub.user_id }
       } catch (err: any) {
         console.error("[Push] Send error:", err.statusCode, err.body)
-        errors.push({ userId: sub.user_id, error: err.message })
 
         // Remove invalid subscriptions (410 Gone or 404 Not Found)
         if (err.statusCode === 410 || err.statusCode === 404) {
           await supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint)
         }
+
+        return { success: false, userId: sub.user_id, error: err.message }
       }
+    })
+
+    const results = await Promise.all(sendPromises)
+    sentCount = results.filter((r) => r.success).length
+    const failedResults = results.filter((r) => !r.success)
+    if (failedResults.length > 0) {
+      failedResults.forEach((r) => errors.push({ userId: r.userId, error: r.error }))
     }
 
     return NextResponse.json({
