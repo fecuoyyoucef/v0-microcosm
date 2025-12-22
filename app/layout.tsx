@@ -82,6 +82,26 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="msapplication-TileColor" content="#1a1a2e" />
         <meta name="msapplication-tap-highlight" content="no" />
+        <meta name="screen-orientation" content="portrait" />
+        <meta name="x5-orientation" content="portrait" />
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+          @media screen and (orientation: landscape) {
+            html {
+              transform: rotate(-90deg);
+              transform-origin: left top;
+              width: 100vh;
+              height: 100vw;
+              overflow-x: hidden;
+              position: absolute;
+              top: 100%;
+              left: 0;
+            }
+          }
+        `,
+          }}
+        />
       </head>
       <body className={`${ibmPlexArabic.variable} ${geistMono.variable} font-sans antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
@@ -108,11 +128,29 @@ export default function RootLayout({
                   );
                 });
               }
-              if (screen.orientation && screen.orientation.lock) {
-                screen.orientation.lock('portrait').catch(err => {
-                  console.log('Screen orientation lock failed:', err);
-                });
+              
+              function lockOrientation() {
+                if (screen.orientation && screen.orientation.lock) {
+                  screen.orientation.lock('portrait').catch(err => {
+                    console.log('Screen orientation lock failed:', err);
+                  });
+                } else if (screen.lockOrientation) {
+                  screen.lockOrientation('portrait');
+                } else if (screen.mozLockOrientation) {
+                  screen.mozLockOrientation('portrait');
+                } else if (screen.msLockOrientation) {
+                  screen.msLockOrientation('portrait');
+                }
               }
+              
+              lockOrientation();
+              
+              window.addEventListener('orientationchange', lockOrientation);
+              if (screen.orientation) {
+                screen.orientation.addEventListener('change', lockOrientation);
+              }
+              
+              window.addEventListener('resize', lockOrientation);
             `,
           }}
         />
