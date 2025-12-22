@@ -83,16 +83,13 @@ export async function sendPushNotification(
       },
     }
 
-    console.log("[Firebase Admin] Sending notification-only message to token:", token.substring(0, 20) + "...")
     const result = await adminInstance.messaging().send(message)
-    console.log("[Firebase Admin] Notification sent successfully, messageId:", result)
     return { success: true }
   } catch (error: any) {
     if (
       error.code === "messaging/registration-token-not-registered" ||
       error.code === "messaging/invalid-registration-token"
     ) {
-      console.log("[Firebase Admin] Invalid token detected:", token.substring(0, 20))
       return { success: false, invalidToken: true }
     } else {
       console.error("[Firebase Admin] Send error:", error.code, error.message)
@@ -101,7 +98,6 @@ export async function sendPushNotification(
   }
 }
 
-// إرسال إشعار لعدة مستخدمين
 export async function sendPushNotificationToMany(
   tokens: string[],
   title: string,
@@ -109,14 +105,12 @@ export async function sendPushNotificationToMany(
   data?: Record<string, string>,
 ): Promise<{ success: number; failure: number; invalidTokens: string[] }> {
   if (tokens.length === 0) {
-    console.log("[Firebase Admin] No tokens provided")
     return { success: 0, failure: 0, invalidTokens: [] }
   }
 
   // Remove duplicates
   const uniqueTokens = [...new Set(tokens)]
-  console.log(`[Firebase Admin] ========== MULTICAST START ==========`)
-  console.log(`[Firebase Admin] Received ${tokens.length} tokens, ${uniqueTokens.length} unique`)
+  console.log(`[Firebase] Sending to ${uniqueTokens.length} unique tokens (from ${tokens.length} total)`)
 
   try {
     const adminInstance = getFirebaseAdmin()
@@ -145,84 +139,63 @@ export async function sendPushNotificationToMany(
       },
     ]
 
-    const message = {
-      tokens: uniqueTokens,
-      notification: {
-        title,
-        body,
-      },
-      webpush: {
-        notification: webpushNotification,
-        fcmOptions: {
-          link: data?.action_url || data?.url || "/",
-        },
-      },
-    }
-
-    console.log(
-      `[Firebase Admin] Message payload:`,
-      JSON.stringify({
-        tokensCount: uniqueTokens.length,
-        notification: message.notification,
-        webpush: { notification: { title: webpushNotification.title, body: webpushNotification.body } },
-      }),
-    )
-
-    console.log(`[Firebase Admin] Calling sendEachForMulticast...`)
-    const response = await adminInstance.messaging().sendEachForMulticast(message)
-
-    console.log(`[Firebase Admin] ========== MULTICAST RESULT ==========`)
-    console.log(`[Firebase Admin] Success count: ${response.successCount}`)
-    console.log(`[Firebase Admin] Failure count: ${response.failureCount}`)
-
-    const invalidTokens: string[] = []
-
-    response.responses.forEach((resp, idx) => {
-      const tokenPreview = uniqueTokens[idx].substring(0, 25) + "..."
-      if (resp.success) {
-        console.log(`[Firebase Admin] [${idx}] SUCCESS - token: ${tokenPreview}, messageId: ${resp.messageId}`)
-      } else if (resp.error) {
-        const errorCode = resp.error.code
-        const errorMsg = resp.error.message
-        console.error(`[Firebase Admin] [${idx}] FAILED - token: ${tokenPreview}, error: ${errorCode} - ${errorMsg}`)
-
-        if (
-          errorCode === "messaging/registration-token-not-registered" ||
-          errorCode === "messaging/invalid-registration-token" ||
-          errorCode === "messaging/invalid-argument"
-        ) {
-          invalidTokens.push(uniqueTokens[idx])
-          console.log(`[Firebase Admin] [${idx}] Marked as INVALID`)
+    const sendPromises = uniqueTokens.map(async (token) => {
+      try {
+        const message = {
+          token,
+          notification: {
+            title,
+            body,
+          },
+          webpush: {
+            notification: webpushNotification,
+            fcmOptions: {
+              link: data?.action_url || data?.url || "/",
+            },
+          },
         }
+
+        await adminInstance.messaging().send(message)
+        return { success: true, token, invalidToken: false }
+      } catch (error: any) {
+        const isInvalid =
+          error.code === "messaging/registration-token-not-registered" ||
+          error.code === "messaging/invalid-registration-token" ||
+          error.code === "messaging/invalid-argument"
+
+        return { success: false, token, invalidToken: isInvalid }
       }
     })
 
-    console.log(`[Firebase Admin] Invalid tokens found: ${invalidTokens.length}`)
+    console.log(`[Firebase] Starting parallel send to ${uniqueTokens.length} tokens...`)
+    const startTime = Date.now()
+    const results = await Promise.all(sendPromises)
+    const endTime = Date.now()
+    console.log(`[Firebase] Parallel send completed in ${endTime - startTime}ms`)
+
+    const successCount = results.filter((r) => r.success).length
+    const failureCount = results.filter((r) => !r.success).length
+    const invalidTokens = results.filter((r) => r.invalidToken).map((r) => r.token)
+
+    console.log(`[Firebase] Results: ${successCount} success, ${failureCount} failed, ${invalidTokens.length} invalid`)
 
     if (invalidTokens.length > 0) {
-      console.log(`[Firebase Admin] Removing ${invalidTokens.length} invalid tokens from database...`)
       try {
         const supabase = await createClient()
-        const { error } = await supabase.from("fcm_tokens").delete().in("token", invalidTokens)
-        if (error) {
-          console.error("[Firebase Admin] Error deleting invalid tokens:", error)
-        } else {
-          console.log(`[Firebase Admin] Successfully removed ${invalidTokens.length} invalid tokens`)
-        }
+        await supabase.from("fcm_tokens").delete().in("token", invalidTokens)
+        console.log(`[Firebase] Removed ${invalidTokens.length} invalid tokens`)
       } catch (dbError) {
-        console.error("[Firebase Admin] Database error while removing tokens:", dbError)
+        console.error("[Firebase] Error removing invalid tokens:", dbError)
       }
     }
 
-    console.log(`[Firebase Admin] ========== MULTICAST END ==========`)
-
     return {
-      success: response.successCount,
-      failure: response.failureCount,
+      success: successCount,
+      failure: failureCount,
       invalidTokens,
     }
   } catch (error: any) {
-    console.error("[Firebase Admin] Multicast error:", error.code, error.message)
+    console.error("[Firebase Admin] Multicast error:", error)
     return { success: 0, failure: uniqueTokens.length, invalidTokens: [] }
   }
 }
