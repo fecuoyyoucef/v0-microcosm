@@ -31,13 +31,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to create notification" }, { status: 500 })
     }
 
-    // إرسال push notification لكل مستخدم
-    for (const uid of userIds) {
-      const { data: tokens } = await supabase.from("fcm_tokens").select("token").eq("user_id", uid)
+    const pushPromises = userIds.map(async (uid) => {
+      try {
+        const { data: tokens } = await supabase.from("fcm_tokens").select("token").eq("user_id", uid)
 
-      if (tokens && tokens.length > 0) {
-        try {
-          await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notifications/send-push`, {
+        if (tokens && tokens.length > 0) {
+          return fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/notifications/send-push`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -51,11 +50,15 @@ export async function POST(request: NextRequest) {
               },
             }),
           })
-        } catch (pushError) {
-          console.error("[Notifications API] Push error for user", uid, ":", pushError)
         }
+      } catch (pushError) {
+        console.error("[Notifications API] Push error for user", uid, ":", pushError)
+        return null
       }
-    }
+    })
+
+    // انتظار جميع الإرسالات بالتوازي
+    await Promise.allSettled(pushPromises)
 
     return NextResponse.json({ success: true, notifications: createdNotifications })
   } catch (error) {
