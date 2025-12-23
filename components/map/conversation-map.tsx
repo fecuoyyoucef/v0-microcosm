@@ -31,60 +31,101 @@ interface ConversationMapProps {
 
 const NODE_COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#06B6D4"]
 
-const calculateNodePositions = (
+const calculateMindMapPositions = (
   nodes: ConversationNode[],
   containerWidth: number,
   containerHeight: number,
 ): ConversationNode[] => {
-  const primaryNodes = nodes.filter((n) => !n.parent_id)
-  const childNodes = nodes.filter((n) => n.parent_id)
+  if (nodes.length === 0) return []
 
+  const centerX = containerWidth / 2
+  const centerY = containerHeight / 2
   const positioned: ConversationNode[] = []
 
-  // Calculate grid based on container size
-  const nodeWidth = 180
-  const nodeHeight = 100
-  const horizontalGap = 60
-  const verticalGap = 40
+  // Find root nodes (no parent)
+  const rootNodes = nodes.filter((n) => !n.parent_id)
+  const childNodes = nodes.filter((n) => n.parent_id)
 
-  const cols = Math.max(2, Math.floor((containerWidth - 100) / (nodeWidth + horizontalGap)))
-
-  // Position primary nodes in a grid
-  primaryNodes.forEach((node, index) => {
-    const col = index % cols
-    const row = Math.floor(index / cols)
+  // If there's only one root, place it in center
+  if (rootNodes.length === 1) {
+    const root = rootNodes[0]
     positioned.push({
-      ...node,
-      position_x: 50 + col * (nodeWidth + horizontalGap),
-      position_y: 50 + row * (nodeHeight + verticalGap + 80),
+      ...root,
+      position_x: centerX,
+      position_y: centerY,
     })
-  })
 
-  // Position child nodes relative to their parents
-  const childrenByParent: Record<string, ConversationNode[]> = {}
-  childNodes.forEach((node) => {
-    if (node.parent_id) {
-      if (!childrenByParent[node.parent_id]) {
-        childrenByParent[node.parent_id] = []
-      }
-      childrenByParent[node.parent_id].push(node)
-    }
-  })
+    // Get children of root
+    const rootChildren = childNodes.filter((n) => n.parent_id === root.id)
+    const angleStep = (Math.PI * 2) / Math.max(rootChildren.length, 1)
+    const radius = Math.min(containerWidth, containerHeight) * 0.25
 
-  Object.entries(childrenByParent).forEach(([parentId, children]) => {
-    const parent = positioned.find((n) => n.id === parentId)
-    if (parent) {
-      children.forEach((node, siblingIndex) => {
-        positioned.push({
-          ...node,
-          position_x: parent.position_x + nodeWidth + horizontalGap,
-          position_y: parent.position_y + siblingIndex * (nodeHeight + verticalGap / 2),
-        })
+    rootChildren.forEach((child, index) => {
+      const angle = angleStep * index - Math.PI / 2 // Start from top
+      const x = centerX + Math.cos(angle) * radius
+      const y = centerY + Math.sin(angle) * radius
+
+      positioned.push({
+        ...child,
+        position_x: x,
+        position_y: y,
       })
-    } else {
-      children.forEach((node) => positioned.push(node))
-    }
-  })
+
+      // Position grandchildren
+      const grandchildren = childNodes.filter((n) => n.parent_id === child.id)
+      if (grandchildren.length > 0) {
+        const subAngleStep = angleStep / (grandchildren.length + 1)
+        const subRadius = radius * 0.6
+
+        grandchildren.forEach((gc, gcIndex) => {
+          const subAngle = angle + subAngleStep * (gcIndex + 1) - angleStep / 2
+          const gcX = x + Math.cos(subAngle) * subRadius
+          const gcY = y + Math.sin(subAngle) * subRadius
+
+          positioned.push({
+            ...gc,
+            position_x: gcX,
+            position_y: gcY,
+          })
+        })
+      }
+    })
+  } else {
+    // Multiple roots - arrange in circle
+    const angleStep = (Math.PI * 2) / rootNodes.length
+    const rootRadius = Math.min(containerWidth, containerHeight) * 0.15
+
+    rootNodes.forEach((root, index) => {
+      const angle = angleStep * index - Math.PI / 2
+      const x = centerX + Math.cos(angle) * rootRadius
+      const y = centerY + Math.sin(angle) * rootRadius
+
+      positioned.push({
+        ...root,
+        position_x: x,
+        position_y: y,
+      })
+
+      // Position children around their parent
+      const children = childNodes.filter((n) => n.parent_id === root.id)
+      if (children.length > 0) {
+        const childRadius = Math.min(containerWidth, containerHeight) * 0.2
+        const childAngleStep = (Math.PI * 2) / children.length
+
+        children.forEach((child, childIndex) => {
+          const childAngle = angle + childAngleStep * childIndex
+          const childX = x + Math.cos(childAngle) * childRadius
+          const childY = y + Math.sin(childAngle) * childRadius
+
+          positioned.push({
+            ...child,
+            position_x: childX,
+            position_y: childY,
+          })
+        })
+      }
+    })
+  }
 
   return positioned
 }
@@ -94,7 +135,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 })
 
   const nodes = useMemo(
-    () => calculateNodePositions(initialNodes, containerSize.width, containerSize.height),
+    () => calculateMindMapPositions(initialNodes, containerSize.width, containerSize.height),
     [initialNodes, containerSize.width, containerSize.height],
   )
 
@@ -153,7 +194,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
             .order("created_at", { ascending: true })
 
           if (data) {
-            setLocalNodes(calculateNodePositions(data, containerSize.width, containerSize.height))
+            setLocalNodes(calculateMindMapPositions(data, containerSize.width, containerSize.height))
           }
         },
       )
@@ -201,25 +242,14 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
 
     setIsCreating(true)
     try {
-      let posX = 100 + Math.random() * 200
-      let posY = 100 + Math.random() * 200
-
-      if (newNodeParent) {
-        const parentNode = localNodes.find((n) => n.id === newNodeParent)
-        if (parentNode) {
-          posX = parentNode.position_x + 250
-          posY = parentNode.position_y + Math.random() * 100 - 50
-        }
-      }
-
       const { error } = await supabase.from("conversation_nodes").insert({
         group_id: groupId,
         title: newNodeTitle.trim(),
         description: newNodeDescription.trim() || null,
         parent_id: newNodeParent,
         color: newNodeColor,
-        position_x: posX,
-        position_y: posY,
+        position_x: 0,
+        position_y: 0,
         created_by: currentUserId,
       })
 
@@ -424,28 +454,42 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
             className="absolute inset-0 map-canvas"
             style={{
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-              transformOrigin: "0 0",
+              transformOrigin: "center center",
               minWidth: "100%",
               minHeight: "100%",
             }}
           >
-            {/* SVG for connections */}
             <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ overflow: "visible" }}>
               {localNodes.map((node) => {
                 if (!node.parent_id) return null
                 const parent = localNodes.find((n) => n.id === node.parent_id)
                 if (!parent) return null
 
+                const x1 = parent.position_x
+                const y1 = parent.position_y
+                const x2 = node.position_x
+                const y2 = node.position_y
+
+                // Calculate control point for curved line
+                const midX = (x1 + x2) / 2
+                const midY = (y1 + y2) / 2
+                const dx = x2 - x1
+                const dy = y2 - y1
+                const distance = Math.sqrt(dx * dx + dy * dy)
+                const curveOffset = distance * 0.15
+
+                const controlX = midX - (dy / distance) * curveOffset
+                const controlY = midY + (dx / distance) * curveOffset
+
                 return (
-                  <line
+                  <path
                     key={`line-${node.id}`}
-                    x1={parent.position_x + 80}
-                    y1={parent.position_y + 30}
-                    x2={node.position_x}
-                    y2={node.position_y + 30}
+                    d={`M ${x1} ${y1} Q ${controlX} ${controlY} ${x2} ${y2}`}
                     stroke={node.color}
-                    strokeWidth={2}
-                    strokeOpacity={0.4}
+                    strokeWidth={3}
+                    strokeOpacity={0.6}
+                    fill="none"
+                    strokeLinecap="round"
                   />
                 )
               })}
@@ -552,32 +596,53 @@ function MapNode({
   isSelected: boolean
   onClick: () => void
 }) {
+  const hasParent = !!node.parent_id
+
   return (
     <div
-      className={cn(
-        "absolute px-4 py-3 rounded-xl bg-card cursor-pointer transition-all hover:shadow-lg min-w-[160px] max-w-[200px]",
-        isSelected ? "shadow-xl scale-105 ring-2 ring-primary" : "hover:scale-[1.02] shadow-md",
-      )}
+      className={cn("absolute cursor-pointer transition-all duration-200 group", isSelected && "z-10")}
       style={{
-        left: node.position_x,
-        top: node.position_y,
-        borderWidth: "2px",
-        borderStyle: "solid",
-        borderColor: node.color,
+        left: node.position_x - (hasParent ? 70 : 90),
+        top: node.position_y - (hasParent ? 25 : 30),
+        transform: isSelected ? "scale(1.05)" : "scale(1)",
       }}
       onClick={onClick}
     >
-      <div className="flex items-center gap-2 mb-1">
-        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: node.color }} />
-        <h4 className="font-medium text-sm truncate">{node.title}</h4>
-      </div>
-      {node.description && <p className="text-xs text-muted-foreground line-clamp-2">{node.description}</p>}
-      {node.messages_count !== undefined && node.messages_count > 0 && (
-        <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
-          <MessageSquare className="w-3 h-3" />
-          <span>{node.messages_count}</span>
+      {/* Node container */}
+      <div
+        className={cn(
+          "rounded-full px-4 py-2 shadow-lg transition-all duration-200",
+          "border-2 backdrop-blur-sm",
+          hasParent ? "min-w-[140px]" : "min-w-[180px]",
+          isSelected ? "shadow-2xl ring-4 ring-primary/30" : "hover:shadow-xl hover:scale-105",
+        )}
+        style={{
+          backgroundColor: node.color + "15",
+          borderColor: node.color,
+        }}
+      >
+        <div className="flex items-center justify-center gap-2">
+          <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: node.color }} />
+          <span
+            className={cn("font-medium text-center leading-tight", hasParent ? "text-sm" : "text-base")}
+            style={{ color: node.color }}
+          >
+            {node.title}
+          </span>
+          {node.messages_count > 0 && (
+            <div
+              className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full shrink-0"
+              style={{
+                backgroundColor: node.color + "30",
+                color: node.color,
+              }}
+            >
+              <MessageSquare className="w-3 h-3" />
+              <span>{node.messages_count}</span>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }
