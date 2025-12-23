@@ -8,6 +8,8 @@ import { Menu, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
+const OWNER_EMAIL = "youcef192837@gmail.com"
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isChecking, setIsChecking] = useState(true)
@@ -22,6 +24,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       if (!user) {
         router.push("/auth/login?redirect=/admin")
+        return
+      }
+
+      if (user.email === OWNER_EMAIL) {
+        setIsChecking(false)
         return
       }
 
