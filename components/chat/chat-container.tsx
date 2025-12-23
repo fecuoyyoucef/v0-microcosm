@@ -512,9 +512,11 @@ export function ChatContainer({
             isLoading={isLoading}
             messagesEndRef={messagesEndRef}
             nodes={nodes}
-            onReply={handleReply}
-            onDelete={handleDeleteMessage}
-            onEdit={handleEditMessage}
+            onReplySelect={handleReply}
+            onEditSelect={handleEditMessage}
+            onMessageDeleted={(messageId) => {
+              setMessages((prev) => prev.filter((m) => m.id !== messageId))
+            }}
           />
           <TypingIndicator userNames={typingUserNames} />
         </div>

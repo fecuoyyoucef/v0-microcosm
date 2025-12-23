@@ -1,18 +1,17 @@
 "use client"
 
 import React from "react"
-import { useState, useEffect, useRef } from "react"
+import { useState, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
-import { Copy, Edit2, CheckCheck, Trash2, Languages, Loader2, Check, Pin, Smile, Globe } from "lucide-react"
+import { Copy, Edit2, Trash2, Languages, Check, Pin, Reply } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ar } from "date-fns/locale"
 import type { Message, GroupMember, ConversationNode } from "@/lib/types"
 import { cn } from "@/lib/utils"
-import Link from "next/link"
 import { toast } from "@/components/ui/use-toast"
 import {
   AlertDialog,
@@ -24,7 +23,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Reply } from "lucide-react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 
 const avatarColors = [
@@ -48,29 +46,6 @@ const getAvatarColor = (str: string) => {
 
 const quickReactions = ["👍", "❤️", "😂", "😮", "😢", "🔥"]
 
-interface MessageListProps {
-  messages: Message[]
-  groupId?: string // Assuming groupId is relevant for fetching members or context
-  currentUserId: string
-  members?: GroupMember[] // Make members optional and default to empty array
-  isLoading: boolean
-  messagesEndRef: React.RefObject<HTMLDivElement>
-  nodes: ConversationNode[]
-  onReply?: (message: Message) => void
-  onDelete?: (messageId: string) => void
-  onEdit?: (message: Message) => void
-  onPin?: (messageId: string) => void
-  onTranslate?: (messageId: string, content: string) => Promise<void>
-}
-
-interface Reaction {
-  id: string
-  message_id: string
-  user_id: string
-  reaction: string
-  created_at: string
-}
-
 const layerStyles: Record<string, { bg: string; ownBg: string; icon: string }> = {
   upper: {
     bg: "bg-orange-100/80 dark:bg-orange-900/30",
@@ -85,879 +60,407 @@ const layerStyles: Record<string, { bg: string; ownBg: string; icon: string }> =
   },
 }
 
+interface MessageListProps {
+  messages: Message[]
+  groupId?: string
+  currentUserId: string
+  members?: GroupMember[]
+  isLoading: boolean
+  messagesEndRef: React.RefObject<HTMLDivElement | null>
+  nodes?: ConversationNode[]
+  onReplySelect?: (message: Message) => void
+  onEditSelect?: (message: Message) => void
+  onMessageDeleted?: (messageId: string) => void
+}
+
+interface Reaction {
+  id: string
+  message_id: string
+  user_id: string
+  reaction: string
+  created_at: string
+}
+
 export const MessageList = React.memo(function MessageList({
   messages,
   currentUserId,
-  onReply,
-  onEdit,
-  onDelete,
-  onPin,
-  onTranslate,
   isLoading,
   messagesEndRef,
   nodes = [],
+  onReplySelect,
+  onEditSelect,
+  onMessageDeleted,
 }: MessageListProps) {
   const supabase = createClient()
-  const containerRef = useRef<HTMLDivElement>(null)
-  const reactionPickerRef = useRef<HTMLDivElement>(null) // Keep this for potential future use or if needed for context
-  const [reactions, setReactions] = useState<Record<string, Reaction[]>>({})
-  const [activeMessageId, setActiveMessageId] = useState<string | null>(null)
-  const [showReactionsFor, setShowReactionsFor] = useState<string | null>(null)
-  const [lightboxImage, setLightboxImage] = useState<string | null>(null)
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [messageToDelete, setMessageToDelete] = useState<string | null>(null)
-  const [translatedMessages, setTranslatedMessages] = useState<Record<string, string>>({})
-  const [translatingMessages, setTranslatingMessages] = useState<Set<string>>(new Set())
-  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null)
+
   const [showActionSheet, setShowActionSheet] = useState(false)
-  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null)
-  const [showReactionPicker, setShowReactionPicker] = useState(false)
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [translatingId, setTranslatingId] = useState<string | null>(null)
+  const [translations, setTranslations] = useState<Record<string, string>>({})
+  const [reactions, setReactions] = useState<Record<string, Reaction[]>>({})
 
-  const handleMouseEnter = (messageId: string) => {
-    setActiveMessageId(messageId)
-  }
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null)
 
-  const handleMouseLeave = () => {
-    setActiveMessageId(null)
-  }
-
-  const handleMessageLongPress = (message: Message) => {
-    setSelectedMessage(message)
-    setShowActionSheet(true)
-  }
-
-  const handleTouchStart = (messageId: string, e: React.TouchEvent) => {
-    const message = messages.find((m) => m.id === messageId)
-    if (!message) return
-
-    const timer = setTimeout(() => {
-      handleMessageLongPress(message)
-    }, 500) // 500ms long press
-
-    setLongPressTimer(timer)
-  }
-
-  const handleTouchEnd = () => {
-    if (longPressTimer) {
-      clearTimeout(longPressTimer)
-      setLongPressTimer(null)
-    }
-  }
-
-  const handleTouchMove = () => {
-    if (longPressTimer) {
-      clearTimeout(longPressTimer)
-      setLongPressTimer(null)
-    }
-  }
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (reactionPickerRef.current && !reactionPickerRef.current.contains(event.target as Node)) {
-        setShowReactionsFor(null)
-      }
-      // Close actions menu when clicking outside
-      if (showActionSheet && !event.target!.closest(".actions-menu-container")) {
-        // Assuming a class for the actions menu container
-        setShowActionSheet(false)
-        setSelectedMessage(null)
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
-    }
-  }, [showReactionsFor, showActionSheet])
-
-  useEffect(() => {
-    if (messages.length === 0) return
-
-    const fetchReactions = async () => {
-      const messageIds = messages.map((m) => m.id).filter((id) => !id.startsWith("temp-"))
-      if (messageIds.length === 0) return
-
-      const { data } = await supabase.from("message_reactions").select("*").in("message_id", messageIds)
-
-      if (data) {
-        const grouped: Record<string, Reaction[]> = {}
-        data.forEach((r) => {
-          if (!grouped[r.message_id]) grouped[r.message_id] = []
-          grouped[r.message_id].push(r)
-        })
-        setReactions(grouped)
-      }
-    }
-
-    fetchReactions()
-
-    const channel = supabase
-      .channel("reactions-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "message_reactions" }, () => fetchReactions())
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [messages, supabase])
-
-  useEffect(() => {
-    if (containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight
-    }
-  }, [messages.length])
-
-  const toggleReaction = async (messageId: string, reactionEmoji: string) => {
-    const existingReaction = reactions[messageId]?.find((r) => r.user_id === currentUserId)
-
-    if (existingReaction) {
-      await supabase.from("message_reactions").delete().eq("id", existingReaction.id)
-      if (existingReaction.reaction !== reactionEmoji) {
-        await supabase.from("message_reactions").insert({
-          message_id: messageId,
-          user_id: currentUserId,
-          reaction: reactionEmoji,
-        })
-        const message = messages.find((m) => m.id === messageId)
-        if (message && message.sender_id !== currentUserId) {
-          await sendReactionNotification(message, reactionEmoji)
-        }
-      }
-    } else {
-      await supabase.from("message_reactions").insert({
-        message_id: messageId,
-        user_id: currentUserId,
-        reaction: reactionEmoji,
-      })
-      const message = messages.find((m) => m.id === messageId)
-      if (message && message.sender_id !== currentUserId) {
-        await sendReactionNotification(message, reactionEmoji)
-      }
-    }
-    setShowReactionsFor(null)
-    setSelectedMessage(null)
-    setShowActionSheet(false)
-    setShowReactionPicker(false)
-  }
-
-  const sendReactionNotification = async (message: Message, emoji: string) => {
+  const handleCopy = async (content: string, messageId: string) => {
     try {
-      const currentMember = messages.find((m) => m.sender_id === currentUserId)?.sender
-      const senderName = currentMember?.display_name || "مستخدم"
+      await navigator.clipboard.writeText(content)
+      setCopiedId(messageId)
+      setTimeout(() => setCopiedId(null), 2000)
+      toast({ title: "تم النسخ" })
+      setShowActionSheet(false)
+    } catch {
+      toast({ title: "فشل النسخ", variant: "destructive" })
+    }
+  }
 
-      await fetch("/api/notifications/send", {
+  const handleReply = () => {
+    if (selectedMessage && onReplySelect) {
+      onReplySelect(selectedMessage)
+      setShowActionSheet(false)
+      toast({ title: "اختر ردك على الرسالة" })
+    }
+  }
+
+  const handleEdit = () => {
+    if (selectedMessage && onEditSelect) {
+      onEditSelect(selectedMessage)
+      setShowActionSheet(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!selectedMessage) return
+
+    setIsDeleting(true)
+    try {
+      const response = await fetch("/api/messages/delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userIds: [message.sender_id],
-          type: "reaction",
-          title: "تفاعل جديد",
-          body: `تفاعل ${senderName} برسالتك بـ ${emoji}`,
-          data: {
-            messageId: message.id,
-            groupId: message.group_id,
-            emoji,
-            url: `/chat/${message.group_id}`,
-          },
-        }),
-      })
-    } catch (error) {
-      console.error("Error sending reaction notification:", error)
-    }
-  }
-
-  const getReplyPreview = (replyToId: string) => {
-    const originalMessage = messages.find((m) => m.id === replyToId)
-    if (!originalMessage) return null
-    return {
-      senderName: originalMessage.sender?.display_name || "مستخدم",
-      content: originalMessage.content?.substring(0, 50) + (originalMessage.content?.length > 50 ? "..." : ""),
-    }
-  }
-
-  const getGroupedReactions = (messageId: string) => {
-    const messageReactions = reactions[messageId] || []
-    const grouped: Record<string, { count: number; users: string[]; hasCurrentUser: boolean }> = {}
-
-    // Track unique users per reaction
-    const usersByReaction: Record<string, Set<string>> = {}
-
-    messageReactions.forEach((r) => {
-      if (!usersByReaction[r.reaction]) {
-        usersByReaction[r.reaction] = new Set()
-      }
-      // Only count if user hasn't already reacted with this emoji
-      if (!usersByReaction[r.reaction].has(r.user_id)) {
-        usersByReaction[r.reaction].add(r.user_id)
-
-        if (!grouped[r.reaction]) {
-          grouped[r.reaction] = { count: 0, users: [], hasCurrentUser: false }
-        }
-        grouped[r.reaction].count++
-        const member = messages.find((m) => m.sender_id === r.user_id)?.sender
-        grouped[r.reaction].users.push(member?.display_name || "مستخدم")
-        if (r.user_id === currentUserId) {
-          grouped[r.reaction].hasCurrentUser = true
-        }
-      }
-    })
-
-    return grouped
-  }
-
-  const handleDeleteClick = (messageId: string) => {
-    setMessageToDelete(messageId)
-    setDeleteDialogOpen(true)
-  }
-
-  const confirmDelete = () => {
-    if (messageToDelete && onDelete) {
-      onDelete(messageToDelete)
-    }
-    setDeleteDialogOpen(false)
-    setMessageToDelete(null)
-  }
-
-  const handleTranslate = async (messageId: string, content: string) => {
-    if (translatedMessages[messageId]) {
-      // Toggle off translation
-      setTranslatedMessages((prev) => {
-        const updated = { ...prev }
-        delete updated[messageId]
-        return updated
-      })
-      return
-    }
-
-    setTranslatingMessages((prev) => new Set([...prev, messageId]))
-
-    try {
-      const response = await fetch("/api/ai/translate-message", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          content,
-          targetLang: content.match(/[a-zA-Z]/) ? "ar" : "en", // Auto-detect
-        }),
+        body: JSON.stringify({ messageId: selectedMessage.id }),
       })
 
       if (response.ok) {
-        const { translation } = await response.json()
-        setTranslatedMessages((prev) => ({ ...prev, [messageId]: translation }))
+        toast({ title: "تم حذف الرسالة" })
+        onMessageDeleted?.(selectedMessage.id)
+      } else {
+        const data = await response.json()
+        toast({ title: data.error || "فشل الحذف", variant: "destructive" })
       }
-    } catch (error) {
-      console.error("Translation error:", error)
+    } catch {
+      toast({ title: "فشل الحذف", variant: "destructive" })
     } finally {
-      setTranslatingMessages((prev) => {
-        const updated = new Set(prev)
-        updated.delete(messageId)
-        return updated
+      setIsDeleting(false)
+      setShowDeleteDialog(false)
+      setShowActionSheet(false)
+      setSelectedMessage(null)
+    }
+  }
+
+  const handlePin = async () => {
+    if (!selectedMessage) return
+
+    try {
+      const response = await fetch("/api/messages/pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId: selectedMessage.id }),
       })
-    }
-  }
 
-  const renderContentWithMentions = (content: string) => {
-    const mentionPattern = /@(\w+)/g
-    const parts = []
-    let lastIndex = 0
-    let match
-
-    while ((match = mentionPattern.exec(content)) !== null) {
-      // Add text before mention
-      if (match.index > lastIndex) {
-        parts.push(content.substring(lastIndex, match.index))
+      if (response.ok) {
+        const data = await response.json()
+        toast({ title: data.pinned ? "تم التثبيت" : "تم إلغاء التثبيت" })
+      } else {
+        toast({ title: "فشلت العملية", variant: "destructive" })
       }
-
-      // Add mention
-      const username = match[1]
-      const isMentioningCurrentUser =
-        messages.find((m) => m.sender_id === currentUserId)?.sender?.profile?.username?.toLowerCase() ===
-          username.toLowerCase() ||
-        messages
-          .find((m) => m.sender_id === currentUserId)
-          ?.sender?.profile?.display_name?.replace(/\s+/g, "")
-          .toLowerCase() === username.toLowerCase()
-
-      parts.push(
-        <span
-          key={match.index}
-          className={cn(
-            "font-medium px-1 rounded",
-            isMentioningCurrentUser ? "bg-primary/20 text-primary" : "bg-muted-foreground/20 text-muted-foreground",
-          )}
-        >
-          @{username}
-        </span>,
-      )
-
-      lastIndex = match.index + match[0].length
+    } catch {
+      toast({ title: "فشلت العملية", variant: "destructive" })
+    } finally {
+      setShowActionSheet(false)
     }
-
-    // Add remaining text
-    if (lastIndex < content.length) {
-      parts.push(content.substring(lastIndex))
-    }
-
-    return parts.length > 0 ? parts : content
   }
 
-  const handleShowActions = (message: Message) => {
-    setSelectedMessage(message)
-    setShowActionSheet(true)
-  }
+  const handleTranslate = async () => {
+    if (!selectedMessage) return
 
-  const translateMessage = async (content: string) => {
-    const response = await fetch("/api/ai/translate-message", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        content,
-        targetLang: content.match(/[a-zA-Z]/) ? "ar" : "en", // Auto-detect
-      }),
-    })
+    setTranslatingId(selectedMessage.id)
+    setShowActionSheet(false)
 
-    if (response.ok) {
-      const { translation } = await response.json()
-      return translation
+    try {
+      const response = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: selectedMessage.content, targetLang: "en" }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setTranslations((prev) => ({ ...prev, [selectedMessage.id]: data.translated }))
+        toast({ title: "تمت الترجمة" })
+      } else {
+        toast({ title: "فشلت الترجمة", variant: "destructive" })
+      }
+    } catch {
+      toast({ title: "فشلت الترجمة", variant: "destructive" })
+    } finally {
+      setTranslatingId(null)
     }
-
-    throw new Error("Translation failed")
   }
 
+  const handleReaction = async (messageId: string, emoji: string) => {
+    try {
+      const response = await fetch("/api/messages/react", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId, reaction: emoji, userId: currentUserId }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        // Update local reactions
+        if (data.action === "added") {
+          setReactions((prev) => ({
+            ...prev,
+            [messageId]: [
+              ...(prev[messageId] || []),
+              {
+                id: data.reactionId,
+                message_id: messageId,
+                user_id: currentUserId,
+                reaction: emoji,
+                created_at: new Date().toISOString(),
+              },
+            ],
+          }))
+        } else {
+          setReactions((prev) => ({
+            ...prev,
+            [messageId]: (prev[messageId] || []).filter((r) => !(r.user_id === currentUserId && r.reaction === emoji)),
+          }))
+        }
+      }
+    } catch {
+      toast({ title: "فشل التفاعل", variant: "destructive" })
+    }
+  }
+
+  const handleLongPressStart = (message: Message) => {
+    longPressTimer.current = setTimeout(() => {
+      setSelectedMessage(message)
+      setShowActionSheet(true)
+    }, 500)
+  }
+
+  const handleLongPressEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }
+
+  // Loading state
   if (isLoading) {
     return (
-      <div className="flex-1 overflow-auto bg-transparent" ref={containerRef}>
-        <div className="p-4 space-y-4">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="flex items-start gap-3">
-              <Skeleton className="h-10 w-10 rounded-full" />
-              <div className="flex-1 space-y-2">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-16 w-full max-w-md" />
-              </div>
-            </div>
-          ))}
-        </div>
+      <div className="flex-1 p-4 space-y-4">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className={cn("flex gap-3", i % 2 === 0 ? "justify-start" : "justify-end")}>
+            <Skeleton className="h-10 w-10 rounded-full" />
+            <Skeleton className="h-16 w-48 rounded-2xl" />
+          </div>
+        ))}
       </div>
     )
   }
 
+  // Empty state
   if (messages.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center p-4">
-        <div className="text-center">
-          <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-primary/10 flex items-center justify-center">
-            <span className="text-2xl">💬</span>
-          </div>
-          <p className="text-muted-foreground text-sm">ابدأ المحادثة</p>
-        </div>
+      <div className="flex-1 flex items-center justify-center text-muted-foreground">
+        <p>لا توجد رسائل بعد. ابدأ المحادثة!</p>
       </div>
     )
   }
-
-  const groupedMessages = messages.reduce(
-    (acc, message) => {
-      const date = formatDistanceToNow(new Date(message.created_at), { locale: ar })
-      if (!acc[date]) {
-        acc[date] = { date, messages: [] }
-      }
-      acc[date].messages.push(message)
-      return acc
-    },
-    {} as Record<string, { date: string; messages: Message[] }>,
-  )
 
   return (
     <>
-      <div className="flex-1 overflow-auto bg-transparent" ref={containerRef}>
-        <div className="space-y-0.5">
-          {Object.values(groupedMessages).map(({ date, messages: dayMessages }) => (
-            <div key={date} className="space-y-2">
-              {dayMessages.map((message, index) => {
-                const isOwn = message.sender_id === currentUserId
-                const senderName = message.sender?.display_name || "مستخدم"
-                const prevMessage = index > 0 ? dayMessages[index - 1] : null
-                const isSameSenderAsPrev = prevMessage?.sender_id === message.sender_id
-                const nextMessage = index < dayMessages.length - 1 ? dayMessages[index + 1] : null
-                const isSameSenderAsNext = nextMessage?.sender_id === message.sender_id
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {messages.map((message) => {
+          const isOwn = message.sender_id === currentUserId
+          const layer = message.layer || "standard"
+          const style = layerStyles[layer] || layerStyles.standard
+          const messageReactions = reactions[message.id] || []
+          const translation = translations[message.id]
+          const isTranslating = translatingId === message.id
 
-                const style = layerStyles[message.layer] || layerStyles.standard
-                const node = messages.find((n) => n.id === message.node_id)
+          return (
+            <div
+              key={message.id}
+              className={cn("flex gap-2 group", isOwn ? "flex-row-reverse" : "flex-row")}
+              onTouchStart={() => handleLongPressStart(message)}
+              onTouchEnd={handleLongPressEnd}
+              onTouchCancel={handleLongPressEnd}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                setSelectedMessage(message)
+                setShowActionSheet(true)
+              }}
+            >
+              {/* Avatar */}
+              {!isOwn && (
+                <Avatar className="h-8 w-8 shrink-0">
+                  <AvatarImage src={message.sender?.avatar_url || undefined} />
+                  <AvatarFallback className={getAvatarColor(message.sender_id)}>
+                    {message.sender?.username?.[0]?.toUpperCase() || "؟"}
+                  </AvatarFallback>
+                </Avatar>
+              )}
 
-                const showAvatar = !isOwn && !isSameSenderAsPrev
-                const showName = !isOwn && !isSameSenderAsPrev
+              {/* Message bubble */}
+              <div className={cn("max-w-[75%] space-y-1", isOwn ? "items-end" : "items-start")}>
+                {/* Sender name */}
+                {!isOwn && message.sender?.username && (
+                  <span className="text-xs text-muted-foreground px-2">{message.sender.username}</span>
+                )}
 
-                const hasImage = message.attachment_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i)
-                const isActive = activeMessageId === message.id
-                const replyPreview = message.reply_to ? getReplyPreview(message.reply_to) : null
+                {/* Reply reference */}
+                {message.reply_to && (
+                  <div className="text-xs bg-muted/50 rounded px-2 py-1 mb-1 opacity-70">↩️ رد على رسالة</div>
+                )}
 
-                const groupedReactions = getGroupedReactions(message.id)
-                const hasReactions = Object.keys(groupedReactions).length > 0
+                {/* Bubble */}
+                <div
+                  className={cn("rounded-2xl px-4 py-2 break-words", isOwn ? style.ownBg + " text-white" : style.bg)}
+                >
+                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
 
-                const isMentioned =
-                  message.content &&
-                  new RegExp(
-                    `@(${messages.find((m) => m.sender_id === currentUserId)?.sender?.profile?.username}|${messages.find((m) => m.sender_id === currentUserId)?.sender?.profile?.display_name?.replace(/\s+/g, "")})`,
-                    "i",
-                  ).test(message.content)
-
-                return (
-                  <div
-                    key={message.id}
-                    className={cn(
-                      "flex items-end gap-2 px-2 group relative mb-2",
-                      isOwn ? "flex-row-reverse" : "flex-row",
-                    )}
-                    onTouchStart={(e) => handleTouchStart(message.id, e)}
-                    onTouchEnd={handleTouchEnd}
-                    onTouchMove={handleTouchMove}
-                    onContextMenu={(e) => {
-                      e.preventDefault()
-                      handleMessageLongPress(message)
-                    }}
-                    onMouseEnter={() => handleMouseEnter(message.id)}
-                    onMouseLeave={handleMouseLeave}
-                  >
-                    {!isOwn && (
-                      <div className="w-7 shrink-0">
-                        {showAvatar ? (
-                          <Avatar className="w-7 h-7 ring-2 ring-background">
-                            {message.sender?.avatar_url && (
-                              <AvatarImage src={message.sender.avatar_url || "/placeholder.svg"} />
-                            )}
-                            <AvatarFallback
-                              className={cn(getAvatarColor(message.sender_id), "text-white font-bold text-[10px]")}
-                            >
-                              {senderName.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                        ) : null}
-                      </div>
-                    )}
-
-                    <div className={cn("max-w-[70%] flex flex-col", isOwn && "items-end")}>
-                      {showName && (
-                        <div className="flex items-center gap-2 mb-0.5 px-1">
-                          <Link href={`/chat/profile/${message.sender_id}`} className="hover:underline">
-                            <span className="text-[11px] font-medium text-muted-foreground cursor-pointer">
-                              {senderName}
-                            </span>
-                          </Link>
-                          {message.sender?.active_title && (
-                            <Badge
-                              variant="secondary"
-                              className="text-[9px] h-4 px-1.5 gap-0.5"
-                              style={{
-                                backgroundColor: `${message.sender.active_title.color}20`,
-                                borderColor: message.sender.active_title.color,
-                                color: message.sender.active_title.color,
-                              }}
-                            >
-                              <span>{message.sender.active_title.icon}</span>
-                              <span>{message.sender.active_title.name_ar}</span>
-                            </Badge>
-                          )}
-                        </div>
-                      )}
-
-                      {replyPreview && (
-                        <div
-                          className={cn(
-                            "flex items-center gap-1.5 mb-1 px-2 py-1 rounded-lg border-r-2 border-primary bg-primary/5 cursor-pointer hover:bg-primary/10 transition-colors",
-                            isOwn && "border-r-0 border-l-2",
-                          )}
-                          onClick={() => {
-                            // Implement scroll to the replied message if needed
-                          }}
-                        >
-                          <Reply className="w-3 h-3 text-primary shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[10px] font-medium text-primary truncate">{replyPreview.senderName}</p>
-                            <p className="text-[10px] text-muted-foreground truncate">{replyPreview.content}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      <div
-                        className={cn(
-                          "relative group/message rounded-2xl px-3 py-2 text-sm transition-all duration-200",
-                          isOwn
-                            ? [
-                                style.ownBg,
-                                "text-white shadow-md",
-                                "rounded-2xl",
-                                isSameSenderAsPrev && !isSameSenderAsNext && "rounded-tr-md", // Adjusted for potentially missing nextMessage logic
-                                !isSameSenderAsPrev && isSameSenderAsNext && "rounded-br-md", // Adjusted for potentially missing nextMessage logic
-                                isSameSenderAsPrev && isSameSenderAsNext && "rounded-r-md", // Adjusted for potentially missing nextMessage logic
-                              ]
-                            : [
-                                style.bg,
-                                "rounded-2xl",
-                                isSameSenderAsPrev && !isSameSenderAsNext && "rounded-tl-md", // Adjusted for potentially missing nextMessage logic
-                                !isSameSenderAsPrev && isSameSenderAsNext && "rounded-bl-md", // Adjusted for potentially missing nextMessage logic
-                                isSameSenderAsPrev && isSameSenderAsNext && "rounded-l-md", // Adjusted for potentially missing nextMessage logic
-                                isMentioned && "ring-2 ring-primary/30", // Highlight mentioned messages
-                              ],
-                          message.layer === "shadow" && "italic opacity-80",
-                          isActive && "ring-2 ring-primary ring-offset-2 ring-offset-background",
-                        )}
-                      >
-                        {node && (
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              "absolute -bottom-2 text-[8px] px-1 py-0 h-3.5 gap-0.5 bg-background shadow-sm",
-                              isOwn ? "right-2" : "left-2",
-                            )}
-                            style={{ borderColor: node.color, color: node.color }}
-                          >
-                            <span className="w-1 h-1 rounded-full" style={{ backgroundColor: node.color }} />
-                            {node.title}
-                          </Badge>
-                        )}
-
-                        {hasImage && (
-                          <div className="mb-1.5 -mx-1 -mt-0.5">
-                            <img
-                              src={message.attachment_url || "/placeholder.svg"}
-                              alt="مرفق"
-                              className="max-w-full max-h-56 rounded-xl cursor-pointer hover:opacity-90 transition-opacity"
-                              onClick={() => setLightboxImage(message.attachment_url || null)}
-                            />
-                          </div>
-                        )}
-
-                        {message.content && message.content !== "📷 صورة" && (
-                          <p className="text-[14px] whitespace-pre-wrap break-words leading-snug">
-                            {translatedMessages[message.id] || renderContentWithMentions(message.content)}
-                          </p>
-                        )}
-
-                        {translatedMessages[message.id] && (
-                          <div className="mt-1 p-2 bg-muted/50 rounded-lg border border-border/50 text-sm">
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
-                              <Languages className="w-3 h-3" />
-                              <span>ترجمة</span>
-                            </div>
-                            {translatedMessages[message.id]}
-                          </div>
-                        )}
-
-                        <div className={cn("flex items-center gap-1 mt-0.5", isOwn ? "justify-start" : "justify-end")}>
-                          <span className={cn("text-[10px]", isOwn ? "text-white/60" : "text-muted-foreground/70")}>
-                            {formatDistanceToNow(new Date(message.created_at), { locale: ar })}
-                          </span>
-                          {isOwn && message.read_count !== undefined && (
-                            <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground mt-0.5">
-                              {message.read_count > 0 ? (
-                                <>
-                                  <CheckCheck className="w-3 h-3" />
-                                  <span>{message.read_count}</span>
-                                </>
-                              ) : (
-                                <Check className="w-3 h-3" />
-                              )}
-                            </div>
-                          )}
-                          {isOwn && message.updated_at && message.updated_at !== message.created_at && (
-                            <span className="text-[10px] text-muted-foreground">معدّلة</span>
-                          )}
-                          {style.icon && <span className="text-[9px] opacity-50">{style.icon}</span>}
-                        </div>
-                      </div>
-
-                      {hasReactions && (
-                        <div className="flex flex-wrap gap-1 mt-1 px-1">
-                          {Object.entries(groupedReactions).map(([emoji, data]) => (
-                            <button
-                              key={emoji}
-                              onClick={() => toggleReaction(message.id, emoji)}
-                              className={cn(
-                                "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs border transition-all",
-                                data.hasCurrentUser
-                                  ? "bg-primary/20 border-primary text-primary font-medium"
-                                  : "bg-muted border-border hover:bg-muted/80",
-                              )}
-                              title={data.users.join(", ")}
-                            >
-                              <span>{emoji}</span>
-                              {data.count > 1 && <span className="text-[10px]">{data.count}</span>}
-                            </button>
-                          ))}
-                          <button
-                            onClick={() => {
-                              setSelectedMessage(message)
-                              setShowReactionPicker(true)
-                            }}
-                            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs border border-dashed border-muted-foreground/30 hover:bg-muted/50 transition-all"
-                          >
-                            <Smile className="w-3 h-3" />
-                          </button>
-                        </div>
-                      )}
-
-                      {!hasReactions && isActive && (
-                        <div className="flex gap-1 mt-1 px-1">
-                          {quickReactions.map((emoji) => (
-                            <button
-                              key={emoji}
-                              onClick={() => toggleReaction(message.id, emoji)}
-                              className="inline-flex items-center justify-center w-7 h-7 rounded-full hover:bg-muted transition-all text-sm"
-                            >
-                              {emoji}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {isActive && (
-                      <div
-                        className={cn(
-                          "absolute top-0 flex items-center gap-1 transition-opacity animate-in fade-in duration-150",
-                          isOwn ? "left-0 -translate-x-full pr-1" : "right-0 translate-x-full pl-1",
-                        )}
-                      >
-                        {message.content && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 rounded-full"
-                            onClick={() => {
-                              if (selectedMessage?.content) {
-                                navigator.clipboard.writeText(selectedMessage.content)
-                                toast({ title: "تم نسخ الرسالة" })
-                                setShowActionSheet(false)
-                              }
-                            }}
-                          >
-                            <Copy className="w-3.5 h-3.5" />
-                          </Button>
-                        )}
-                        {isOwn && message.content && onEdit && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 rounded-full"
-                            onClick={() => {
-                              if (selectedMessage && onEdit) {
-                                onEdit(selectedMessage) // Call prop directly
-                                setShowActionSheet(false)
-                                setSelectedMessage(null)
-                              }
-                            }}
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </Button>
-                        )}
-                        {onReply && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 rounded-full"
-                            onClick={() => {
-                              if (selectedMessage && onReply) {
-                                onReply(selectedMessage) // Call prop directly
-                                setShowActionSheet(false)
-                                setSelectedMessage(null)
-                              }
-                            }}
-                          >
-                            <Reply className="w-3.5 h-3.5" />
-                          </Button>
-                        )}
-                        {message.content && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 rounded-full"
-                            onClick={async () => {
-                              if (selectedMessage && onTranslate) {
-                                await onTranslate(selectedMessage.id, selectedMessage.content!)
-                                setShowActionSheet(false)
-                                setSelectedMessage(null)
-                              }
-                            }}
-                            disabled={translatingMessages.has(message.id)}
-                          >
-                            {translatingMessages.has(message.id) ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              <Languages className="w-3.5 h-3.5" />
-                            )}
-                          </Button>
-                        )}
-                        {isOwn && onDelete && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 rounded-full text-destructive hover:text-destructive"
-                            onClick={() => {
-                              if (selectedMessage && onDelete) {
-                                onDelete(selectedMessage.id) // Call prop directly
-                                setShowActionSheet(false)
-                                setSelectedMessage(null)
-                              }
-                            }}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          ))}
-        </div>
-
-        <div ref={messagesEndRef} className="h-1" />
-
-        {lightboxImage && (
-          <div
-            className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
-            onClick={() => setLightboxImage(null)}
-          >
-            <img
-              src={lightboxImage || "/placeholder.svg"}
-              alt="صورة مكبرة"
-              className="max-w-full max-h-full object-contain rounded-lg"
-            />
-          </div>
-        )}
-
-        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>حذف الرسالة</AlertDialogTitle>
-              <AlertDialogDescription>
-                هل أنت متأكد من حذف هذه الرسالة؟ لا يمكن التراجع عن هذا الإجراء.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>إلغاء</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={confirmDelete}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                حذف
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        <Sheet open={showActionSheet} onOpenChange={setShowActionSheet}>
-          <SheetContent side="bottom" className="w-full">
-            <SheetHeader>
-              <SheetTitle className="text-right">خيارات الرسالة</SheetTitle>
-            </SheetHeader>
-            {selectedMessage && (
-              <div className="space-y-2 mt-4">
-                <div className="flex gap-2 justify-center py-2 border-b">
-                  {quickReactions.map((emoji) => (
-                    <button
-                      key={emoji}
-                      onClick={() => {
-                        toggleReaction(selectedMessage.id, emoji)
-                        setShowActionSheet(false)
-                      }}
-                      className="inline-flex items-center justify-center w-10 h-10 rounded-full hover:bg-muted transition-all text-xl"
-                    >
-                      {emoji}
-                    </button>
-                  ))}
+                  {/* Translation */}
+                  {isTranslating && <p className="text-xs opacity-70 mt-1">جاري الترجمة...</p>}
+                  {translation && <p className="text-xs opacity-70 mt-1 border-t pt-1">{translation}</p>}
                 </div>
 
-                {selectedMessage.content && (
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-right"
-                    onClick={() => {
-                      if (selectedMessage && onReply) {
-                        onReply(selectedMessage) // Call prop directly
-                        setShowActionSheet(false)
-                        setSelectedMessage(null)
-                      }
-                    }}
-                  >
-                    <Reply className="w-4 h-4 ml-2" />
-                    رد
-                  </Button>
-                )}
+                {/* Time and status */}
+                <div className={cn("flex items-center gap-1 px-2", isOwn ? "justify-end" : "justify-start")}>
+                  <span className="text-[10px] text-muted-foreground">
+                    {formatDistanceToNow(new Date(message.created_at), { addSuffix: true, locale: ar })}
+                  </span>
+                  {message.updated_at && message.updated_at !== message.created_at && (
+                    <Badge variant="outline" className="text-[8px] px-1 py-0">
+                      معدّلة
+                    </Badge>
+                  )}
+                  {layer !== "standard" && <span className="text-[10px]">{style.icon}</span>}
+                </div>
 
-                {selectedMessage?.sender_id === currentUserId && selectedMessage?.content && (
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-right"
-                    onClick={() => {
-                      if (selectedMessage && onEdit) {
-                        onEdit(selectedMessage) // Call prop directly
-                        setShowActionSheet(false)
-                        setSelectedMessage(null)
-                      }
-                    }}
-                  >
-                    <Edit2 className="w-4 h-4 ml-2" />
-                    تعديل
-                  </Button>
-                )}
+                {/* Quick Reactions bar */}
+                <div className="flex gap-1 mt-1">
+                  {quickReactions.map((emoji) => {
+                    const count = messageReactions.filter((r) => r.reaction === emoji).length
+                    const hasReacted = messageReactions.some((r) => r.reaction === emoji && r.user_id === currentUserId)
 
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-right"
-                  onClick={() => {
-                    if (selectedMessage && onPin) {
-                      onPin(selectedMessage.id) // Call prop directly
-                      setShowActionSheet(false)
-                      setSelectedMessage(null)
-                    }
-                  }}
-                >
-                  <Pin className="w-4 h-4 ml-2" />
-                  تثبيت
-                </Button>
-
-                {selectedMessage?.content && (
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-right"
-                    onClick={async () => {
-                      if (selectedMessage && onTranslate) {
-                        await onTranslate(selectedMessage.id, selectedMessage.content!)
-                        setShowActionSheet(false)
-                        setSelectedMessage(null)
-                      }
-                    }}
-                  >
-                    <Globe className="w-4 h-4 ml-2" />
-                    ترجمة
-                  </Button>
-                )}
-
-                {selectedMessage?.sender_id === currentUserId && (
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-right text-red-500"
-                    onClick={() => {
-                      if (selectedMessage && onDelete) {
-                        if (confirm("هل تريد حذف هذه الرسالة؟")) {
-                          onDelete(selectedMessage.id) // Call prop directly
-                          setShowActionSheet(false)
-                          setSelectedMessage(null)
-                        }
-                      }
-                    }}
-                  >
-                    <Trash2 className="w-4 h-4 ml-2" />
-                    حذف
-                  </Button>
-                )}
+                    return (
+                      <button
+                        key={emoji}
+                        onClick={() => handleReaction(message.id, emoji)}
+                        className={cn(
+                          "text-sm px-1 rounded transition-all hover:scale-110",
+                          hasReacted ? "bg-primary/20" : "opacity-50 hover:opacity-100",
+                        )}
+                      >
+                        {emoji}
+                        {count > 0 && <span className="text-[10px] ml-0.5">{count}</span>}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-            )}
-          </SheetContent>
-        </Sheet>
+            </div>
+          )
+        })}
+        <div ref={messagesEndRef} />
       </div>
+
+      {/* Action Sheet */}
+      <Sheet open={showActionSheet} onOpenChange={setShowActionSheet}>
+        <SheetContent side="bottom" className="rounded-t-3xl">
+          <SheetHeader>
+            <SheetTitle className="text-right">خيارات الرسالة</SheetTitle>
+          </SheetHeader>
+
+          <div className="py-4 space-y-2">
+            {/* Copy */}
+            <Button
+              variant="ghost"
+              className="w-full justify-end gap-2"
+              onClick={() => selectedMessage && handleCopy(selectedMessage.content, selectedMessage.id)}
+            >
+              نسخ النص
+              {copiedId === selectedMessage?.id ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            </Button>
+
+            {/* Reply */}
+            <Button variant="ghost" className="w-full justify-end gap-2" onClick={handleReply}>
+              رد
+              <Reply className="h-4 w-4" />
+            </Button>
+
+            {/* Translate */}
+            <Button variant="ghost" className="w-full justify-end gap-2" onClick={handleTranslate}>
+              ترجمة
+              <Languages className="h-4 w-4" />
+            </Button>
+
+            {/* Pin */}
+            <Button variant="ghost" className="w-full justify-end gap-2" onClick={handlePin}>
+              تثبيت
+              <Pin className="h-4 w-4" />
+            </Button>
+
+            {/* Edit - only for own messages */}
+            {selectedMessage?.sender_id === currentUserId && (
+              <Button variant="ghost" className="w-full justify-end gap-2" onClick={handleEdit}>
+                تعديل
+                <Edit2 className="h-4 w-4" />
+              </Button>
+            )}
+
+            {/* Delete - only for own messages */}
+            {selectedMessage?.sender_id === currentUserId && (
+              <Button
+                variant="ghost"
+                className="w-full justify-end gap-2 text-destructive hover:text-destructive"
+                onClick={() => setShowDeleteDialog(true)}
+              >
+                حذف
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-right">حذف الرسالة</AlertDialogTitle>
+            <AlertDialogDescription className="text-right">
+              هل أنت متأكد من حذف هذه الرسالة؟ لا يمكن التراجع عن هذا الإجراء.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row-reverse gap-2">
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {isDeleting ? "جاري الحذف..." : "حذف"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 })
