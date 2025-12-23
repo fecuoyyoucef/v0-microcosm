@@ -2,6 +2,7 @@
 
 import React from "react"
 import { useState, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -91,6 +92,7 @@ export const MessageList = React.memo(function MessageList({
   onEditSelect,
   onMessageDeleted,
 }: MessageListProps) {
+  const router = useRouter()
   const supabase = createClient()
 
   const [showActionSheet, setShowActionSheet] = useState(false)
@@ -128,6 +130,7 @@ export const MessageList = React.memo(function MessageList({
     if (selectedMessage && onEditSelect) {
       onEditSelect(selectedMessage)
       setShowActionSheet(false)
+      setTimeout(() => router.refresh(), 500)
     }
   }
 
@@ -145,6 +148,7 @@ export const MessageList = React.memo(function MessageList({
       if (response.ok) {
         toast({ title: "تم حذف الرسالة" })
         onMessageDeleted?.(selectedMessage.id)
+        router.refresh()
       } else {
         const data = await response.json()
         toast({ title: data.error || "فشل الحذف", variant: "destructive" })
@@ -172,6 +176,7 @@ export const MessageList = React.memo(function MessageList({
       if (response.ok) {
         const data = await response.json()
         toast({ title: data.pinned ? "تم التثبيت" : "تم إلغاء التثبيت" })
+        router.refresh()
       } else {
         toast({ title: "فشلت العملية", variant: "destructive" })
       }
@@ -219,7 +224,6 @@ export const MessageList = React.memo(function MessageList({
 
       if (response.ok) {
         const data = await response.json()
-        // Update local reactions
         if (data.action === "added") {
           setReactions((prev) => ({
             ...prev,
@@ -234,12 +238,15 @@ export const MessageList = React.memo(function MessageList({
               },
             ],
           }))
+          toast({ title: `تم إضافة ${emoji}` })
         } else {
           setReactions((prev) => ({
             ...prev,
             [messageId]: (prev[messageId] || []).filter((r) => !(r.user_id === currentUserId && r.reaction === emoji)),
           }))
+          toast({ title: `تم إزالة ${emoji}` })
         }
+        router.refresh()
       }
     } catch {
       toast({ title: "فشل التفاعل", variant: "destructive" })

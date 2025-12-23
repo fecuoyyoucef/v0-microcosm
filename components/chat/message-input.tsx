@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -80,6 +81,7 @@ export function MessageInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const supabase = createClient()
+  const router = useRouter()
 
   const otherMembers = members.filter((m) => m.user_id !== currentUserId)
   const currentLayerOption = layerOptions.find((l) => l.value === selectedLayer)!
@@ -293,11 +295,15 @@ export function MessageInput({
       const messageContent = content.trim() || (attachmentUrl ? "📷 صورة" : "")
 
       if (editingMessage) {
-        await fetch(`/api/messages/${editingMessage.id}`, {
+        const response = await fetch(`/api/messages/${editingMessage.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content: messageContent }),
         })
+
+        if (response.ok) {
+          router.refresh()
+        }
         onCancelEdit?.()
       } else {
         await onSend(
@@ -309,47 +315,8 @@ export function MessageInput({
           replyingTo?.id || null,
         )
 
-        if (mentionedUsers.length > 0) {
-          try {
-            await fetch("/api/messages/send-with-mentions", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                groupId,
-                content: messageContent,
-                mentionedUsers,
-              }),
-            })
-          } catch (error) {
-            console.error("[v0] Failed to send mention notifications:", error)
-          }
-        }
-
-        const pendingTasks = (window as any).__pendingTasks
-        if (pendingTasks?.tasks && pendingTasks.tasks.length > 0) {
-          // Get the last message ID from the group
-          const { data: lastMessage } = await supabase
-            .from("messages")
-            .select("id")
-            .eq("group_id", groupId)
-            .eq("sender_id", currentUserId)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .single()
-
-          if (lastMessage) {
-            for (const task of pendingTasks.tasks) {
-              await supabase.from("extracted_tasks").insert({
-                message_id: lastMessage.id,
-                group_id: groupId,
-                task_content: task,
-                created_by: currentUserId,
-                status: "pending",
-              })
-            }
-          }
-
-          delete (window as any).__pendingTasks
+        if (replyingTo) {
+          onCancelReply?.()
         }
       }
 
@@ -357,6 +324,8 @@ export function MessageInput({
       setVisibleTo([])
       setMentionedUsers([])
       clearImage()
+    } catch (error) {
+      console.error("Send error:", error)
     } finally {
       setIsSending(false)
       setIsUploadingImage(false)
