@@ -1,6 +1,6 @@
 "use client"
 
-import type React from "react"
+import React from "react"
 import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -25,6 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Reply } from "lucide-react" // Declared the Reply variable here
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 
 const avatarColors = [
   "bg-gradient-to-br from-blue-400 to-blue-600",
@@ -82,16 +83,13 @@ const layerStyles: Record<string, { bg: string; ownBg: string; icon: string }> =
   },
 }
 
-export function MessageList({
+export const MessageList = React.memo(function MessageList({
   messages,
   currentUserId,
-  members = [], // Default members to empty array
-  isLoading,
-  messagesEndRef,
-  nodes,
   onReply,
-  onDelete,
   onEdit,
+  onDelete,
+  isLoading,
 }: MessageListProps) {
   const supabase = createClient()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -104,20 +102,38 @@ export function MessageList({
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null)
   const [translatedMessages, setTranslatedMessages] = useState<Record<string, string>>({})
   const [translatingMessages, setTranslatingMessages] = useState<Set<string>>(new Set())
-  const [showActionsFor, setShowActionsFor] = useState<string | null>(null) // Keep this, might be useful for future actions
-  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null) // Keep this, might be useful for future long press actions
-  const [longPressActive, setLongPressActive] = useState<string | null>(null) // Keep this, might be useful for future long press actions
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null)
+  const [showActionSheet, setShowActionSheet] = useState(false)
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null)
+
+  const handleMessageLongPress = (message: Message) => {
+    setSelectedMessage(message)
+    setShowActionSheet(true)
+  }
 
   const handleTouchStart = (messageId: string, e: React.TouchEvent) => {
-    // Implement touch start logic here
+    const message = messages.find((m) => m.id === messageId)
+    if (!message) return
+
+    const timer = setTimeout(() => {
+      handleMessageLongPress(message)
+    }, 500) // 500ms long press
+
+    setLongPressTimer(timer)
   }
 
   const handleTouchEnd = () => {
-    // Implement touch end logic here
+    if (longPressTimer) {
+      clearTimeout(longPressTimer)
+      setLongPressTimer(null)
+    }
   }
 
   const handleTouchMove = () => {
-    // Implement touch move logic here
+    if (longPressTimer) {
+      clearTimeout(longPressTimer)
+      setLongPressTimer(null)
+    }
   }
 
   useEffect(() => {
@@ -126,10 +142,10 @@ export function MessageList({
         setShowReactionsFor(null)
       }
       // Close actions menu when clicking outside
-      if (showActionsFor && !event.target!.closest(".actions-menu-container")) {
+      if (showActionSheet && !event.target!.closest(".actions-menu-container")) {
         // Assuming a class for the actions menu container
-        setShowActionsFor(null)
-        setLongPressActive(null)
+        setShowActionSheet(false)
+        setSelectedMessage(null)
       }
     }
 
@@ -137,7 +153,7 @@ export function MessageList({
     return () => {
       document.removeEventListener("mousedown", handleClickOutside)
     }
-  }, [showReactionsFor, showActionsFor]) // Added showActionsFor dependency
+  }, [showReactionsFor, showActionSheet])
 
   useEffect(() => {
     if (messages.length === 0) return
@@ -204,14 +220,14 @@ export function MessageList({
       }
     }
     setShowReactionsFor(null)
-    setLongPressActive(null)
-    setShowActionsFor(null)
+    setSelectedMessage(null)
+    setShowActionSheet(false)
   }
 
   const sendReactionNotification = async (message: Message, emoji: string) => {
     try {
-      const currentMember = members.find((m) => m.user_id === currentUserId)
-      const senderName = currentMember?.profile?.display_name || "مستخدم"
+      const currentMember = messages.find((m) => m.sender_id === currentUserId)?.sender
+      const senderName = currentMember?.display_name || "مستخدم"
 
       await fetch("/api/notifications/send", {
         method: "POST",
@@ -262,8 +278,8 @@ export function MessageList({
           grouped[r.reaction] = { count: 0, users: [], hasCurrentUser: false }
         }
         grouped[r.reaction].count++
-        const member = members.find((m) => m.user_id === r.user_id)
-        grouped[r.reaction].users.push(member?.profile?.display_name || "مستخدم")
+        const member = messages.find((m) => m.sender_id === r.user_id)?.sender
+        grouped[r.reaction].users.push(member?.display_name || "مستخدم")
         if (r.user_id === currentUserId) {
           grouped[r.reaction].hasCurrentUser = true
         }
@@ -339,10 +355,11 @@ export function MessageList({
       // Add mention
       const username = match[1]
       const isMentioningCurrentUser =
-        members.find((m) => m.user_id === currentUserId)?.profile?.username?.toLowerCase() === username.toLowerCase() ||
-        members
-          .find((m) => m.user_id === currentUserId)
-          ?.profile?.display_name?.replace(/\s+/g, "")
+        messages.find((m) => m.sender_id === currentUserId)?.sender?.profile?.username?.toLowerCase() ===
+          username.toLowerCase() ||
+        messages
+          .find((m) => m.sender_id === currentUserId)
+          ?.sender?.profile?.display_name?.replace(/\s+/g, "")
           .toLowerCase() === username.toLowerCase()
 
       parts.push(
@@ -374,8 +391,8 @@ export function MessageList({
       title: "تم النسخ",
       description: "تم نسخ الرسالة إلى الحافظة",
     })
-    setShowActionsFor(null)
-    setLongPressActive(null)
+    setShowActionSheet(false)
+    setSelectedMessage(null)
   }
 
   const handleDeleteMessage = async (messageId: string) => {
@@ -387,18 +404,17 @@ export function MessageList({
         return
       }
     }
-    setShowActionsFor(null)
-    setLongPressActive(null)
+    setShowActionSheet(false)
+    setSelectedMessage(null)
   }
 
-  const handleEditMessage = (messageId: string) => {
+  const handleEditMessage = (message: Message) => {
     // سيتم تنفيذه لاحقاً
-    const message = messages.find((m) => m.id === messageId)
-    if (message && onEdit) {
+    if (onEdit) {
       onEdit(message)
     }
-    setShowActionsFor(null)
-    setLongPressActive(null)
+    setShowActionSheet(false)
+    setSelectedMessage(null)
   }
 
   const handlePinMessage = async (messageId: string) => {
@@ -411,8 +427,8 @@ export function MessageList({
       console.error("Error pinning message:", error)
       return
     }
-    setShowActionsFor(null)
-    setLongPressActive(null)
+    setShowActionSheet(false)
+    setSelectedMessage(null)
   }
 
   if (isLoading) {
@@ -473,7 +489,7 @@ export function MessageList({
                 const isSameSenderAsNext = nextMessage?.sender_id === message.sender_id
 
                 const style = layerStyles[message.layer] || layerStyles.standard
-                const node = nodes.find((n) => n.id === message.node_id)
+                const node = messages.find((n) => n.id === message.node_id)
 
                 const showAvatar = !isOwn && !isSameSenderAsPrev
                 const showName = !isOwn && !isSameSenderAsPrev
@@ -488,7 +504,7 @@ export function MessageList({
                 const isMentioned =
                   message.content &&
                   new RegExp(
-                    `@(${members.find((m) => m.user_id === currentUserId)?.profile?.username}|${members.find((m) => m.user_id === currentUserId)?.profile?.display_name?.replace(/\s+/g, "")})`,
+                    `@(${messages.find((m) => m.sender_id === currentUserId)?.sender?.profile?.username}|${messages.find((m) => m.sender_id === currentUserId)?.sender?.profile?.display_name?.replace(/\s+/g, "")})`,
                     "i",
                   ).test(message.content)
 
@@ -499,11 +515,11 @@ export function MessageList({
                     onTouchStart={(e) => handleTouchStart(message.id, e)}
                     onTouchEnd={handleTouchEnd}
                     onTouchMove={handleTouchMove}
-                    onMouseEnter={() => setActiveMessageId(message.id)}
-                    onMouseLeave={() => {
-                      setActiveMessageId(null)
-                      setShowReactionsFor(null)
+                    onContextMenu={(e) => {
+                      e.preventDefault()
+                      handleMessageLongPress(message)
                     }}
+                    className="group relative mb-2"
                   >
                     {!isOwn && (
                       <div className="w-7 shrink-0">
@@ -697,7 +713,7 @@ export function MessageList({
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 rounded-full"
-                            onClick={() => handleEditMessage(message.id)}
+                            onClick={() => handleEditMessage(message)}
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </Button>
@@ -746,7 +762,7 @@ export function MessageList({
           ))}
         </div>
 
-        <div ref={messagesEndRef} className="h-1" />
+        <div ref={containerRef} className="h-1" />
 
         {lightboxImage && (
           <div
@@ -780,7 +796,74 @@ export function MessageList({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <Sheet open={showActionSheet} onOpenChange={setShowActionSheet}>
+          <SheetContent side="bottom" className="w-full">
+            <SheetHeader>
+              <SheetTitle className="text-right">خيارات الرسالة</SheetTitle>
+            </SheetHeader>
+            {selectedMessage && (
+              <div className="space-y-2 mt-4">
+                {selectedMessage.content && (
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-right"
+                    onClick={() => handleCopyMessage(selectedMessage.content!)}
+                  >
+                    <Copy className="w-4 h-4 ml-2" />
+                    نسخ النص
+                  </Button>
+                )}
+                {onReply && (
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-right"
+                    onClick={() => {
+                      onReply(selectedMessage)
+                      setShowActionSheet(false)
+                      setSelectedMessage(null)
+                    }}
+                  >
+                    <Reply className="w-4 h-4 ml-2" />
+                    رد
+                  </Button>
+                )}
+                {selectedMessage.content && (
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-right"
+                    onClick={() => handleTranslate(selectedMessage.id, selectedMessage.content!)}
+                    disabled={translatingMessages.has(selectedMessage.id)}
+                  >
+                    <Languages className="w-4 h-4 ml-2" />
+                    ترجمة
+                  </Button>
+                )}
+                {selectedMessage.sender_id === currentUserId && onEdit && (
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-right"
+                    onClick={() => handleEditMessage(selectedMessage)}
+                  >
+                    <Edit2 className="w-4 h-4 ml-2" />
+                    تعديل
+                  </Button>
+                )}
+                {selectedMessage.sender_id === currentUserId && onDelete && (
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-right text-destructive hover:text-destructive"
+                    onClick={() => handleDeleteMessage(selectedMessage.id)}
+                  >
+                    <Trash2 className="w-4 h-4 ml-2" />
+                    حذف
+                  </Button>
+                )}
+              </div>
+            )}
+          </SheetContent>
+        </Sheet>
       </div>
     </>
   )
-}
+})
