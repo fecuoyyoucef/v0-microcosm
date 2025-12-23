@@ -895,9 +895,10 @@ export const MessageList = React.memo(function MessageList({
                     variant="ghost"
                     className="w-full justify-start text-right"
                     onClick={() => {
-                      if (selectedMessage) {
-                        handleReplyMessage(selectedMessage)
+                      if (onReply) {
+                        onReply(selectedMessage)
                       }
+                      setShowActionSheet(false)
                     }}
                   >
                     <Reply className="w-4 h-4 ml-2" />
