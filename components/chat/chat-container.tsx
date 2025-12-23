@@ -263,6 +263,10 @@ export function ChatContainer({
                 return prev.map((m) => {
                   if (!replaced && m.id.startsWith("temp-") && m.sender_id === currentUserId) {
                     replaced = true
+                    // جلب reply_to_message إن وجدت
+                    if (newMsg.reply_to) {
+                      return { ...newMsg, sender: m.sender, reply_to_message: null } as Message
+                    }
                     return { ...newMsg, sender: m.sender } as Message
                   }
                   return m
@@ -271,6 +275,33 @@ export function ChatContainer({
               if (prev.some((m) => m.id === newMsg.id)) return prev
               return prev
             })
+
+            // جلب reply_to_message بيانات الرسالة إذا كانت الرسالة ردًا
+            if (newMsg.reply_to) {
+              const { data: replyMsg } = await supabase
+                .from("messages")
+                .select("id, content, sender_id")
+                .eq("id", newMsg.reply_to)
+                .single()
+
+              if (replyMsg) {
+                const { data: replySender } = await supabase
+                  .from("profiles")
+                  .select("display_name")
+                  .eq("id", replyMsg.sender_id)
+                  .single()
+
+                const replyToMessage = {
+                  content: replyMsg.content,
+                  sender: replySender ? { display_name: replySender.display_name } : undefined,
+                }
+
+                // تحديث الرسالة مع reply_to_message
+                setMessages((current) =>
+                  current.map((m) => (m.id === newMsg.id ? { ...m, reply_to_message: replyToMessage } : m)),
+                )
+              }
+            }
             return
           }
 
