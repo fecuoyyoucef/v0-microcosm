@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
-import { Copy, Edit2, CheckCheck, Trash2, Languages, Loader2, Check } from "lucide-react"
+import { Copy, Edit2, CheckCheck, Trash2, Languages, Loader2, Check, Pin, Smile } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ar } from "date-fns/locale"
 import type { Message, GroupMember, ConversationNode } from "@/lib/types"
@@ -24,7 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Reply } from "lucide-react" // Declared the Reply variable here
+import { Reply } from "lucide-react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 
 const avatarColors = [
@@ -105,6 +105,15 @@ export const MessageList = React.memo(function MessageList({
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null)
   const [showActionSheet, setShowActionSheet] = useState(false)
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null)
+  const [showReactionPicker, setShowReactionPicker] = useState(false)
+
+  const handleMouseEnter = (messageId: string) => {
+    setActiveMessageId(messageId)
+  }
+
+  const handleMouseLeave = () => {
+    setActiveMessageId(null)
+  }
 
   const handleMessageLongPress = (message: Message) => {
     setSelectedMessage(message)
@@ -222,6 +231,7 @@ export const MessageList = React.memo(function MessageList({
     setShowReactionsFor(null)
     setSelectedMessage(null)
     setShowActionSheet(false)
+    setShowReactionPicker(false)
   }
 
   const sendReactionNotification = async (message: Message, emoji: string) => {
@@ -418,15 +428,23 @@ export const MessageList = React.memo(function MessageList({
   }
 
   const handlePinMessage = async (messageId: string) => {
-    // Assuming you have an 'is_pinned' and 'pinned_by'/'pinned_at' field in your messages table
     const { error } = await supabase
       .from("messages")
       .update({ is_pinned: true, pinned_by: currentUserId, pinned_at: new Date().toISOString() })
       .eq("id", messageId)
     if (error) {
       console.error("Error pinning message:", error)
+      toast({
+        title: "خطأ",
+        description: "فشل تثبيت الرسالة",
+        variant: "destructive",
+      })
       return
     }
+    toast({
+      title: "تم التثبيت",
+      description: "تم تثبيت الرسالة بنجاح",
+    })
     setShowActionSheet(false)
     setSelectedMessage(null)
   }
@@ -511,7 +529,10 @@ export const MessageList = React.memo(function MessageList({
                 return (
                   <div
                     key={message.id}
-                    className={cn("flex items-end gap-2 px-2 group", isOwn ? "flex-row-reverse" : "flex-row")}
+                    className={cn(
+                      "flex items-end gap-2 px-2 group relative mb-2",
+                      isOwn ? "flex-row-reverse" : "flex-row",
+                    )}
                     onTouchStart={(e) => handleTouchStart(message.id, e)}
                     onTouchEnd={handleTouchEnd}
                     onTouchMove={handleTouchMove}
@@ -519,7 +540,8 @@ export const MessageList = React.memo(function MessageList({
                       e.preventDefault()
                       handleMessageLongPress(message)
                     }}
-                    className="group relative mb-2"
+                    onMouseEnter={() => handleMouseEnter(message.id)}
+                    onMouseLeave={handleMouseLeave}
                   >
                     {!isOwn && (
                       <div className="w-7 shrink-0">
@@ -687,6 +709,29 @@ export const MessageList = React.memo(function MessageList({
                               {data.count > 1 && <span className="text-[10px]">{data.count}</span>}
                             </button>
                           ))}
+                          <button
+                            onClick={() => {
+                              setSelectedMessage(message)
+                              setShowReactionPicker(true)
+                            }}
+                            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs border border-dashed border-muted-foreground/30 hover:bg-muted/50 transition-all"
+                          >
+                            <Smile className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+
+                      {!hasReactions && isActive && (
+                        <div className="flex gap-1 mt-1 px-1">
+                          {quickReactions.map((emoji) => (
+                            <button
+                              key={emoji}
+                              onClick={() => toggleReaction(message.id, emoji)}
+                              className="inline-flex items-center justify-center w-7 h-7 rounded-full hover:bg-muted transition-all text-sm"
+                            >
+                              {emoji}
+                            </button>
+                          ))}
                         </div>
                       )}
                     </div>
@@ -694,7 +739,7 @@ export const MessageList = React.memo(function MessageList({
                     {isActive && (
                       <div
                         className={cn(
-                          "absolute top-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity animate-in fade-in duration-150",
+                          "absolute top-0 flex items-center gap-1 transition-opacity animate-in fade-in duration-150",
                           isOwn ? "left-0 -translate-x-full pr-1" : "right-0 translate-x-full pl-1",
                         )}
                       >
@@ -804,6 +849,18 @@ export const MessageList = React.memo(function MessageList({
             </SheetHeader>
             {selectedMessage && (
               <div className="space-y-2 mt-4">
+                <div className="flex gap-2 justify-center py-2 border-b">
+                  {quickReactions.map((emoji) => (
+                    <button
+                      key={emoji}
+                      onClick={() => toggleReaction(selectedMessage.id, emoji)}
+                      className="inline-flex items-center justify-center w-10 h-10 rounded-full hover:bg-muted transition-all text-xl"
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+
                 {selectedMessage.content && (
                   <Button
                     variant="ghost"
@@ -839,6 +896,14 @@ export const MessageList = React.memo(function MessageList({
                     ترجمة
                   </Button>
                 )}
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start text-right"
+                  onClick={() => handlePinMessage(selectedMessage.id)}
+                >
+                  <Pin className="w-4 h-4 ml-2" />
+                  تثبيت
+                </Button>
                 {selectedMessage.sender_id === currentUserId && onEdit && (
                   <Button
                     variant="ghost"
