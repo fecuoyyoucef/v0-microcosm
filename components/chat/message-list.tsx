@@ -7,12 +7,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
-import { CheckCheck, Reply, Trash2, Languages, Loader2 } from "lucide-react"
+import { Copy, Edit2, CheckCheck, Trash2, Languages, Loader2, Check } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ar } from "date-fns/locale"
 import type { Message, GroupMember, ConversationNode } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
+import { toast } from "@/components/ui/use-toast"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Reply } from "lucide-react" // Declared the Reply variable here
 
 const avatarColors = [
   "bg-gradient-to-br from-blue-400 to-blue-600",
@@ -55,6 +57,7 @@ interface MessageListProps {
   nodes: ConversationNode[]
   onReply?: (message: Message) => void
   onDelete?: (messageId: string) => void
+  onEdit?: (message: Message) => void
 }
 
 interface Reaction {
@@ -88,6 +91,7 @@ export function MessageList({
   nodes,
   onReply,
   onDelete,
+  onEdit,
 }: MessageListProps) {
   const supabase = createClient()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -366,7 +370,10 @@ export function MessageList({
 
   const handleCopyMessage = (content: string) => {
     navigator.clipboard.writeText(content)
-    // toast.success("تم نسخ الرسالة") // Removed toast import and usage
+    toast({
+      title: "تم النسخ",
+      description: "تم نسخ الرسالة إلى الحافظة",
+    })
     setShowActionsFor(null)
     setLongPressActive(null)
   }
@@ -377,10 +384,8 @@ export function MessageList({
       const { error } = await supabase.from("messages").delete().eq("id", messageId)
       if (error) {
         console.error("Error deleting message:", error)
-        // toast.error("فشل حذف الرسالة") // Removed toast import and usage
         return
       }
-      // toast.success("تم حذف الرسالة") // Removed toast import and usage
     }
     setShowActionsFor(null)
     setLongPressActive(null)
@@ -388,7 +393,10 @@ export function MessageList({
 
   const handleEditMessage = (messageId: string) => {
     // سيتم تنفيذه لاحقاً
-    // toast.info("ميزة التعديل قريباً") // Removed toast import and usage
+    const message = messages.find((m) => m.id === messageId)
+    if (message && onEdit) {
+      onEdit(message)
+    }
     setShowActionsFor(null)
     setLongPressActive(null)
   }
@@ -401,10 +409,8 @@ export function MessageList({
       .eq("id", messageId)
     if (error) {
       console.error("Error pinning message:", error)
-      // toast.error("فشل تثبيت الرسالة") // Removed toast import and usage
       return
     }
-    // toast.success("تم تثبيت الرسالة") // Removed toast import and usage
     setShowActionsFor(null)
     setLongPressActive(null)
   }
@@ -628,7 +634,21 @@ export function MessageList({
                           <span className={cn("text-[10px]", isOwn ? "text-white/60" : "text-muted-foreground/70")}>
                             {formatDistanceToNow(new Date(message.created_at), { locale: ar })}
                           </span>
-                          {isOwn && <CheckCheck className="w-3 h-3 text-white/60" />}
+                          {isOwn && message.read_count !== undefined && (
+                            <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground mt-0.5">
+                              {message.read_count > 0 ? (
+                                <>
+                                  <CheckCheck className="w-3 h-3" />
+                                  <span>{message.read_count}</span>
+                                </>
+                              ) : (
+                                <Check className="w-3 h-3" />
+                              )}
+                            </div>
+                          )}
+                          {isOwn && message.updated_at && message.updated_at !== message.created_at && (
+                            <span className="text-[10px] text-muted-foreground">معدّلة</span>
+                          )}
                           {style.icon && <span className="text-[9px] opacity-50">{style.icon}</span>}
                         </div>
                       </div>
@@ -662,6 +682,26 @@ export function MessageList({
                           isOwn ? "left-0 -translate-x-full pr-1" : "right-0 translate-x-full pl-1",
                         )}
                       >
+                        {message.content && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 rounded-full"
+                            onClick={() => handleCopyMessage(message.content!)}
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                        {isOwn && message.content && onEdit && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 rounded-full"
+                            onClick={() => handleEditMessage(message.id)}
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
                         {onReply && (
                           <Button
                             variant="ghost"

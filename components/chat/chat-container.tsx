@@ -35,6 +35,7 @@ export function ChatContainer({
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null)
   const [importantMessageToasts, setImportantMessageToasts] = useState<Message[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
@@ -125,11 +126,33 @@ export function ChatContainer({
         .in("id", senderIds)
 
       const profileMap = new Map(profiles?.map((p) => [p.id, p]) || [])
+      const messageIds = messagesData.map((m) => m.id)
+      const { data: readCounts } = await supabase
+        .from("message_reads")
+        .select("message_id")
+        .in("message_id", messageIds)
+
+      const readCountMap: Record<string, number> = {}
+      readCounts?.forEach((r) => {
+        readCountMap[r.message_id] = (readCountMap[r.message_id] || 0) + 1
+      })
+
       const messagesWithSender = messagesData.map((m) => ({
         ...m,
         sender: profileMap.get(m.sender_id) || null,
+        read_count: readCountMap[m.id] || 0,
       }))
       setMessages(messagesWithSender as Message[])
+
+      const unreadMessageIds = messagesData.filter((m) => m.sender_id !== currentUserId).map((m) => m.id)
+
+      if (unreadMessageIds.length > 0) {
+        await fetch("/api/messages/mark-read-bulk", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messageIds: unreadMessageIds }),
+        }).catch((err) => console.error("Failed to mark messages as read:", err))
+      }
     } else if (isMounted.current) {
       setMessages([])
     }
@@ -138,7 +161,7 @@ export function ChatContainer({
       setIsLoading(false)
       setTimeout(scrollToBottom, 100)
     }
-  }, [groupId, supabase])
+  }, [groupId, supabase, currentUserId])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -321,6 +344,12 @@ export function ChatContainer({
 
   const handleReply = (message: Message) => {
     setReplyingTo(message)
+    setEditingMessage(null)
+  }
+
+  const handleEditMessage = (message: Message) => {
+    setEditingMessage(message)
+    setReplyingTo(null)
   }
 
   const handleDeleteMessage = async (messageId: string) => {
@@ -485,6 +514,7 @@ export function ChatContainer({
             nodes={nodes}
             onReply={handleReply}
             onDelete={handleDeleteMessage}
+            onEdit={handleEditMessage}
           />
           <TypingIndicator userNames={typingUserNames} />
         </div>
@@ -501,6 +531,8 @@ export function ChatContainer({
           replyingTo={replyingTo}
           onCancelReply={() => setReplyingTo(null)}
           onTyping={broadcastTyping}
+          editingMessage={editingMessage}
+          onCancelEdit={() => setEditingMessage(null)}
         />
       </div>
     </div>

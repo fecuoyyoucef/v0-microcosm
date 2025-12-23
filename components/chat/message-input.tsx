@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select"
-import { Send, Eye, GitBranch, X, Loader2, Reply, Camera, Sparkles, AtSign } from "lucide-react"
+import { Send, Eye, GitBranch, X, Loader2, Reply, Camera, Sparkles, AtSign, Edit2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import type { MessageLayer, GroupMember, ConversationNode, GroupSettings, Message } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -33,6 +33,8 @@ interface MessageInputProps {
   replyingTo?: Message | null
   onCancelReply?: () => void
   onTyping?: () => void
+  editingMessage?: Message | null
+  onCancelEdit?: () => void
 }
 
 const layerOptions: { value: MessageLayer; label: string; icon: string }[] = [
@@ -53,6 +55,8 @@ export function MessageInput({
   replyingTo,
   onCancelReply,
   onTyping,
+  editingMessage,
+  onCancelEdit,
 }: MessageInputProps) {
   const [content, setContent] = useState("")
   const [selectedLayer, setSelectedLayer] = useState<MessageLayer>("standard")
@@ -79,6 +83,12 @@ export function MessageInput({
 
   const otherMembers = members.filter((m) => m.user_id !== currentUserId)
   const currentLayerOption = layerOptions.find((l) => l.value === selectedLayer)!
+
+  useEffect(() => {
+    if (editingMessage) {
+      setContent(editingMessage.content || "")
+    }
+  }, [editingMessage])
 
   const canPostInUpper = () => {
     if (!groupSettings) return true
@@ -282,56 +292,65 @@ export function MessageInput({
 
       const messageContent = content.trim() || (attachmentUrl ? "📷 صورة" : "")
 
-      await onSend(
-        messageContent,
-        selectedLayer,
-        messageNodeId,
-        selectedLayer === "shadow" && visibleTo.length > 0 ? visibleTo : undefined,
-        attachmentUrl,
-        replyingTo?.id || null,
-      )
+      if (editingMessage) {
+        await fetch(`/api/messages/${editingMessage.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: messageContent }),
+        })
+        onCancelEdit?.()
+      } else {
+        await onSend(
+          messageContent,
+          selectedLayer,
+          messageNodeId,
+          selectedLayer === "shadow" && visibleTo.length > 0 ? visibleTo : undefined,
+          attachmentUrl,
+          replyingTo?.id || null,
+        )
 
-      if (mentionedUsers.length > 0) {
-        try {
-          await fetch("/api/messages/send-with-mentions", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              groupId,
-              content: messageContent,
-              mentionedUsers,
-            }),
-          })
-        } catch (error) {
-          console.error("[v0] Failed to send mention notifications:", error)
-        }
-      }
-
-      const pendingTasks = (window as any).__pendingTasks
-      if (pendingTasks?.tasks && pendingTasks.tasks.length > 0) {
-        // Get the last message ID from the group
-        const { data: lastMessage } = await supabase
-          .from("messages")
-          .select("id")
-          .eq("group_id", groupId)
-          .eq("sender_id", currentUserId)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single()
-
-        if (lastMessage) {
-          for (const task of pendingTasks.tasks) {
-            await supabase.from("extracted_tasks").insert({
-              message_id: lastMessage.id,
-              group_id: groupId,
-              task_content: task,
-              created_by: currentUserId,
-              status: "pending",
+        if (mentionedUsers.length > 0) {
+          try {
+            await fetch("/api/messages/send-with-mentions", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                groupId,
+                content: messageContent,
+                mentionedUsers,
+              }),
             })
+          } catch (error) {
+            console.error("[v0] Failed to send mention notifications:", error)
           }
         }
 
-        delete (window as any).__pendingTasks
+        const pendingTasks = (window as any).__pendingTasks
+        if (pendingTasks?.tasks && pendingTasks.tasks.length > 0) {
+          // Get the last message ID from the group
+          const { data: lastMessage } = await supabase
+            .from("messages")
+            .select("id")
+            .eq("group_id", groupId)
+            .eq("sender_id", currentUserId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .single()
+
+          if (lastMessage) {
+            for (const task of pendingTasks.tasks) {
+              await supabase.from("extracted_tasks").insert({
+                message_id: lastMessage.id,
+                group_id: groupId,
+                task_content: task,
+                created_by: currentUserId,
+                status: "pending",
+              })
+            }
+          }
+
+          delete (window as any).__pendingTasks
+        }
       }
 
       setContent("")
@@ -377,8 +396,24 @@ export function MessageInput({
 
   return (
     <div className="shrink-0 border-t border-border/50 bg-background w-full max-w-full overflow-hidden relative">
+      {editingMessage && (
+        <div className="px-3 py-1.5 bg-muted/50 border-b border-border/50 flex items-center justify-between animate-in slide-in-from-bottom-2 duration-200">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="w-0.5 h-6 bg-primary rounded-full shrink-0" />
+            <Edit2 className="w-3.5 h-3.5 text-primary shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-medium text-primary truncate">تعديل الرسالة</p>
+              <p className="text-[11px] text-muted-foreground truncate">{editingMessage.content}</p>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 rounded-full" onClick={onCancelEdit}>
+            <X className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      )}
+
       {/* Reply preview */}
-      {replyingTo && (
+      {replyingTo && !editingMessage && (
         <div className="px-3 py-1.5 bg-muted/50 border-b border-border/50 flex items-center justify-between animate-in slide-in-from-bottom-2 duration-200">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <div className="w-0.5 h-6 bg-primary rounded-full shrink-0" />
