@@ -23,6 +23,7 @@ interface MessageInputProps {
     visibleTo?: string[],
     attachmentUrl?: string,
     replyTo?: string | null,
+    replyPreview?: { id: string; content: string; user_name: string } | null,
   ) => Promise<void>
   members: GroupMember[]
   currentUserId: string
@@ -309,6 +310,14 @@ export function MessageInput({
         }
         onCancelEdit?.()
       } else {
+        const replyPreview = replyingTo
+          ? {
+              id: replyingTo.id,
+              content: replyingTo.content,
+              user_name: replyingTo.sender?.display_name || replyingTo.sender?.username || "مستخدم",
+            }
+          : null
+
         await onSend(
           messageContent,
           selectedLayer,
@@ -316,6 +325,7 @@ export function MessageInput({
           selectedLayer === "shadow" && visibleTo.length > 0 ? visibleTo : undefined,
           attachmentUrl,
           replyingTo?.id || null,
+          replyPreview, // Pass reply_preview
         )
 
         if (replyingTo) {

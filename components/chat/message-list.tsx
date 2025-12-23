@@ -382,12 +382,17 @@ export const MessageList = React.memo(function MessageList({
                       <span className="text-xs text-muted-foreground px-2">{message.sender.username}</span>
                     )}
 
-                    {message.reply_to && replyToMessage && (
+                    {message.reply_to && (message as any).reply_preview ? (
+                      <div className="text-xs bg-muted/50 rounded px-2 py-1 mb-1 opacity-70 border-r-2 border-primary">
+                        <span className="font-medium">{(message as any).reply_preview.user_name}</span>
+                        <p className="truncate max-w-[200px]">{(message as any).reply_preview.content}</p>
+                      </div>
+                    ) : message.reply_to && replyToMessage ? (
                       <div className="text-xs bg-muted/50 rounded px-2 py-1 mb-1 opacity-70 border-r-2 border-primary">
                         <span className="font-medium">{replyToMessage.sender?.display_name || "مستخدم"}</span>
                         <p className="truncate max-w-[200px]">{replyToMessage.content}</p>
                       </div>
-                    )}
+                    ) : null}
 
                     <div
                       className={cn(
@@ -487,12 +492,17 @@ export const MessageList = React.memo(function MessageList({
                   <span className="text-xs text-muted-foreground px-2">{message.sender.username}</span>
                 )}
 
-                {message.reply_to && replyToMessage && (
+                {message.reply_to && (message as any).reply_preview ? (
+                  <div className="text-xs bg-muted/50 rounded px-2 py-1 mb-1 opacity-70 border-r-2 border-primary">
+                    <span className="font-medium">{(message as any).reply_preview.user_name}</span>
+                    <p className="truncate max-w-[200px]">{(message as any).reply_preview.content}</p>
+                  </div>
+                ) : message.reply_to && replyToMessage ? (
                   <div className="text-xs bg-muted/50 rounded px-2 py-1 mb-1 opacity-70 border-r-2 border-primary">
                     <span className="font-medium">{replyToMessage.sender?.display_name || "مستخدم"}</span>
                     <p className="truncate max-w-[200px]">{replyToMessage.content}</p>
                   </div>
-                )}
+                ) : null}
 
                 <div
                   className={cn("rounded-2xl px-4 py-2 break-words", isOwn ? style.ownBg + " text-white" : style.bg)}
