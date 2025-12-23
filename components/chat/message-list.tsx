@@ -74,20 +74,11 @@ interface MessageListProps {
   onMessageDeleted?: (messageId: string) => void
 }
 
-interface Reaction {
-  id: string
-  message_id: string
-  user_id: string
-  reaction: string
-  created_at: string
-}
-
 export const MessageList = React.memo(function MessageList({
   messages,
   currentUserId,
   isLoading,
   messagesEndRef,
-  nodes = [],
   onReplySelect,
   onEditSelect,
   onMessageDeleted,
@@ -102,7 +93,9 @@ export const MessageList = React.memo(function MessageList({
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [translatingId, setTranslatingId] = useState<string | null>(null)
   const [translations, setTranslations] = useState<Record<string, string>>({})
-  const [reactions, setReactions] = useState<Record<string, Reaction[]>>({})
+  const [localReactions, setLocalReactions] = useState<
+    Record<string, Array<{ id: string; user_id: string; reaction: string }>>
+  >({})
 
   const longPressTimer = useRef<NodeJS.Timeout | null>(null)
 
@@ -122,7 +115,6 @@ export const MessageList = React.memo(function MessageList({
     if (selectedMessage && onReplySelect) {
       onReplySelect(selectedMessage)
       setShowActionSheet(false)
-      toast({ title: "اختر ردك على الرسالة" })
     }
   }
 
@@ -130,7 +122,6 @@ export const MessageList = React.memo(function MessageList({
     if (selectedMessage && onEditSelect) {
       onEditSelect(selectedMessage)
       setShowActionSheet(false)
-      setTimeout(() => router.refresh(), 500)
     }
   }
 
@@ -139,22 +130,17 @@ export const MessageList = React.memo(function MessageList({
 
     setIsDeleting(true)
     try {
-      const response = await fetch("/api/messages/delete", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messageId: selectedMessage.id,
-          senderId: currentUserId,
-        }),
-      })
+      const { error } = await supabase
+        .from("messages")
+        .delete()
+        .eq("id", selectedMessage.id)
+        .eq("sender_id", currentUserId)
 
-      if (response.ok) {
+      if (!error) {
         toast({ title: "تم حذف الرسالة" })
         onMessageDeleted?.(selectedMessage.id)
-        router.refresh()
       } else {
-        const data = await response.json()
-        toast({ title: data.error || "فشل الحذف", variant: "destructive" })
+        toast({ title: "فشل الحذف", variant: "destructive" })
       }
     } catch {
       toast({ title: "فشل الحذف", variant: "destructive" })
@@ -170,18 +156,14 @@ export const MessageList = React.memo(function MessageList({
     if (!selectedMessage) return
 
     try {
-      const response = await fetch("/api/messages/pin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messageId: selectedMessage.id,
-          userId: currentUserId,
-        }),
-      })
+      const currentPinned = selectedMessage.is_pinned || false
+      const { error } = await supabase
+        .from("messages")
+        .update({ is_pinned: !currentPinned })
+        .eq("id", selectedMessage.id)
 
-      if (response.ok) {
-        const data = await response.json()
-        toast({ title: data.pinned ? "تم التثبيت" : "تم إلغاء التثبيت" })
+      if (!error) {
+        toast({ title: currentPinned ? "تم إلغاء التثبيت" : "تم التثبيت" })
         router.refresh()
       } else {
         toast({ title: "فشلت العملية", variant: "destructive" })
@@ -222,37 +204,42 @@ export const MessageList = React.memo(function MessageList({
 
   const handleReaction = async (messageId: string, emoji: string) => {
     try {
-      const response = await fetch("/api/messages/react", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messageId, reaction: emoji, userId: currentUserId }),
-      })
+      // Check if reaction exists
+      const { data: existing } = await supabase
+        .from("message_reactions")
+        .select("id")
+        .eq("message_id", messageId)
+        .eq("user_id", currentUserId)
+        .eq("reaction", emoji)
+        .single()
 
-      if (response.ok) {
-        const data = await response.json()
-        if (data.action === "added") {
-          setReactions((prev) => ({
+      if (existing) {
+        // Remove reaction
+        await supabase.from("message_reactions").delete().eq("id", existing.id)
+        setLocalReactions((prev) => ({
+          ...prev,
+          [messageId]: (prev[messageId] || []).filter((r) => !(r.user_id === currentUserId && r.reaction === emoji)),
+        }))
+        toast({ title: `تم إزالة ${emoji}` })
+      } else {
+        // Add reaction
+        const { data: newReaction } = await supabase
+          .from("message_reactions")
+          .insert({
+            message_id: messageId,
+            user_id: currentUserId,
+            reaction: emoji,
+          })
+          .select()
+          .single()
+
+        if (newReaction) {
+          setLocalReactions((prev) => ({
             ...prev,
-            [messageId]: [
-              ...(prev[messageId] || []),
-              {
-                id: data.reactionId,
-                message_id: messageId,
-                user_id: currentUserId,
-                reaction: emoji,
-                created_at: new Date().toISOString(),
-              },
-            ],
+            [messageId]: [...(prev[messageId] || []), { id: newReaction.id, user_id: currentUserId, reaction: emoji }],
           }))
           toast({ title: `تم إضافة ${emoji}` })
-        } else {
-          setReactions((prev) => ({
-            ...prev,
-            [messageId]: (prev[messageId] || []).filter((r) => !(r.user_id === currentUserId && r.reaction === emoji)),
-          }))
-          toast({ title: `تم إزالة ${emoji}` })
         }
-        router.refresh()
       }
     } catch {
       toast({ title: "فشل التفاعل", variant: "destructive" })
@@ -273,7 +260,6 @@ export const MessageList = React.memo(function MessageList({
     }
   }
 
-  // Loading state
   if (isLoading) {
     return (
       <div className="flex-1 p-4 space-y-4">
@@ -287,7 +273,6 @@ export const MessageList = React.memo(function MessageList({
     )
   }
 
-  // Empty state
   if (messages.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground">
@@ -303,9 +288,18 @@ export const MessageList = React.memo(function MessageList({
           const isOwn = message.sender_id === currentUserId
           const layer = message.layer || "standard"
           const style = layerStyles[layer] || layerStyles.standard
-          const messageReactions = reactions[message.id] || []
+          const dbReactions = (message as any).reactions || []
+          const localMsgReactions = localReactions[message.id] || []
+          const allReactions = [...dbReactions]
+          // Add local reactions that aren't in db yet
+          localMsgReactions.forEach((lr) => {
+            if (!allReactions.some((r) => r.id === lr.id)) {
+              allReactions.push(lr)
+            }
+          })
           const translation = translations[message.id]
           const isTranslating = translatingId === message.id
+          const replyToMessage = (message as any).reply_to_message
 
           return (
             <div
@@ -320,7 +314,6 @@ export const MessageList = React.memo(function MessageList({
                 setShowActionSheet(true)
               }}
             >
-              {/* Avatar */}
               {!isOwn && (
                 <Avatar className="h-8 w-8 shrink-0">
                   <AvatarImage src={message.sender?.avatar_url || undefined} />
@@ -330,30 +323,26 @@ export const MessageList = React.memo(function MessageList({
                 </Avatar>
               )}
 
-              {/* Message bubble */}
               <div className={cn("max-w-[75%] space-y-1", isOwn ? "items-end" : "items-start")}>
-                {/* Sender name */}
                 {!isOwn && message.sender?.username && (
                   <span className="text-xs text-muted-foreground px-2">{message.sender.username}</span>
                 )}
 
-                {/* Reply reference */}
-                {message.reply_to && (
-                  <div className="text-xs bg-muted/50 rounded px-2 py-1 mb-1 opacity-70">↩️ رد على رسالة</div>
+                {message.reply_to && replyToMessage && (
+                  <div className="text-xs bg-muted/50 rounded px-2 py-1 mb-1 opacity-70 border-r-2 border-primary">
+                    <span className="font-medium">{replyToMessage.sender?.display_name || "مستخدم"}</span>
+                    <p className="truncate max-w-[200px]">{replyToMessage.content}</p>
+                  </div>
                 )}
 
-                {/* Bubble */}
                 <div
                   className={cn("rounded-2xl px-4 py-2 break-words", isOwn ? style.ownBg + " text-white" : style.bg)}
                 >
                   <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-
-                  {/* Translation */}
                   {isTranslating && <p className="text-xs opacity-70 mt-1">جاري الترجمة...</p>}
                   {translation && <p className="text-xs opacity-70 mt-1 border-t pt-1">{translation}</p>}
                 </div>
 
-                {/* Time and status */}
                 <div className={cn("flex items-center gap-1 px-2", isOwn ? "justify-end" : "justify-start")}>
                   <span className="text-[10px] text-muted-foreground">
                     {formatDistanceToNow(new Date(message.created_at), { addSuffix: true, locale: ar })}
@@ -363,29 +352,26 @@ export const MessageList = React.memo(function MessageList({
                       معدّلة
                     </Badge>
                   )}
+                  {message.is_pinned && <Pin className="h-3 w-3 text-primary" />}
                   {layer !== "standard" && <span className="text-[10px]">{style.icon}</span>}
                 </div>
 
-                {/* Quick Reactions bar - only show on hover/select */}
-                {selectedMessage?.id === message.id && (
-                  <div className="flex gap-1 mt-1">
+                {allReactions.length > 0 && (
+                  <div className="flex gap-1 flex-wrap mt-1">
                     {quickReactions.map((emoji) => {
-                      const count = messageReactions.filter((r) => r.reaction === emoji).length
-                      const hasReacted = messageReactions.some(
-                        (r) => r.reaction === emoji && r.user_id === currentUserId,
-                      )
-
+                      const count = allReactions.filter((r) => r.reaction === emoji).length
+                      if (count === 0) return null
+                      const hasReacted = allReactions.some((r) => r.reaction === emoji && r.user_id === currentUserId)
                       return (
                         <button
                           key={emoji}
                           onClick={() => handleReaction(message.id, emoji)}
                           className={cn(
-                            "text-sm px-1 rounded transition-all hover:scale-110",
-                            hasReacted ? "bg-primary/20" : "opacity-50 hover:opacity-100",
+                            "text-xs px-1.5 py-0.5 rounded-full transition-all",
+                            hasReacted ? "bg-primary/20 border border-primary/50" : "bg-muted/50",
                           )}
                         >
-                          {emoji}
-                          {count > 0 && <span className="text-[10px] ml-0.5">{count}</span>}
+                          {emoji} {count}
                         </button>
                       )
                     })}
@@ -398,15 +384,31 @@ export const MessageList = React.memo(function MessageList({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Action Sheet */}
+      {/* Action Sheet with Quick Reactions */}
       <Sheet open={showActionSheet} onOpenChange={setShowActionSheet}>
         <SheetContent side="bottom" className="rounded-t-3xl">
           <SheetHeader>
             <SheetTitle className="text-right">خيارات الرسالة</SheetTitle>
           </SheetHeader>
 
+          <div className="flex justify-center gap-2 py-4 border-b">
+            {quickReactions.map((emoji) => (
+              <button
+                key={emoji}
+                onClick={() => {
+                  if (selectedMessage) {
+                    handleReaction(selectedMessage.id, emoji)
+                    setShowActionSheet(false)
+                  }
+                }}
+                className="text-2xl hover:scale-125 transition-transform p-2"
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+
           <div className="py-4 space-y-2">
-            {/* Copy */}
             <Button
               variant="ghost"
               className="w-full justify-end gap-2"
@@ -416,25 +418,21 @@ export const MessageList = React.memo(function MessageList({
               {copiedId === selectedMessage?.id ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
             </Button>
 
-            {/* Reply */}
             <Button variant="ghost" className="w-full justify-end gap-2" onClick={handleReply}>
               رد
               <Reply className="h-4 w-4" />
             </Button>
 
-            {/* Translate */}
             <Button variant="ghost" className="w-full justify-end gap-2" onClick={handleTranslate}>
               ترجمة
               <Languages className="h-4 w-4" />
             </Button>
 
-            {/* Pin */}
             <Button variant="ghost" className="w-full justify-end gap-2" onClick={handlePin}>
-              تثبيت
+              {selectedMessage?.is_pinned ? "إلغاء التثبيت" : "تثبيت"}
               <Pin className="h-4 w-4" />
             </Button>
 
-            {/* Edit - only for own messages */}
             {selectedMessage?.sender_id === currentUserId && (
               <Button variant="ghost" className="w-full justify-end gap-2" onClick={handleEdit}>
                 تعديل
@@ -442,7 +440,6 @@ export const MessageList = React.memo(function MessageList({
               </Button>
             )}
 
-            {/* Delete - only for own messages */}
             {selectedMessage?.sender_id === currentUserId && (
               <Button
                 variant="ghost"
@@ -457,7 +454,6 @@ export const MessageList = React.memo(function MessageList({
         </SheetContent>
       </Sheet>
 
-      {/* Delete Confirmation */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>

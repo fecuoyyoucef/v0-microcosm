@@ -127,6 +127,8 @@ export function ChatContainer({
 
       const profileMap = new Map(profiles?.map((p) => [p.id, p]) || [])
       const messageIds = messagesData.map((m) => m.id)
+
+      // Fetch read counts
       const { data: readCounts } = await supabase
         .from("message_reads")
         .select("message_id")
@@ -137,10 +139,44 @@ export function ChatContainer({
         readCountMap[r.message_id] = (readCountMap[r.message_id] || 0) + 1
       })
 
+      const { data: reactionsData } = await supabase.from("message_reactions").select("*").in("message_id", messageIds)
+
+      const reactionsMap: Record<string, Array<{ id: string; user_id: string; reaction: string }>> = {}
+      reactionsData?.forEach((r) => {
+        if (!reactionsMap[r.message_id]) {
+          reactionsMap[r.message_id] = []
+        }
+        reactionsMap[r.message_id].push({
+          id: r.id,
+          user_id: r.user_id,
+          reaction: r.reaction,
+        })
+      })
+
+      const replyToIds = messagesData.filter((m) => m.reply_to).map((m) => m.reply_to)
+      const replyMessagesMap: Record<string, { content: string; sender?: { display_name: string } }> = {}
+
+      if (replyToIds.length > 0) {
+        const { data: replyMessages } = await supabase
+          .from("messages")
+          .select("id, content, sender_id")
+          .in("id", replyToIds)
+
+        replyMessages?.forEach((rm) => {
+          const senderProfile = profileMap.get(rm.sender_id)
+          replyMessagesMap[rm.id] = {
+            content: rm.content,
+            sender: senderProfile ? { display_name: senderProfile.display_name } : undefined,
+          }
+        })
+      }
+
       const messagesWithSender = messagesData.map((m) => ({
         ...m,
         sender: profileMap.get(m.sender_id) || null,
         read_count: readCountMap[m.id] || 0,
+        reactions: reactionsMap[m.id] || [],
+        reply_to_message: m.reply_to ? replyMessagesMap[m.reply_to] : null,
       }))
       setMessages(messagesWithSender as Message[])
 

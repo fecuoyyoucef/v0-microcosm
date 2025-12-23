@@ -295,13 +295,16 @@ export function MessageInput({
       const messageContent = content.trim() || (attachmentUrl ? "📷 صورة" : "")
 
       if (editingMessage) {
-        const response = await fetch(`/api/messages/${editingMessage.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: messageContent }),
-        })
+        const { error } = await supabase
+          .from("messages")
+          .update({
+            content: messageContent,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", editingMessage.id)
+          .eq("sender_id", currentUserId)
 
-        if (response.ok) {
+        if (!error) {
           router.refresh()
         }
         onCancelEdit?.()
