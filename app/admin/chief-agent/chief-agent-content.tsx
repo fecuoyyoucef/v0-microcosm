@@ -231,6 +231,23 @@ export default function ChiefAgentContent() {
     }
   }
 
+  const handleAnalyzeErrors = async () => {
+    setIsAnalyzing(true)
+    try {
+      const result = await analyzeErrors()
+      setErrorAnalysis(result)
+    } catch (error) {
+      console.error("Error:", error)
+      setErrorAnalysis({
+        totalTickets: 0,
+        criticalIssues: [],
+        error: "فشل تحليل الأخطاء",
+      })
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
+
   if (loading) {
     return <div className="p-6">جاري التحميل...</div>
   }
@@ -326,7 +343,7 @@ export default function ChiefAgentContent() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold">تحليل الأخطاء من GitHub</h2>
           <button
-            onClick={() => analyzeErrors(setErrorAnalysis, setIsAnalyzing)}
+            onClick={handleAnalyzeErrors}
             disabled={isAnalyzing}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
           >

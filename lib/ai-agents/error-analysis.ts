@@ -1,10 +1,11 @@
+"use server"
+
 import { generateText } from "ai"
 import { createServiceClient } from "@/lib/supabase/server"
 
-const supabase = createServiceClient()
+export async function analyzeErrors() {
+  const supabase = createServiceClient()
 
-export async function analyzeErrors(setErrorAnalysis: (data: any) => void, setIsAnalyzing: (loading: boolean) => void) {
-  setIsAnalyzing(true)
   try {
     // Fetch recent support tickets with errors
     const { data: tickets } = await supabase
@@ -14,12 +15,11 @@ export async function analyzeErrors(setErrorAnalysis: (data: any) => void, setIs
       .limit(20)
 
     if (!tickets || tickets.length === 0) {
-      setErrorAnalysis({
+      return {
         totalTickets: 0,
         criticalIssues: [],
         message: "لا توجد تذاكر لتحليلها",
-      })
-      return
+      }
     }
 
     // Extract error messages and analyze with AI
@@ -42,19 +42,17 @@ export async function analyzeErrors(setErrorAnalysis: (data: any) => void, setIs
       severity: "high",
     }))
 
-    setErrorAnalysis({
+    return {
       totalTickets: tickets.length,
       criticalIssues,
       lastAnalyzed: new Date().toISOString(),
-    })
+    }
   } catch (error) {
     console.error("Error analyzing errors:", error)
-    setErrorAnalysis({
+    return {
       totalTickets: 0,
       criticalIssues: [],
       error: "فشل تحليل الأخطاء",
-    })
-  } finally {
-    setIsAnalyzing(false)
+    }
   }
 }
