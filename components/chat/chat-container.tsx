@@ -274,6 +274,28 @@ export function ChatContainer({
             return
           }
 
+          let replyToMessage = null
+          if (newMsg.reply_to) {
+            const { data: replyMsg } = await supabase
+              .from("messages")
+              .select("id, content, sender_id")
+              .eq("id", newMsg.reply_to)
+              .single()
+
+            if (replyMsg) {
+              const { data: replySender } = await supabase
+                .from("profiles")
+                .select("display_name")
+                .eq("id", replyMsg.sender_id)
+                .single()
+
+              replyToMessage = {
+                content: replyMsg.content,
+                sender: replySender ? { display_name: replySender.display_name } : undefined,
+              }
+            }
+          }
+
           setMessages((prev) => {
             if (prev.some((m) => m.id === newMsg.id)) return prev
 
@@ -288,7 +310,7 @@ export function ChatContainer({
                 }
               })
 
-            return [...prev, { ...newMsg, sender: null } as Message]
+            return [...prev, { ...newMsg, sender: null, reply_to_message: replyToMessage } as Message]
           })
           setTimeout(scrollToBottom, 100)
           fetchNodes()

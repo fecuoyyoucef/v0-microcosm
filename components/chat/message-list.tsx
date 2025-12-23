@@ -98,6 +98,8 @@ export const MessageList = React.memo(function MessageList({
   >({})
 
   const longPressTimer = useRef<NodeJS.Timeout | null>(null)
+  const touchStartPos = useRef<{ x: number; y: number } | null>(null)
+  const isTouchMoving = useRef(false)
 
   const handleCopy = async (content: string, messageId: string) => {
     try {
@@ -185,7 +187,10 @@ export const MessageList = React.memo(function MessageList({
       const response = await fetch("/api/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: selectedMessage.content, targetLang: "en" }),
+        body: JSON.stringify({
+          text: selectedMessage.content,
+          targetLang: /[\u0600-\u06FF]/.test(selectedMessage.content) ? "en" : "ar",
+        }),
       })
 
       if (response.ok) {
@@ -246,18 +251,43 @@ export const MessageList = React.memo(function MessageList({
     }
   }
 
-  const handleLongPressStart = (message: Message) => {
+  const handleTouchStart = (e: React.TouchEvent, message: Message) => {
+    const touch = e.touches[0]
+    touchStartPos.current = { x: touch.clientX, y: touch.clientY }
+    isTouchMoving.current = false
+
     longPressTimer.current = setTimeout(() => {
-      setSelectedMessage(message)
-      setShowActionSheet(true)
+      if (!isTouchMoving.current) {
+        setSelectedMessage(message)
+        setShowActionSheet(true)
+      }
     }, 500)
   }
 
-  const handleLongPressEnd = () => {
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchStartPos.current) return
+
+    const touch = e.touches[0]
+    const dx = Math.abs(touch.clientX - touchStartPos.current.x)
+    const dy = Math.abs(touch.clientY - touchStartPos.current.y)
+
+    // If moved more than 10px, cancel long press
+    if (dx > 10 || dy > 10) {
+      isTouchMoving.current = true
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current)
+        longPressTimer.current = null
+      }
+    }
+  }
+
+  const handleTouchEnd = () => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
     }
+    touchStartPos.current = null
+    isTouchMoving.current = false
   }
 
   if (isLoading) {
@@ -281,17 +311,130 @@ export const MessageList = React.memo(function MessageList({
     )
   }
 
+  const pinnedMessages = messages.filter((m) => m.is_pinned)
+  const regularMessages = messages.filter((m) => !m.is_pinned)
+
   return (
     <>
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {messages.map((message) => {
+        {pinnedMessages.length > 0 && (
+          <div className="mb-4 border-b pb-4">
+            <div className="flex items-center gap-2 mb-2 text-sm text-muted-foreground">
+              <Pin className="h-4 w-4" />
+              <span>رسائل مثبتة</span>
+            </div>
+            {pinnedMessages.map((message) => {
+              const isOwn = message.sender_id === currentUserId
+              const layer = message.layer || "standard"
+              const style = layerStyles[layer] || layerStyles.standard
+              const dbReactions = (message as any).reactions || []
+              const localMsgReactions = localReactions[message.id] || []
+              const allReactions = [...dbReactions]
+              localMsgReactions.forEach((lr) => {
+                if (!allReactions.some((r) => r.id === lr.id)) {
+                  allReactions.push(lr)
+                }
+              })
+              const translation = translations[message.id]
+              const isTranslating = translatingId === message.id
+              const replyToMessage = (message as any).reply_to_message
+
+              return (
+                <div
+                  key={message.id}
+                  className={cn("flex gap-2 group", isOwn ? "flex-row-reverse" : "flex-row")}
+                  onTouchStart={(e) => handleTouchStart(e, message)}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                  onTouchCancel={handleTouchEnd}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    setSelectedMessage(message)
+                    setShowActionSheet(true)
+                  }}
+                >
+                  {!isOwn && (
+                    <Avatar className="h-8 w-8 shrink-0">
+                      <AvatarImage src={message.sender?.avatar_url || undefined} />
+                      <AvatarFallback className={getAvatarColor(message.sender_id)}>
+                        {message.sender?.username?.[0]?.toUpperCase() || "؟"}
+                      </AvatarFallback>
+                    </Avatar>
+                  )}
+
+                  <div className={cn("max-w-[75%] space-y-1", isOwn ? "items-end" : "items-start")}>
+                    {!isOwn && message.sender?.username && (
+                      <span className="text-xs text-muted-foreground px-2">{message.sender.username}</span>
+                    )}
+
+                    {message.reply_to && replyToMessage && (
+                      <div className="text-xs bg-muted/50 rounded px-2 py-1 mb-1 opacity-70 border-r-2 border-primary">
+                        <span className="font-medium">{replyToMessage.sender?.display_name || "مستخدم"}</span>
+                        <p className="truncate max-w-[200px]">{replyToMessage.content}</p>
+                      </div>
+                    )}
+
+                    <div
+                      className={cn(
+                        "rounded-2xl px-4 py-2 break-words",
+                        isOwn ? style.ownBg + " text-white" : style.bg,
+                      )}
+                    >
+                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      {isTranslating && <p className="text-xs opacity-70 mt-1">جاري الترجمة...</p>}
+                      {translation && <p className="text-xs opacity-70 mt-1 border-t pt-1">{translation}</p>}
+                    </div>
+
+                    <div className={cn("flex items-center gap-1 px-2", isOwn ? "justify-end" : "justify-start")}>
+                      <span className="text-[10px] text-muted-foreground">
+                        {formatDistanceToNow(new Date(message.created_at), { addSuffix: true, locale: ar })}
+                      </span>
+                      {message.updated_at && message.updated_at !== message.created_at && (
+                        <Badge variant="outline" className="text-[8px] px-1 py-0">
+                          معدّلة
+                        </Badge>
+                      )}
+                      <Pin className="h-3 w-3 text-primary fill-primary" />
+                      {layer !== "standard" && <span className="text-[10px]">{style.icon}</span>}
+                    </div>
+
+                    {allReactions.length > 0 && (
+                      <div className="flex gap-1 flex-wrap mt-1">
+                        {quickReactions.map((emoji) => {
+                          const count = allReactions.filter((r) => r.reaction === emoji).length
+                          if (count === 0) return null
+                          const hasReacted = allReactions.some(
+                            (r) => r.reaction === emoji && r.user_id === currentUserId,
+                          )
+                          return (
+                            <button
+                              key={emoji}
+                              onClick={() => handleReaction(message.id, emoji)}
+                              className={cn(
+                                "text-xs px-1.5 py-0.5 rounded-full transition-all",
+                                hasReacted ? "bg-primary/20 border border-primary/50" : "bg-muted/50",
+                              )}
+                            >
+                              {emoji} {count}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {regularMessages.map((message) => {
           const isOwn = message.sender_id === currentUserId
           const layer = message.layer || "standard"
           const style = layerStyles[layer] || layerStyles.standard
           const dbReactions = (message as any).reactions || []
           const localMsgReactions = localReactions[message.id] || []
           const allReactions = [...dbReactions]
-          // Add local reactions that aren't in db yet
           localMsgReactions.forEach((lr) => {
             if (!allReactions.some((r) => r.id === lr.id)) {
               allReactions.push(lr)
@@ -305,9 +448,10 @@ export const MessageList = React.memo(function MessageList({
             <div
               key={message.id}
               className={cn("flex gap-2 group", isOwn ? "flex-row-reverse" : "flex-row")}
-              onTouchStart={() => handleLongPressStart(message)}
-              onTouchEnd={handleLongPressEnd}
-              onTouchCancel={handleLongPressEnd}
+              onTouchStart={(e) => handleTouchStart(e, message)}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              onTouchCancel={handleTouchEnd}
               onContextMenu={(e) => {
                 e.preventDefault()
                 setSelectedMessage(message)
@@ -352,7 +496,6 @@ export const MessageList = React.memo(function MessageList({
                       معدّلة
                     </Badge>
                   )}
-                  {message.is_pinned && <Pin className="h-3 w-3 text-primary" />}
                   {layer !== "standard" && <span className="text-[10px]">{style.icon}</span>}
                 </div>
 
@@ -428,10 +571,12 @@ export const MessageList = React.memo(function MessageList({
               <Languages className="h-4 w-4" />
             </Button>
 
-            <Button variant="ghost" className="w-full justify-end gap-2" onClick={handlePin}>
-              {selectedMessage?.is_pinned ? "إلغاء التثبيت" : "تثبيت"}
-              <Pin className="h-4 w-4" />
-            </Button>
+            {selectedMessage?.sender_id === currentUserId && (
+              <Button variant="ghost" className="w-full justify-end gap-2" onClick={handlePin}>
+                {selectedMessage?.is_pinned ? "إلغاء التثبيت" : "تثبيت"}
+                <Pin className="h-4 w-4" />
+              </Button>
+            )}
 
             {selectedMessage?.sender_id === currentUserId && (
               <Button variant="ghost" className="w-full justify-end gap-2" onClick={handleEdit}>
