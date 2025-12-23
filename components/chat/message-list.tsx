@@ -409,10 +409,8 @@ export const MessageList = React.memo(function MessageList({
 
   const handleDeleteMessage = async (messageId: string) => {
     if (confirm("هل أنت متأكد من حذف هذه الرسالة؟")) {
-      const { error } = await supabase.from("messages").delete().eq("id", messageId)
-      if (error) {
-        console.error("Error deleting message:", error)
-        return
+      if (onDelete) {
+        onDelete(messageId)
       }
       toast({
         title: "تم الحذف",
@@ -431,16 +429,32 @@ export const MessageList = React.memo(function MessageList({
     setSelectedMessage(null)
   }
 
+  const handleReplyMessage = (message: Message) => {
+    if (onReply) {
+      onReply(message)
+    }
+    setShowActionSheet(false)
+    setSelectedMessage(null)
+  }
+
   const handlePinMessage = async (messageId: string) => {
     try {
       const { error } = await supabase.from("messages").update({ is_pinned: true }).eq("id", messageId)
 
       if (error) throw error
-      alert("تم تثبيت الرسالة")
+      toast({
+        title: "تم التثبيت",
+        description: "تم تثبيت الرسالة بنجاح",
+      })
     } catch (error) {
       console.error("Error pinning message:", error)
-      alert("حدث خطأ في تثبيت الرسالة")
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ في تثبيت الرسالة",
+      })
     }
+    setShowActionSheet(false)
+    setSelectedMessage(null)
   }
 
   const translateMessage = async (content: string) => {
@@ -780,7 +794,7 @@ export const MessageList = React.memo(function MessageList({
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 rounded-full"
-                            onClick={() => onReply(message)}
+                            onClick={() => handleReplyMessage(message)}
                           >
                             <Reply className="w-3.5 h-3.5" />
                           </Button>
@@ -881,37 +895,24 @@ export const MessageList = React.memo(function MessageList({
                     variant="ghost"
                     className="w-full justify-start text-right"
                     onClick={() => {
-                      handleCopyMessage(selectedMessage.content!)
+                      if (selectedMessage) {
+                        handleReplyMessage(selectedMessage)
+                      }
                     }}
                   >
-                    <Copy className="w-4 h-4 ml-2" />
-                    نسخ النص
+                    <Reply className="w-4 h-4 ml-2" />
+                    رد
                   </Button>
                 )}
-
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-right"
-                  onClick={() => {
-                    if (onReply && selectedMessage) {
-                      onReply(selectedMessage)
-                    }
-                    setShowActionSheet(false)
-                  }}
-                >
-                  <Reply className="w-4 h-4 ml-2" />
-                  رد
-                </Button>
 
                 {selectedMessage.sender_id === currentUserId && (
                   <Button
                     variant="ghost"
                     className="w-full justify-start text-right"
                     onClick={() => {
-                      if (onEdit && selectedMessage) {
-                        onEdit(selectedMessage)
+                      if (selectedMessage) {
+                        handleEditMessage(selectedMessage)
                       }
-                      setShowActionSheet(false)
                     }}
                   >
                     <Edit2 className="w-4 h-4 ml-2" />
@@ -926,7 +927,6 @@ export const MessageList = React.memo(function MessageList({
                     if (selectedMessage) {
                       handlePinMessage(selectedMessage.id)
                     }
-                    setShowActionSheet(false)
                   }}
                 >
                   <Pin className="w-4 h-4 ml-2" />
@@ -940,8 +940,9 @@ export const MessageList = React.memo(function MessageList({
                     onClick={async () => {
                       if (selectedMessage.content) {
                         await handleTranslate(selectedMessage.id, selectedMessage.content)
+                        setShowActionSheet(false)
+                        setSelectedMessage(null)
                       }
-                      setShowActionSheet(false)
                     }}
                   >
                     <Globe className="w-4 h-4 ml-2" />
@@ -952,12 +953,11 @@ export const MessageList = React.memo(function MessageList({
                 {selectedMessage.sender_id === currentUserId && (
                   <Button
                     variant="ghost"
-                    className="w-full justify-start text-right text-destructive hover:text-destructive"
+                    className="w-full justify-start text-right text-red-500 hover:text-red-600"
                     onClick={() => {
-                      if (onDelete && selectedMessage) {
-                        onDelete(selectedMessage.id)
+                      if (selectedMessage) {
+                        handleDeleteMessage(selectedMessage.id)
                       }
-                      setShowActionSheet(false)
                     }}
                   >
                     <Trash2 className="w-4 h-4 ml-2" />
