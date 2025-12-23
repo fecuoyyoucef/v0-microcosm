@@ -140,9 +140,12 @@ export const MessageList = React.memo(function MessageList({
     setIsDeleting(true)
     try {
       const response = await fetch("/api/messages/delete", {
-        method: "POST",
+        method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messageId: selectedMessage.id }),
+        body: JSON.stringify({
+          messageId: selectedMessage.id,
+          senderId: currentUserId,
+        }),
       })
 
       if (response.ok) {
@@ -170,7 +173,10 @@ export const MessageList = React.memo(function MessageList({
       const response = await fetch("/api/messages/pin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messageId: selectedMessage.id }),
+        body: JSON.stringify({
+          messageId: selectedMessage.id,
+          userId: currentUserId,
+        }),
       })
 
       if (response.ok) {

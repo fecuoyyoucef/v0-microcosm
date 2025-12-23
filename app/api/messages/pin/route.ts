@@ -3,7 +3,7 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { revalidatePath } from "next/cache"
 
-export async function PUT(request: Request) {
+export async function POST(request: Request) {
   const cookieStore = await cookies()
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
     cookies: {
@@ -12,18 +12,22 @@ export async function PUT(request: Request) {
     },
   })
 
-  const { messageId, userId, isPinned } = await request.json()
+  const { messageId, userId } = await request.json()
 
-  if (!messageId || userId === undefined) {
+  if (!messageId || !userId) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
   }
+
+  const { data: currentMessage } = await supabase.from("messages").select("is_pinned").eq("id", messageId).single()
+
+  const newPinStatus = !currentMessage?.is_pinned
 
   const { data, error } = await supabase
     .from("messages")
     .update({
-      is_pinned: isPinned,
-      pinned_at: isPinned ? new Date().toISOString() : null,
-      pinned_by: isPinned ? userId : null,
+      is_pinned: newPinStatus,
+      pinned_at: newPinStatus ? new Date().toISOString() : null,
+      pinned_by: newPinStatus ? userId : null,
     })
     .eq("id", messageId)
     .select()
@@ -33,5 +37,5 @@ export async function PUT(request: Request) {
 
   revalidatePath("/chat")
 
-  return NextResponse.json({ data, success: true, pinned: isPinned })
+  return NextResponse.json({ data, success: true, pinned: newPinStatus })
 }
