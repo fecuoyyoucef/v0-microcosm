@@ -1,9 +1,10 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 
 export async function POST(request: Request) {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
     cookies: {
       getAll: () => cookieStore.getAll(),
@@ -27,18 +28,23 @@ export async function POST(request: Request) {
     .single()
 
   if (existing) {
-    // Remove reaction
     const { error } = await supabase.from("message_reactions").delete().eq("id", existing.id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    revalidatePath("/chat")
+    return NextResponse.json({ success: true, action: "removed" })
   } else {
-    // Add reaction
-    const { error } = await supabase.from("message_reactions").insert({
-      message_id: messageId,
-      user_id: userId,
-      reaction,
-    })
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  }
+    const { data, error } = await supabase
+      .from("message_reactions")
+      .insert({
+        message_id: messageId,
+        user_id: userId,
+        reaction,
+      })
+      .select()
+      .single()
 
-  return NextResponse.json({ success: true })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    revalidatePath("/chat")
+    return NextResponse.json({ success: true, action: "added", reactionId: data.id })
+  }
 }

@@ -353,27 +353,31 @@ export const MessageList = React.memo(function MessageList({
                   {layer !== "standard" && <span className="text-[10px]">{style.icon}</span>}
                 </div>
 
-                {/* Quick Reactions bar */}
-                <div className="flex gap-1 mt-1">
-                  {quickReactions.map((emoji) => {
-                    const count = messageReactions.filter((r) => r.reaction === emoji).length
-                    const hasReacted = messageReactions.some((r) => r.reaction === emoji && r.user_id === currentUserId)
+                {/* Quick Reactions bar - only show on hover/select */}
+                {selectedMessage?.id === message.id && (
+                  <div className="flex gap-1 mt-1">
+                    {quickReactions.map((emoji) => {
+                      const count = messageReactions.filter((r) => r.reaction === emoji).length
+                      const hasReacted = messageReactions.some(
+                        (r) => r.reaction === emoji && r.user_id === currentUserId,
+                      )
 
-                    return (
-                      <button
-                        key={emoji}
-                        onClick={() => handleReaction(message.id, emoji)}
-                        className={cn(
-                          "text-sm px-1 rounded transition-all hover:scale-110",
-                          hasReacted ? "bg-primary/20" : "opacity-50 hover:opacity-100",
-                        )}
-                      >
-                        {emoji}
-                        {count > 0 && <span className="text-[10px] ml-0.5">{count}</span>}
-                      </button>
-                    )
-                  })}
-                </div>
+                      return (
+                        <button
+                          key={emoji}
+                          onClick={() => handleReaction(message.id, emoji)}
+                          className={cn(
+                            "text-sm px-1 rounded transition-all hover:scale-110",
+                            hasReacted ? "bg-primary/20" : "opacity-50 hover:opacity-100",
+                          )}
+                        >
+                          {emoji}
+                          {count > 0 && <span className="text-[10px] ml-0.5">{count}</span>}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           )
