@@ -59,6 +59,8 @@ interface MessageListProps {
   onReply?: (message: Message) => void
   onDelete?: (messageId: string) => void
   onEdit?: (message: Message) => void
+  onPin?: (messageId: string) => void
+  onTranslate?: (messageId: string, content: string) => Promise<void>
 }
 
 interface Reaction {
@@ -89,6 +91,8 @@ export const MessageList = React.memo(function MessageList({
   onReply,
   onEdit,
   onDelete,
+  onPin,
+  onTranslate,
   isLoading,
   messagesEndRef,
   nodes = [],
@@ -397,64 +401,9 @@ export const MessageList = React.memo(function MessageList({
     return parts.length > 0 ? parts : content
   }
 
-  const handleCopyMessage = (content: string) => {
-    navigator.clipboard.writeText(content)
-    toast({
-      title: "تم النسخ",
-      description: "تم نسخ الرسالة إلى الحافظة",
-    })
-    setShowActionSheet(false)
-    setSelectedMessage(null)
-  }
-
-  const handleDeleteMessage = async (messageId: string) => {
-    if (confirm("هل أنت متأكد من حذف هذه الرسالة؟")) {
-      if (onDelete) {
-        onDelete(messageId)
-      }
-      toast({
-        title: "تم الحذف",
-        description: "تم حذف الرسالة بنجاح",
-      })
-    }
-    setShowActionSheet(false)
-    setSelectedMessage(null)
-  }
-
-  const handleEditMessage = (message: Message) => {
-    if (onEdit) {
-      onEdit(message)
-    }
-    setShowActionSheet(false)
-    setSelectedMessage(null)
-  }
-
-  const handleReplyMessage = (message: Message) => {
-    if (onReply) {
-      onReply(message)
-    }
-    setShowActionSheet(false)
-    setSelectedMessage(null)
-  }
-
-  const handlePinMessage = async (messageId: string) => {
-    try {
-      const { error } = await supabase.from("messages").update({ is_pinned: true }).eq("id", messageId)
-
-      if (error) throw error
-      toast({
-        title: "تم التثبيت",
-        description: "تم تثبيت الرسالة بنجاح",
-      })
-    } catch (error) {
-      console.error("Error pinning message:", error)
-      toast({
-        title: "خطأ",
-        description: "حدث خطأ في تثبيت الرسالة",
-      })
-    }
-    setShowActionSheet(false)
-    setSelectedMessage(null)
+  const handleShowActions = (message: Message) => {
+    setSelectedMessage(message)
+    setShowActionSheet(true)
   }
 
   const translateMessage = async (content: string) => {
@@ -774,7 +723,13 @@ export const MessageList = React.memo(function MessageList({
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 rounded-full"
-                            onClick={() => handleCopyMessage(message.content!)}
+                            onClick={() => {
+                              if (selectedMessage?.content) {
+                                navigator.clipboard.writeText(selectedMessage.content)
+                                toast({ title: "تم نسخ الرسالة" })
+                                setShowActionSheet(false)
+                              }
+                            }}
                           >
                             <Copy className="w-3.5 h-3.5" />
                           </Button>
@@ -784,7 +739,13 @@ export const MessageList = React.memo(function MessageList({
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 rounded-full"
-                            onClick={() => handleEditMessage(message)}
+                            onClick={() => {
+                              if (selectedMessage && onEdit) {
+                                onEdit(selectedMessage) // Call prop directly
+                                setShowActionSheet(false)
+                                setSelectedMessage(null)
+                              }
+                            }}
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </Button>
@@ -794,7 +755,13 @@ export const MessageList = React.memo(function MessageList({
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 rounded-full"
-                            onClick={() => handleReplyMessage(message)}
+                            onClick={() => {
+                              if (selectedMessage && onReply) {
+                                onReply(selectedMessage) // Call prop directly
+                                setShowActionSheet(false)
+                                setSelectedMessage(null)
+                              }
+                            }}
                           >
                             <Reply className="w-3.5 h-3.5" />
                           </Button>
@@ -804,7 +771,13 @@ export const MessageList = React.memo(function MessageList({
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 rounded-full"
-                            onClick={() => handleTranslate(message.id, message.content!)}
+                            onClick={async () => {
+                              if (selectedMessage && onTranslate) {
+                                await onTranslate(selectedMessage.id, selectedMessage.content!)
+                                setShowActionSheet(false)
+                                setSelectedMessage(null)
+                              }
+                            }}
                             disabled={translatingMessages.has(message.id)}
                           >
                             {translatingMessages.has(message.id) ? (
@@ -819,7 +792,13 @@ export const MessageList = React.memo(function MessageList({
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 rounded-full text-destructive hover:text-destructive"
-                            onClick={() => handleDeleteClick(message.id)}
+                            onClick={() => {
+                              if (selectedMessage && onDelete) {
+                                onDelete(selectedMessage.id) // Call prop directly
+                                setShowActionSheet(false)
+                                setSelectedMessage(null)
+                              }
+                            }}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>
@@ -895,10 +874,11 @@ export const MessageList = React.memo(function MessageList({
                     variant="ghost"
                     className="w-full justify-start text-right"
                     onClick={() => {
-                      if (onReply) {
-                        onReply(selectedMessage)
+                      if (selectedMessage && onReply) {
+                        onReply(selectedMessage) // Call prop directly
+                        setShowActionSheet(false)
+                        setSelectedMessage(null)
                       }
-                      setShowActionSheet(false)
                     }}
                   >
                     <Reply className="w-4 h-4 ml-2" />
@@ -906,13 +886,15 @@ export const MessageList = React.memo(function MessageList({
                   </Button>
                 )}
 
-                {selectedMessage.sender_id === currentUserId && (
+                {selectedMessage?.sender_id === currentUserId && selectedMessage?.content && (
                   <Button
                     variant="ghost"
                     className="w-full justify-start text-right"
                     onClick={() => {
-                      if (selectedMessage) {
-                        handleEditMessage(selectedMessage)
+                      if (selectedMessage && onEdit) {
+                        onEdit(selectedMessage) // Call prop directly
+                        setShowActionSheet(false)
+                        setSelectedMessage(null)
                       }
                     }}
                   >
@@ -925,8 +907,10 @@ export const MessageList = React.memo(function MessageList({
                   variant="ghost"
                   className="w-full justify-start text-right"
                   onClick={() => {
-                    if (selectedMessage) {
-                      handlePinMessage(selectedMessage.id)
+                    if (selectedMessage && onPin) {
+                      onPin(selectedMessage.id) // Call prop directly
+                      setShowActionSheet(false)
+                      setSelectedMessage(null)
                     }
                   }}
                 >
@@ -934,13 +918,13 @@ export const MessageList = React.memo(function MessageList({
                   تثبيت
                 </Button>
 
-                {selectedMessage.content && (
+                {selectedMessage?.content && (
                   <Button
                     variant="ghost"
                     className="w-full justify-start text-right"
                     onClick={async () => {
-                      if (selectedMessage.content) {
-                        await handleTranslate(selectedMessage.id, selectedMessage.content)
+                      if (selectedMessage && onTranslate) {
+                        await onTranslate(selectedMessage.id, selectedMessage.content!)
                         setShowActionSheet(false)
                         setSelectedMessage(null)
                       }
@@ -951,13 +935,17 @@ export const MessageList = React.memo(function MessageList({
                   </Button>
                 )}
 
-                {selectedMessage.sender_id === currentUserId && (
+                {selectedMessage?.sender_id === currentUserId && (
                   <Button
                     variant="ghost"
-                    className="w-full justify-start text-right text-red-500 hover:text-red-600"
+                    className="w-full justify-start text-right text-red-500"
                     onClick={() => {
-                      if (selectedMessage) {
-                        handleDeleteMessage(selectedMessage.id)
+                      if (selectedMessage && onDelete) {
+                        if (confirm("هل تريد حذف هذه الرسالة؟")) {
+                          onDelete(selectedMessage.id) // Call prop directly
+                          setShowActionSheet(false)
+                          setSelectedMessage(null)
+                        }
                       }
                     }}
                   >
