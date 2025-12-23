@@ -243,7 +243,131 @@ export default function ChiefAgentContent() {
         </div>
       </div>
 
-      {/* ... rest of existing JSX ... */}
+      {/* Stats Grid */}
+      {stats && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="border rounded-lg p-4">
+            <div className="text-2xl font-bold">{stats.totalActions || 0}</div>
+            <div className="text-sm text-muted-foreground">إجراءات تم اتخاذها</div>
+          </div>
+          <div className="border rounded-lg p-4">
+            <div className="text-2xl font-bold">{stats.pendingApprovals || 0}</div>
+            <div className="text-sm text-muted-foreground">تنتظر الموافقة</div>
+          </div>
+          <div className="border rounded-lg p-4">
+            <div className="text-2xl font-bold">{stats.issuesDetected || 0}</div>
+            <div className="text-sm text-muted-foreground">مشاكل تم اكتشافها</div>
+          </div>
+          <div className="border rounded-lg p-4">
+            <div className="text-2xl font-bold">{stats.uptime || "0%"}</div>
+            <div className="text-sm text-muted-foreground">وقت التشغيل</div>
+          </div>
+        </div>
+      )}
+
+      {/* Recent Actions */}
+      <div className="border rounded-lg p-6">
+        <h2 className="text-xl font-semibold mb-4">الإجراءات الأخيرة</h2>
+        {actions.length === 0 ? (
+          <p className="text-muted-foreground text-center py-8">لا توجد إجراءات حتى الآن</p>
+        ) : (
+          <div className="space-y-3">
+            {actions.slice(0, 5).map((action) => (
+              <div key={action.id} className="flex items-center justify-between border-b pb-3">
+                <div className="flex-1">
+                  <div className="font-medium">{getActionTitle(action.action_type)}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {new Date(action.created_at).toLocaleString("ar-EG")}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {!action.was_undone && (
+                    <button
+                      onClick={() => undoAction(action.id)}
+                      className="text-xs px-3 py-1 border rounded hover:bg-muted"
+                    >
+                      تراجع
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Chat with Agent */}
+      <div className="border rounded-lg p-6">
+        <h2 className="text-xl font-semibold mb-4">محادثة الوكيل</h2>
+        <div className="border rounded-lg h-96 overflow-y-auto p-4 mb-4 bg-muted/20">
+          {chatMessages.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8">ابدأ محادثة مع الوكيل الرئيسي</p>
+          ) : (
+            <div className="space-y-4">
+              {chatMessages.map((msg, idx) => (
+                <div key={idx} className={`flex ${msg.role === "user" ? "justify-start" : "justify-end"}`}>
+                  <div
+                    className={`max-w-[70%] rounded-lg p-3 ${
+                      msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
+                    }`}
+                  >
+                    {msg.content}
+                  </div>
+                </div>
+              ))}
+              <div ref={chatEndRef} />
+            </div>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            onKeyPress={(e) => e.key === "Enter" && sendChatMessage()}
+            placeholder="اكتب رسالتك..."
+            className="flex-1 border rounded-lg px-4 py-2"
+            disabled={isChatting}
+          />
+          <button
+            onClick={sendChatMessage}
+            disabled={isChatting || !chatInput.trim()}
+            className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
+          >
+            {isChatting ? "جاري..." : "إرسال"}
+          </button>
+        </div>
+      </div>
+
+      {/* Error Analysis */}
+      <div className="border rounded-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold">تحليل الأخطاء من GitHub</h2>
+          <button
+            onClick={analyzeErrors}
+            disabled={isAnalyzing}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
+          >
+            {isAnalyzing ? "جاري التحليل..." : "تحليل الأخطاء"}
+          </button>
+        </div>
+        {errorAnalysis && (
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground">تم تحليل {errorAnalysis.totalTickets || 0} تذكرة</div>
+            {errorAnalysis.criticalIssues?.map((issue: any, idx: number) => (
+              <div key={idx} className="border rounded-lg p-4">
+                <div className="font-medium">{issue.title}</div>
+                <div className="text-sm text-muted-foreground mt-1">{issue.analysis}</div>
+                {issue.suggestedFix && (
+                  <div className="text-sm mt-2 p-2 bg-muted rounded">
+                    <strong>الحل المقترح:</strong> {issue.suggestedFix}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
