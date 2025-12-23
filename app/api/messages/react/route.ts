@@ -18,33 +18,39 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
   }
 
-  // Check if reaction already exists
-  const { data: existing } = await supabase
+  const { data: existingReactions } = await supabase
     .from("message_reactions")
     .select()
     .eq("message_id", messageId)
     .eq("user_id", userId)
-    .eq("reaction", reaction)
+
+  if (existingReactions && existingReactions.length > 0) {
+    const { error: deleteError } = await supabase
+      .from("message_reactions")
+      .delete()
+      .eq("message_id", messageId)
+      .eq("user_id", userId)
+
+    if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 })
+
+    const hadSameReaction = existingReactions.some((r) => r.reaction === reaction)
+    if (hadSameReaction) {
+      revalidatePath("/chat")
+      return NextResponse.json({ success: true, action: "removed" })
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("message_reactions")
+    .insert({
+      message_id: messageId,
+      user_id: userId,
+      reaction,
+    })
+    .select()
     .single()
 
-  if (existing) {
-    const { error } = await supabase.from("message_reactions").delete().eq("id", existing.id)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    revalidatePath("/chat")
-    return NextResponse.json({ success: true, action: "removed" })
-  } else {
-    const { data, error } = await supabase
-      .from("message_reactions")
-      .insert({
-        message_id: messageId,
-        user_id: userId,
-        reaction,
-      })
-      .select()
-      .single()
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    revalidatePath("/chat")
-    return NextResponse.json({ success: true, action: "added", reactionId: data.id })
-  }
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  revalidatePath("/chat")
+  return NextResponse.json({ success: true, action: "added", reactionId: data.id })
 }

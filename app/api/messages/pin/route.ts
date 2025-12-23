@@ -12,10 +12,16 @@ export async function POST(request: Request) {
     },
   })
 
-  const { messageId, userId } = await request.json()
+  const { messageId, userId, groupId } = await request.json()
 
-  if (!messageId || !userId) {
+  if (!messageId || !userId || !groupId) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
+  }
+
+  const { data: group } = await supabase.from("groups").select("owner_id").eq("id", groupId).single()
+
+  if (!group || group.owner_id !== userId) {
+    return NextResponse.json({ error: "Only group owner can pin messages" }, { status: 403 })
   }
 
   const { data: currentMessage } = await supabase.from("messages").select("is_pinned").eq("id", messageId).single()

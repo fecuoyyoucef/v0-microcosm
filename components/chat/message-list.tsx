@@ -72,16 +72,19 @@ interface MessageListProps {
   onReplySelect?: (message: Message) => void
   onEditSelect?: (message: Message) => void
   onMessageDeleted?: (messageId: string) => void
+  setMessages: (messages: Message[]) => void
 }
 
 export const MessageList = React.memo(function MessageList({
   messages,
+  groupId,
   currentUserId,
   isLoading,
   messagesEndRef,
   onReplySelect,
   onEditSelect,
   onMessageDeleted,
+  setMessages,
 }: MessageListProps) {
   const router = useRouter()
   const supabase = createClient()
@@ -154,26 +157,38 @@ export const MessageList = React.memo(function MessageList({
     }
   }
 
-  const handlePin = async () => {
+  const handlePinMessage = async () => {
     if (!selectedMessage) return
 
     try {
-      const currentPinned = selectedMessage.is_pinned || false
-      const { error } = await supabase
-        .from("messages")
-        .update({ is_pinned: !currentPinned })
-        .eq("id", selectedMessage.id)
+      const response = await fetch("/api/messages/pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messageId: selectedMessage.id,
+          userId: currentUserId,
+          groupId,
+        }),
+      })
 
-      if (!error) {
-        toast({ title: currentPinned ? "تم إلغاء التثبيت" : "تم التثبيت" })
-        router.refresh()
-      } else {
-        toast({ title: "فشلت العملية", variant: "destructive" })
+      if (!response.ok) {
+        const error = await response.json()
+        alert(error.error || "خطأ في تثبيت الرسالة")
+        return
       }
-    } catch {
-      toast({ title: "فشلت العملية", variant: "destructive" })
-    } finally {
+
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === selectedMessage.id
+            ? { ...m, is_pinned: !m.is_pinned, pinned_at: !m.is_pinned ? new Date().toISOString() : null }
+            : m,
+        ),
+      )
       setShowActionSheet(false)
+      setSelectedMessage(null)
+    } catch (error) {
+      console.error("Error pinning message:", error)
+      alert("خطأ في تثبيت الرسالة")
     }
   }
 
@@ -572,7 +587,7 @@ export const MessageList = React.memo(function MessageList({
             </Button>
 
             {selectedMessage?.sender_id === currentUserId && (
-              <Button variant="ghost" className="w-full justify-end gap-2" onClick={handlePin}>
+              <Button variant="ghost" className="w-full justify-end gap-2" onClick={handlePinMessage}>
                 {selectedMessage?.is_pinned ? "إلغاء التثبيت" : "تثبيت"}
                 <Pin className="h-4 w-4" />
               </Button>
