@@ -406,20 +406,24 @@ export const MessageList = React.memo(function MessageList({
   }
 
   const handleDeleteMessage = async (messageId: string) => {
+    console.log("[v0] Delete clicked - currentUserId:", currentUserId)
     if (confirm("هل أنت متأكد من حذف هذه الرسالة؟")) {
-      // Assuming you have a way to delete messages via Supabase, similar to how reactions are handled
       const { error } = await supabase.from("messages").delete().eq("id", messageId)
       if (error) {
         console.error("Error deleting message:", error)
         return
       }
+      toast({
+        title: "تم الحذف",
+        description: "تم حذف الرسالة بنجاح",
+      })
     }
     setShowActionSheet(false)
     setSelectedMessage(null)
   }
 
   const handleEditMessage = (message: Message) => {
-    // سيتم تنفيذه لاحقاً
+    console.log("[v0] Edit clicked - currentUserId:", currentUserId, "sender_id:", message.sender_id)
     if (onEdit) {
       onEdit(message)
     }
@@ -428,6 +432,7 @@ export const MessageList = React.memo(function MessageList({
   }
 
   const handlePinMessage = async (messageId: string) => {
+    console.log("[v0] Pin clicked - messageId:", messageId)
     const { error } = await supabase
       .from("messages")
       .update({ is_pinned: true, pinned_by: currentUserId, pinned_at: new Date().toISOString() })
@@ -758,7 +763,10 @@ export const MessageList = React.memo(function MessageList({
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 rounded-full"
-                            onClick={() => handleEditMessage(message)}
+                            onClick={() => {
+                              console.log("[v0] Edit button clicked")
+                              handleEditMessage(message)
+                            }}
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </Button>
@@ -793,7 +801,10 @@ export const MessageList = React.memo(function MessageList({
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 rounded-full text-destructive hover:text-destructive"
-                            onClick={() => handleDeleteClick(message.id)}
+                            onClick={() => {
+                              console.log("[v0] Delete button clicked")
+                              handleDeleteClick(message.id)
+                            }}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>
@@ -908,7 +919,10 @@ export const MessageList = React.memo(function MessageList({
                   <Button
                     variant="ghost"
                     className="w-full justify-start text-right"
-                    onClick={() => handleEditMessage(selectedMessage)}
+                    onClick={() => {
+                      console.log("[v0] Edit button clicked")
+                      handleEditMessage(selectedMessage)
+                    }}
                   >
                     <Edit2 className="w-4 h-4 ml-2" />
                     تعديل
@@ -918,7 +932,10 @@ export const MessageList = React.memo(function MessageList({
                   <Button
                     variant="ghost"
                     className="w-full justify-start text-right text-destructive hover:text-destructive"
-                    onClick={() => handleDeleteMessage(selectedMessage.id)}
+                    onClick={() => {
+                      console.log("[v0] Delete button clicked")
+                      handleDeleteMessage(selectedMessage.id)
+                    }}
                   >
                     <Trash2 className="w-4 h-4 ml-2" />
                     حذف
