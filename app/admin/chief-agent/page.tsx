@@ -21,6 +21,9 @@ import {
   Send,
   Bot,
   User,
+  FileCode,
+  GitBranch,
+  Search,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
@@ -33,6 +36,8 @@ export default function ChiefAgentPage() {
   const [chatMessages, setChatMessages] = useState<{ role: string; content: string }[]>([])
   const [chatInput, setChatInput] = useState("")
   const [isChatting, setIsChatting] = useState(false)
+  const [errorAnalysis, setErrorAnalysis] = useState<any>(null)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const { toast } = useToast()
 
@@ -199,6 +204,41 @@ export default function ChiefAgentPage() {
     }
   }
 
+  const analyzeErrors = async () => {
+    setIsAnalyzing(true)
+    try {
+      const res = await fetch("/api/ai-agents/analyze-errors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        setErrorAnalysis(data)
+        toast({
+          title: "تم التحليل بنجاح",
+          description: `تم تحليل ${data.criticalIssues?.length || 0} أخطاء حرجة`,
+        })
+      } else {
+        toast({
+          title: "خطأ",
+          description: data.error || "فشل تحليل الأخطاء",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "خطأ",
+        description: "فشل الاتصال بالخادم",
+        variant: "destructive",
+      })
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
+
   if (loading) {
     return <div className="p-6">جاري التحميل...</div>
   }
@@ -333,6 +373,137 @@ export default function ChiefAgentPage() {
           </div>
         </Card>
       </div>
+
+      {/* Error Analysis Panel */}
+      <Card className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <FileCode className="w-5 h-5" />
+            تحليل الأخطاء من GitHub
+          </h2>
+          <Button onClick={analyzeErrors} disabled={isAnalyzing}>
+            {isAnalyzing ? (
+              <>جاري التحليل...</>
+            ) : (
+              <>
+                <Search className="w-4 h-4 ml-2" />
+                تحليل التذاكر الحالية
+              </>
+            )}
+          </Button>
+        </div>
+
+        {errorAnalysis ? (
+          <div className="space-y-4">
+            {/* Critical Issues */}
+            {errorAnalysis.criticalIssues && errorAnalysis.criticalIssues.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="font-semibold text-red-500 flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5" />
+                  أخطاء حرجة ({errorAnalysis.criticalIssues.length})
+                </h3>
+                {errorAnalysis.criticalIssues.map((issue: any, idx: number) => (
+                  <Card key={idx} className="p-4 border-red-500/50">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Badge variant="destructive">{issue.severity}</Badge>
+                        <Badge variant="outline">ثقة {issue.confidence}%</Badge>
+                      </div>
+                      <p className="font-semibold">{issue.summary}</p>
+                      <div className="text-sm text-muted-foreground">
+                        <p className="font-semibold mb-1">الأسباب المحتملة:</p>
+                        <ul className="list-disc list-inside space-y-1">
+                          {issue.possibleCauses.map((cause: string, i: number) => (
+                            <li key={i}>{cause}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div className="text-sm">
+                        <p className="font-semibold mb-1 flex items-center gap-2">
+                          <GitBranch className="w-4 h-4" />
+                          الملفات المتأثرة:
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {issue.affectedFiles.map((file: string, i: number) => (
+                            <Badge key={i} variant="secondary" className="text-xs">
+                              {file}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                      {issue.suggestedFixes && issue.suggestedFixes.length > 0 && (
+                        <div className="text-sm">
+                          <p className="font-semibold mb-1">الحلول المقترحة:</p>
+                          <ul className="list-disc list-inside space-y-1">
+                            {issue.suggestedFixes.map((fix: string, i: number) => (
+                              <li key={i} className="text-green-600">
+                                {fix}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {issue.recentChanges && (
+                        <Badge variant="outline" className="text-orange-500">
+                          تم تعديل الملف مؤخراً
+                        </Badge>
+                      )}
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {/* Common Patterns */}
+            {errorAnalysis.commonErrors && errorAnalysis.commonErrors.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5" />
+                  الأنماط المتكررة
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {errorAnalysis.commonErrors.map((error: any, idx: number) => (
+                    <Card key={idx} className="p-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">{error.pattern}</span>
+                        <Badge>{error.count} مرات</Badge>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Recommendations */}
+            {errorAnalysis.recommendations && errorAnalysis.recommendations.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Brain className="w-5 h-5" />
+                  التوصيات
+                </h3>
+                <div className="space-y-2">
+                  {errorAnalysis.recommendations.map((rec: string, idx: number) => (
+                    <div key={idx} className="flex items-start gap-2 p-3 bg-blue-500/10 rounded-lg">
+                      <CheckCircle className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                      <p className="text-sm">{rec}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="p-8 border rounded-lg bg-muted/30 text-center">
+            <FileCode className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+            <p className="text-muted-foreground mb-4">
+              انقر على "تحليل التذاكر الحالية" لفحص الأخطاء المُبلغ عنها وربطها بالكود في GitHub
+            </p>
+            <p className="text-sm text-muted-foreground">
+              سيقوم الوكيل بالبحث في المستودع عن الأسباب المحتملة واقتراح حلول
+            </p>
+          </div>
+        )}
+      </Card>
 
       {/* Capabilities Control */}
       <Card className="p-6">
