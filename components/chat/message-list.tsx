@@ -90,6 +90,8 @@ export const MessageList = React.memo(function MessageList({
   onEdit,
   onDelete,
   isLoading,
+  messagesEndRef,
+  nodes = [],
 }: MessageListProps) {
   const supabase = createClient()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -430,25 +432,15 @@ export const MessageList = React.memo(function MessageList({
   }
 
   const handlePinMessage = async (messageId: string) => {
-    const { error } = await supabase
-      .from("messages")
-      .update({ is_pinned: true, pinned_by: currentUserId, pinned_at: new Date().toISOString() })
-      .eq("id", messageId)
-    if (error) {
+    try {
+      const { error } = await supabase.from("messages").update({ is_pinned: true }).eq("id", messageId)
+
+      if (error) throw error
+      alert("تم تثبيت الرسالة")
+    } catch (error) {
       console.error("Error pinning message:", error)
-      toast({
-        title: "خطأ",
-        description: "فشل تثبيت الرسالة",
-        variant: "destructive",
-      })
-      return
+      alert("حدث خطأ في تثبيت الرسالة")
     }
-    toast({
-      title: "تم التثبيت",
-      description: "تم تثبيت الرسالة بنجاح",
-    })
-    setShowActionSheet(false)
-    setSelectedMessage(null)
   }
 
   const translateMessage = async (content: string) => {
@@ -827,7 +819,7 @@ export const MessageList = React.memo(function MessageList({
           ))}
         </div>
 
-        <div ref={containerRef} className="h-1" />
+        <div ref={messagesEndRef} className="h-1" />
 
         {lightboxImage && (
           <div
@@ -890,7 +882,6 @@ export const MessageList = React.memo(function MessageList({
                     className="w-full justify-start text-right"
                     onClick={() => {
                       handleCopyMessage(selectedMessage.content!)
-                      setShowActionSheet(false)
                     }}
                   >
                     <Copy className="w-4 h-4 ml-2" />
@@ -902,10 +893,10 @@ export const MessageList = React.memo(function MessageList({
                   variant="ghost"
                   className="w-full justify-start text-right"
                   onClick={() => {
-                    if (onReply) {
+                    if (onReply && selectedMessage) {
                       onReply(selectedMessage)
-                      setShowActionSheet(false)
                     }
+                    setShowActionSheet(false)
                   }}
                 >
                   <Reply className="w-4 h-4 ml-2" />
@@ -913,63 +904,64 @@ export const MessageList = React.memo(function MessageList({
                 </Button>
 
                 {selectedMessage.sender_id === currentUserId && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start text-right"
-                      onClick={() => {
-                        if (onEdit) {
-                          onEdit(selectedMessage)
-                          setShowActionSheet(false)
-                        }
-                      }}
-                    >
-                      <Edit2 className="w-4 h-4 ml-2" />
-                      تعديل
-                    </Button>
-
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start text-right"
-                      onClick={() => {
-                        if (onDelete) {
-                          onDelete(selectedMessage.id)
-                          setShowActionSheet(false)
-                        }
-                      }}
-                    >
-                      <Pin className="w-4 h-4 ml-2" />
-                      تثبيت
-                    </Button>
-
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start text-right text-destructive hover:text-destructive"
-                      onClick={() => {
-                        if (onDelete) {
-                          onDelete(selectedMessage.id)
-                          setShowActionSheet(false)
-                        }
-                      }}
-                    >
-                      <Trash2 className="w-4 h-4 ml-2" />
-                      حذف
-                    </Button>
-                  </>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-right"
+                    onClick={() => {
+                      if (onEdit && selectedMessage) {
+                        onEdit(selectedMessage)
+                      }
+                      setShowActionSheet(false)
+                    }}
+                  >
+                    <Edit2 className="w-4 h-4 ml-2" />
+                    تعديل
+                  </Button>
                 )}
+
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start text-right"
+                  onClick={() => {
+                    if (selectedMessage) {
+                      handlePinMessage(selectedMessage.id)
+                    }
+                    setShowActionSheet(false)
+                  }}
+                >
+                  <Pin className="w-4 h-4 ml-2" />
+                  تثبيت
+                </Button>
 
                 {selectedMessage.content && (
                   <Button
                     variant="ghost"
                     className="w-full justify-start text-right"
                     onClick={async () => {
-                      const translated = await translateMessage(selectedMessage.content!)
-                      // Handle translation display
+                      if (selectedMessage.content) {
+                        await handleTranslate(selectedMessage.id, selectedMessage.content)
+                      }
                       setShowActionSheet(false)
                     }}
                   >
                     <Globe className="w-4 h-4 ml-2" />
                     ترجمة
+                  </Button>
+                )}
+
+                {selectedMessage.sender_id === currentUserId && (
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-right text-destructive hover:text-destructive"
+                    onClick={() => {
+                      if (onDelete && selectedMessage) {
+                        onDelete(selectedMessage.id)
+                      }
+                      setShowActionSheet(false)
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4 ml-2" />
+                    حذف
                   </Button>
                 )}
               </div>
