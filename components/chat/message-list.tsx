@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
-import { Copy, Edit2, CheckCheck, Trash2, Languages, Loader2, Check, Pin, Smile } from "lucide-react"
+import { Copy, Edit2, CheckCheck, Trash2, Languages, Loader2, Check, Pin, Smile, Globe } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ar } from "date-fns/locale"
 import type { Message, GroupMember, ConversationNode } from "@/lib/types"
@@ -406,7 +406,6 @@ export const MessageList = React.memo(function MessageList({
   }
 
   const handleDeleteMessage = async (messageId: string) => {
-    console.log("[v0] Delete clicked - currentUserId:", currentUserId)
     if (confirm("هل أنت متأكد من حذف هذه الرسالة؟")) {
       const { error } = await supabase.from("messages").delete().eq("id", messageId)
       if (error) {
@@ -423,7 +422,6 @@ export const MessageList = React.memo(function MessageList({
   }
 
   const handleEditMessage = (message: Message) => {
-    console.log("[v0] Edit clicked - currentUserId:", currentUserId, "sender_id:", message.sender_id)
     if (onEdit) {
       onEdit(message)
     }
@@ -432,7 +430,6 @@ export const MessageList = React.memo(function MessageList({
   }
 
   const handlePinMessage = async (messageId: string) => {
-    console.log("[v0] Pin clicked - messageId:", messageId)
     const { error } = await supabase
       .from("messages")
       .update({ is_pinned: true, pinned_by: currentUserId, pinned_at: new Date().toISOString() })
@@ -452,6 +449,24 @@ export const MessageList = React.memo(function MessageList({
     })
     setShowActionSheet(false)
     setSelectedMessage(null)
+  }
+
+  const translateMessage = async (content: string) => {
+    const response = await fetch("/api/ai/translate-message", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content,
+        targetLang: content.match(/[a-zA-Z]/) ? "ar" : "en", // Auto-detect
+      }),
+    })
+
+    if (response.ok) {
+      const { translation } = await response.json()
+      return translation
+    }
+
+    throw new Error("Translation failed")
   }
 
   if (isLoading) {
@@ -763,10 +778,7 @@ export const MessageList = React.memo(function MessageList({
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 rounded-full"
-                            onClick={() => {
-                              console.log("[v0] Edit button clicked")
-                              handleEditMessage(message)
-                            }}
+                            onClick={() => handleEditMessage(message)}
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </Button>
@@ -801,10 +813,7 @@ export const MessageList = React.memo(function MessageList({
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 rounded-full text-destructive hover:text-destructive"
-                            onClick={() => {
-                              console.log("[v0] Delete button clicked")
-                              handleDeleteClick(message.id)
-                            }}
+                            onClick={() => handleDeleteClick(message.id)}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>
@@ -864,7 +873,10 @@ export const MessageList = React.memo(function MessageList({
                   {quickReactions.map((emoji) => (
                     <button
                       key={emoji}
-                      onClick={() => toggleReaction(selectedMessage.id, emoji)}
+                      onClick={() => {
+                        toggleReaction(selectedMessage.id, emoji)
+                        setShowActionSheet(false)
+                      }}
                       className="inline-flex items-center justify-center w-10 h-10 rounded-full hover:bg-muted transition-all text-xl"
                     >
                       {emoji}
@@ -876,69 +888,88 @@ export const MessageList = React.memo(function MessageList({
                   <Button
                     variant="ghost"
                     className="w-full justify-start text-right"
-                    onClick={() => handleCopyMessage(selectedMessage.content!)}
+                    onClick={() => {
+                      handleCopyMessage(selectedMessage.content!)
+                      setShowActionSheet(false)
+                    }}
                   >
                     <Copy className="w-4 h-4 ml-2" />
                     نسخ النص
                   </Button>
                 )}
-                {onReply && (
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-right"
-                    onClick={() => {
+
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start text-right"
+                  onClick={() => {
+                    if (onReply) {
                       onReply(selectedMessage)
                       setShowActionSheet(false)
-                      setSelectedMessage(null)
-                    }}
-                  >
-                    <Reply className="w-4 h-4 ml-2" />
-                    رد
-                  </Button>
+                    }
+                  }}
+                >
+                  <Reply className="w-4 h-4 ml-2" />
+                  رد
+                </Button>
+
+                {selectedMessage.sender_id === currentUserId && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start text-right"
+                      onClick={() => {
+                        if (onEdit) {
+                          onEdit(selectedMessage)
+                          setShowActionSheet(false)
+                        }
+                      }}
+                    >
+                      <Edit2 className="w-4 h-4 ml-2" />
+                      تعديل
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start text-right"
+                      onClick={() => {
+                        if (onDelete) {
+                          onDelete(selectedMessage.id)
+                          setShowActionSheet(false)
+                        }
+                      }}
+                    >
+                      <Pin className="w-4 h-4 ml-2" />
+                      تثبيت
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start text-right text-destructive hover:text-destructive"
+                      onClick={() => {
+                        if (onDelete) {
+                          onDelete(selectedMessage.id)
+                          setShowActionSheet(false)
+                        }
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4 ml-2" />
+                      حذف
+                    </Button>
+                  </>
                 )}
+
                 {selectedMessage.content && (
                   <Button
                     variant="ghost"
                     className="w-full justify-start text-right"
-                    onClick={() => handleTranslate(selectedMessage.id, selectedMessage.content!)}
-                    disabled={translatingMessages.has(selectedMessage.id)}
+                    onClick={async () => {
+                      const translated = await translateMessage(selectedMessage.content!)
+                      // Handle translation display
+                      setShowActionSheet(false)
+                    }}
                   >
-                    <Languages className="w-4 h-4 ml-2" />
+                    <Globe className="w-4 h-4 ml-2" />
                     ترجمة
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-right"
-                  onClick={() => handlePinMessage(selectedMessage.id)}
-                >
-                  <Pin className="w-4 h-4 ml-2" />
-                  تثبيت
-                </Button>
-                {selectedMessage.sender_id === currentUserId && onEdit && (
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-right"
-                    onClick={() => {
-                      console.log("[v0] Edit button clicked")
-                      handleEditMessage(selectedMessage)
-                    }}
-                  >
-                    <Edit2 className="w-4 h-4 ml-2" />
-                    تعديل
-                  </Button>
-                )}
-                {selectedMessage.sender_id === currentUserId && onDelete && (
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-right text-destructive hover:text-destructive"
-                    onClick={() => {
-                      console.log("[v0] Delete button clicked")
-                      handleDeleteMessage(selectedMessage.id)
-                    }}
-                  >
-                    <Trash2 className="w-4 h-4 ml-2" />
-                    حذف
                   </Button>
                 )}
               </div>
