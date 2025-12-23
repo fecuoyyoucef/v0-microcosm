@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 import crypto from "crypto"
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify webhook signature
-    const signature = request.headers.get("x-hub-signature-256")
+    const signature = request.headers.get("x-hub-signature-256") || ""
     const body = await request.text()
+    const event = request.headers.get("x-github-event") || ""
 
     if (process.env.GITHUB_WEBHOOK_SECRET) {
       const hmac = crypto.createHmac("sha256", process.env.GITHUB_WEBHOOK_SECRET)
@@ -18,18 +18,8 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = JSON.parse(body)
-    const event = request.headers.get("x-github-event")
+    const supabase = createServiceClient()
 
-    const supabase = await createClient()
-
-    // Log event
-    await supabase.from("github_events").insert({
-      event_type: event,
-      payload,
-      created_at: new Date().toISOString(),
-    })
-
-    // Handle different events
     switch (event) {
       case "issues":
         await handleIssueEvent(payload, supabase)
@@ -43,43 +33,45 @@ export async function POST(request: NextRequest) {
         await handlePushEvent(payload, supabase)
         break
 
-      case "code_scanning_alert":
-        await handleSecurityAlert(payload, supabase)
+      case "security_advisory":
+        await handleSecurityAdvisory(payload, supabase)
         break
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, event })
   } catch (error) {
-    console.error("Webhook error:", error)
+    console.error("[v0] Webhook error:", error)
     return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 })
   }
 }
 
 async function handleIssueEvent(payload: any, supabase: any) {
   if (payload.action === "opened") {
-    // Auto-analyze new issues
+    // Trigger Chief Agent analysis for new issues
     await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai-agents/github/analyze`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        issueTitle: payload.issue.title,
         issueBody: payload.issue.body,
-        ticketId: null,
+        issueNumber: payload.issue.number,
+        issueUrl: payload.issue.html_url,
       }),
-    })
+    }).catch((err) => console.error("[v0] Analysis trigger failed:", err))
   }
 }
 
 async function handlePREvent(payload: any, supabase: any) {
-  // Log PR activity
-  console.log(`PR ${payload.action}: ${payload.pull_request.title}`)
+  // Log PR events for Chief Agent review
+  console.log(`[v0] PR ${payload.action}: ${payload.pull_request.title}`)
 }
 
 async function handlePushEvent(payload: any, supabase: any) {
-  // Track commits
-  console.log(`Push to ${payload.ref}: ${payload.commits.length} commits`)
+  // Track commits for monitoring
+  console.log(`[v0] Push to ${payload.ref}: ${payload.commits.length} commits`)
 }
 
-async function handleSecurityAlert(payload: any, supabase: any) {
-  // Notify admins of security issues
-  console.log(`Security alert: ${payload.alert.rule.description}`)
+async function handleSecurityAdvisory(payload: any, supabase: any) {
+  // Alert on security issues
+  console.log(`[v0] Security alert: ${payload.security_advisory?.description}`)
 }
