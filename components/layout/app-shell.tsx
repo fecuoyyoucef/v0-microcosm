@@ -20,14 +20,7 @@ import {
   CommandItem,
 } from "@/components/ui/command"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -423,62 +416,14 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
           )}
 
           {/* Join by Invite button below cells list */}
-          <Dialog
-            open={isInviteDialogOpen}
-            onOpenChange={(open) => {
-              setIsInviteDialogOpen(open)
-              setInviteError(null)
-              setInviteLink("")
-            }}
+          <Button
+            onClick={() => setIsInviteDialogOpen(true)}
+            variant="ghost"
+            className="w-full justify-start gap-3 h-10 mt-1 text-muted-foreground hover:text-foreground"
           >
-            <DialogTrigger asChild>
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-3 h-10 mt-1 text-muted-foreground hover:text-foreground"
-              >
-                <Link2 className="w-5 h-5" />
-                <span className="truncate flex-1 text-right text-sm">{t.joinByInvite}</span>
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>{t.joinByInvite}</DialogTitle>
-                <DialogDescription>
-                  {language === "ar" ? "الصق رابط الدعوة للانضمام إلى خلية" : "Paste invite link to join a cell"}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 mt-4">
-                {inviteError && (
-                  <div className="p-3 rounded-xl bg-destructive/10 text-destructive text-sm">{inviteError}</div>
-                )}
-                <div className="space-y-2">
-                  <Label htmlFor="inviteLinkSidebar">{language === "ar" ? "رابط الدعوة" : "Invite Link"}</Label>
-                  <Input
-                    id="inviteLinkSidebar"
-                    value={inviteLink}
-                    onChange={(e) => setInviteLink(e.target.value)}
-                    placeholder={t.inviteLinkPlaceholder}
-                    className="bg-background rounded-xl"
-                    dir="ltr"
-                  />
-                </div>
-                <Button
-                  onClick={handleJoinByInvite}
-                  disabled={!inviteLink.trim() || isJoining}
-                  className="w-full rounded-xl h-11"
-                >
-                  {isJoining ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin ml-2" />
-                      {t.joining}
-                    </>
-                  ) : (
-                    t.join
-                  )}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+            <Link2 className="w-5 h-5" />
+            <span className="truncate flex-1 text-right text-sm">{t.joinByInvite}</span>
+          </Button>
         </div>
       </ScrollArea>
 
@@ -723,6 +668,57 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
             </CommandGroup>
           </CommandList>
         </CommandDialog>
+
+        {/* Join by Invite Dialog */}
+        <Dialog
+          open={isInviteDialogOpen}
+          onOpenChange={(open) => {
+            setIsInviteDialogOpen(open)
+            if (!open) {
+              setInviteError(null)
+              setInviteLink("")
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>{t.joinByInvite}</DialogTitle>
+              <DialogDescription>
+                {language === "ar" ? "الصق رابط الدعوة للانضمام إلى خلية" : "Paste invite link to join a cell"}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              {inviteError && (
+                <div className="p-3 rounded-xl bg-destructive/10 text-destructive text-sm">{inviteError}</div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="inviteLinkSidebar">{language === "ar" ? "رابط الدعوة" : "Invite Link"}</Label>
+                <Input
+                  id="inviteLinkSidebar"
+                  value={inviteLink}
+                  onChange={(e) => setInviteLink(e.target.value)}
+                  placeholder={t.inviteLinkPlaceholder}
+                  className="bg-background rounded-xl"
+                  dir="ltr"
+                />
+              </div>
+              <Button
+                onClick={handleJoinByInvite}
+                disabled={!inviteLink.trim() || isJoining}
+                className="w-full rounded-xl h-11"
+              >
+                {isJoining ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                    {t.joining}
+                  </>
+                ) : (
+                  t.join
+                )}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </TooltipProvider>
   )
