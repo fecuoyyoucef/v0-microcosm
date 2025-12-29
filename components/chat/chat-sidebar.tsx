@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
@@ -42,14 +42,13 @@ import {
 } from "lucide-react"
 import type { Profile } from "@/lib/types"
 import { useTheme } from "next-themes"
-import { useSettings } from "@/components/settings-provider"
 import { CellSurveyDialog } from "@/components/groups/cell-survey-dialog"
+import { useLanguage } from "@/components/language-provider"
 
 interface ChatSidebarProps {
-  userId: string
-  mobileOnly?: boolean
-  isOpen?: boolean
-  onOpenChange?: (open: boolean) => void
+  currentUserId: string
+  groups: any[]
+  onSignOut: () => void
 }
 
 interface ExtendedProfile extends Profile {
@@ -161,7 +160,7 @@ const translations = {
   },
 }
 
-export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }: ChatSidebarProps) {
+export function ChatSidebar({ currentUserId, groups, onSignOut }: ChatSidebarProps) {
   const [profile, setProfile] = useState<ExtendedProfile | null>(null)
   const [isOwner, setIsOwner] = useState(false)
   const [userEmail, setUserEmail] = useState<string>("")
@@ -172,14 +171,15 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
   const [showCellSurvey, setShowCellSurvey] = useState(false)
   const [newGroupId, setNewGroupId] = useState<string | null>(null)
   const [internalOpen, setInternalOpen] = useState(false)
-  const isMobileMenuOpen = isOpen !== undefined ? isOpen : internalOpen
-  const setIsMobileMenuOpen = onOpenChange || setInternalOpen
+  const isMobileMenuOpen = internalOpen
+  const setIsMobileMenuOpen = setInternalOpen
   const [error, setError] = useState<string | null>(null)
   const [unreadNotifications, setUnreadNotifications] = useState(0)
   const router = useRouter()
+  const pathname = usePathname()
   const supabase = createClient()
   const { theme, setTheme } = useTheme()
-  const { language } = useSettings()
+  const { isRTL, language } = useLanguage()
   const t = translations[language]
   const [showSupportChat, setShowSupportChat] = useState(false)
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
@@ -204,7 +204,7 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
           event: "INSERT",
           schema: "public",
           table: "notifications",
-          filter: `user_id=eq.${userId}`,
+          filter: `user_id=eq.${currentUserId}`,
         },
         () => {
           setUnreadNotifications((prev) => prev + 1)
@@ -216,7 +216,7 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
           event: "UPDATE",
           schema: "public",
           table: "notifications",
-          filter: `user_id=eq.${userId}`,
+          filter: `user_id=eq.${currentUserId}`,
         },
         (payload) => {
           const updated = payload.new as any
@@ -230,10 +230,10 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [userId])
+  }, [currentUserId])
 
   useEffect(() => {
-    if (!mobileOnly) return
+    if (!pathname.includes("/chat")) return
 
     const handleTouchStart = (e: TouchEvent) => {
       touchStartX.current = e.touches[0].clientX
@@ -273,10 +273,10 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
       document.removeEventListener("touchmove", handleTouchMove)
       document.removeEventListener("touchend", handleTouchEnd)
     }
-  }, [mobileOnly, setIsMobileMenuOpen])
+  }, [pathname, setIsMobileMenuOpen])
 
   const fetchProfile = async () => {
-    const { data } = await supabase.from("profiles").select("*").eq("id", userId).single()
+    const { data } = await supabase.from("profiles").select("*").eq("id", currentUserId).single()
 
     if (data) {
       setProfile(data)
@@ -294,7 +294,7 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
     const { count } = await supabase
       .from("notifications")
       .select("*", { count: "exact", head: true })
-      .eq("user_id", userId)
+      .eq("user_id", currentUserId)
       .eq("is_read", false)
 
     setUnreadNotifications(count || 0)
@@ -362,6 +362,7 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
     await supabase.auth.signOut()
     router.push("/")
     router.refresh()
+    onSignOut()
   }
 
   const closeSidebar = () => {
@@ -466,6 +467,7 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
             </div>
           </Link>
 
+          {/* Create New Group Dialog */}
           <Dialog
             open={isDialogOpen}
             onOpenChange={(open) => {
@@ -525,6 +527,7 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
             </DialogContent>
           </Dialog>
 
+          {/* Join by Invite Dialog */}
           <Dialog
             open={isInviteDialogOpen}
             onOpenChange={(open) => {
@@ -543,7 +546,7 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
               <DialogHeader>
                 <DialogTitle>{t.joinByInvite}</DialogTitle>
                 <DialogDescription>
-                  {language === "ar" ? "الصق رابط الدعوة للانضمام إلى الخلية" : "Paste the invite link to join a cell"}
+                  {language === "ar" ? "الصق رابط الدعوة للانضمام إلى خلية" : "Paste invite link to join a cell"}
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 mt-4">
@@ -646,68 +649,37 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
     setError(null)
 
     try {
-      const url = new URL(inviteLink.trim())
-      const pathParts = url.pathname.split("/")
-      const groupId = pathParts[pathParts.indexOf("invite") + 1]
+      // Extract group ID from invite link
+      const urlPattern = /\/invite\/([a-zA-Z0-9-]+)/
+      const match = inviteLink.match(urlPattern)
 
-      if (!groupId) {
+      if (!match || !match[1]) {
         setError(t.invalidInviteLink)
+        setIsJoining(false)
         return
       }
 
+      const groupId = match[1]
+
+      // Navigate to invite page
       router.push(`/invite/${groupId}`)
-      setInviteLink("")
       setIsInviteDialogOpen(false)
-      setIsMobileMenuOpen(false)
+      setInviteLink("")
     } catch (err) {
-      console.error("Error parsing invite link:", err)
-      setError(t.invalidInviteLink)
+      console.error("Error joining by invite:", err)
+      setError(t.unexpectedError)
     } finally {
       setIsJoining(false)
     }
   }
 
-  if (mobileOnly) {
-    return (
-      <>
-        <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-          <SheetContent side="right" className="w-80 p-0">
-            <SidebarContent />
-          </SheetContent>
-        </Sheet>
-        {newGroupId && (
-          <CellSurveyDialog
-            open={showCellSurvey}
-            onOpenChange={setShowCellSurvey}
-            groupId={newGroupId}
-            onComplete={handleSurveyComplete}
-          />
-        )}
-        {showSupportChat && (
-          <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setShowSupportChat(false)}>
-            <div className="fixed bottom-0 right-0 w-full max-w-md h-[600px]" onClick={(e) => e.stopPropagation()}>
-              <div className="h-full bg-card rounded-t-xl overflow-hidden">
-                <div className="flex items-center justify-between p-4 border-b border-border">
-                  <div className="flex items-center gap-2">
-                    <MessageCircle className="w-5 h-5 text-cyan-500" />
-                    <h3 className="font-semibold">{t.supportAgent}</h3>
-                  </div>
-                  <Button variant="ghost" size="icon" onClick={() => setShowSupportChat(false)}>
-                    <X className="w-5 h-5" />
-                  </Button>
-                </div>
-                <iframe src="/chat/support/agent" className="w-full h-[calc(100%-65px)] border-0" />
-              </div>
-            </div>
-          </div>
-        )}
-      </>
-    )
-  }
-
   return (
     <>
-      <SidebarContent />
+      <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+        <SheetContent side="right" className="w-80 p-0">
+          <SidebarContent />
+        </SheetContent>
+      </Sheet>
       {newGroupId && (
         <CellSurveyDialog
           open={showCellSurvey}
@@ -718,8 +690,8 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
       )}
       {showSupportChat && (
         <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setShowSupportChat(false)}>
-          <div className="fixed bottom-6 right-6 w-96 h-[600px]" onClick={(e) => e.stopPropagation()}>
-            <div className="h-full bg-card rounded-xl overflow-hidden shadow-2xl">
+          <div className="fixed bottom-0 right-0 w-full max-w-md h-[600px]" onClick={(e) => e.stopPropagation()}>
+            <div className="h-full bg-card rounded-t-xl overflow-hidden">
               <div className="flex items-center justify-between p-4 border-b border-border">
                 <div className="flex items-center gap-2">
                   <MessageCircle className="w-5 h-5 text-cyan-500" />
