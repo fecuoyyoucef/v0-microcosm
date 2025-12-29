@@ -436,6 +436,13 @@ export function ChatContainer({
     const tempId = `temp-${Date.now()}`
     const currentProfile = members.find((m) => m.user_id === currentUserId)?.profile
 
+    const replyToMessageData = replyingTo
+      ? {
+          content: replyingTo.content,
+          sender: replyingTo.sender ? { display_name: replyingTo.sender.display_name } : { display_name: "مستخدم" },
+        }
+      : null
+
     const optimisticMessage: Message = {
       id: tempId,
       group_id: groupId,
@@ -447,6 +454,7 @@ export function ChatContainer({
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       reply_to: replyTo || null,
+      reply_to_message: replyToMessageData,
       sender: currentProfile || {
         id: currentUserId,
         display_name: "أنت",
@@ -484,7 +492,13 @@ export function ChatContainer({
       alert("حدث خطأ في إرسال الرسالة")
     } else if (data) {
       pendingMessageIds.current.add(data.id)
-      setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...data, sender: optimisticMessage.sender } : m)))
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === tempId
+            ? { ...data, sender: optimisticMessage.sender, reply_to_message: optimisticMessage.reply_to_message }
+            : m,
+        ),
+      )
 
       if (layer !== "shadow") {
         try {
