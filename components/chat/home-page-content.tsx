@@ -11,11 +11,18 @@ import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Card, CardContent } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { SmartRecommendations } from "@/components/groups/smart-recommendations"
 import { SuggestedCells } from "@/components/groups/suggested-cells"
 import { CellSurveyDialog } from "@/components/groups/cell-survey-dialog"
-import { Plus, Users, Search, Loader2, MessageCircle } from "lucide-react"
+import { Plus, Users, Search, Loader2, MessageCircle, Link2 } from "lucide-react"
 import type { Group, Profile } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { useSettings } from "@/components/settings-provider"
@@ -55,6 +62,11 @@ const translations = {
     sendMessage: "إرسال",
     typeMessage: "اكتب رسالتك...",
     supportTitle: "دعم العملاء",
+    joinByInvite: "انضم بدعوة",
+    inviteLinkPlaceholder: "الصق رابط الدعوة هنا...",
+    join: "انضم",
+    joining: "جاري الانضمام...",
+    invalidInviteLink: "رابط الدعوة غير صالح",
   },
   en: {
     welcome: "Welcome",
@@ -83,6 +95,11 @@ const translations = {
     sendMessage: "Send",
     typeMessage: "Type your message...",
     supportTitle: "Customer Support",
+    joinByInvite: "Join by Invite",
+    inviteLinkPlaceholder: "Paste invite link here...",
+    join: "Join",
+    joining: "Joining...",
+    invalidInviteLink: "Invalid invite link",
   },
   fr: {
     welcome: "Bienvenue",
@@ -111,6 +128,11 @@ const translations = {
     sendMessage: "Envoyer",
     typeMessage: "Votre message...",
     supportTitle: "Support Client",
+    joinByInvite: "Rejoindre par invitation",
+    inviteLinkPlaceholder: "Collez le lien...",
+    join: "Rejoindre",
+    joining: "En cours...",
+    invalidInviteLink: "Lien invalide",
   },
 }
 
@@ -131,6 +153,10 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
   const [supportInput, setSupportInput] = useState("")
   const [isSendingSupport, setIsSendingSupport] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
+  const [inviteLink, setInviteLink] = useState("")
+  const [isJoining, setIsJoining] = useState(false)
+  const [inviteError, setInviteError] = useState<string | null>(null)
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -295,6 +321,34 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
     }
   }
 
+  const handleJoinByInvite = async () => {
+    if (!inviteLink.trim()) return
+
+    setIsJoining(true)
+    setInviteError(null)
+
+    try {
+      const urlPattern = /\/invite\/([a-zA-Z0-9-]+)/
+      const match = inviteLink.match(urlPattern)
+
+      if (!match || !match[1]) {
+        setInviteError(t.invalidInviteLink)
+        setIsJoining(false)
+        return
+      }
+
+      const groupId = match[1]
+      router.push(`/invite/${groupId}`)
+      setIsInviteDialogOpen(false)
+      setInviteLink("")
+    } catch (err) {
+      console.error("Error joining by invite:", err)
+      setInviteError(t.invalidInviteLink)
+    } finally {
+      setIsJoining(false)
+    }
+  }
+
   return (
     <div className="flex flex-col h-full bg-background pb-16 md:pb-0">
       {/* Header */}
@@ -306,9 +360,63 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
             </h1>
             <p className="text-sm text-muted-foreground">{t.cells}</p>
           </div>
-          <Button onClick={() => setIsCreateDialogOpen(true)} size="icon" className="rounded-full h-10 w-10">
-            <Plus className="w-5 h-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Dialog
+              open={isInviteDialogOpen}
+              onOpenChange={(open) => {
+                setIsInviteDialogOpen(open)
+                setInviteError(null)
+                setInviteLink("")
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button variant="outline" size="icon" className="rounded-full h-10 w-10 bg-transparent">
+                  <Link2 className="w-5 h-5" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>{t.joinByInvite}</DialogTitle>
+                  <DialogDescription>
+                    {language === "ar" ? "الصق رابط الدعوة للانضمام إلى خلية" : "Paste invite link to join a cell"}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 mt-4">
+                  {inviteError && (
+                    <div className="p-3 rounded-xl bg-destructive/10 text-destructive text-sm">{inviteError}</div>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="inviteLinkHome">{language === "ar" ? "رابط الدعوة" : "Invite Link"}</Label>
+                    <Input
+                      id="inviteLinkHome"
+                      value={inviteLink}
+                      onChange={(e) => setInviteLink(e.target.value)}
+                      placeholder={t.inviteLinkPlaceholder}
+                      className="bg-background rounded-xl"
+                      dir="ltr"
+                    />
+                  </div>
+                  <Button
+                    onClick={handleJoinByInvite}
+                    disabled={!inviteLink.trim() || isJoining}
+                    className="w-full rounded-xl h-11"
+                  >
+                    {isJoining ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                        {t.joining}
+                      </>
+                    ) : (
+                      t.join
+                    )}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+            <Button onClick={() => setIsCreateDialogOpen(true)} size="icon" className="rounded-full h-10 w-10">
+              <Plus className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
 
         {/* Search */}

@@ -21,6 +21,16 @@ import {
 } from "@/components/ui/command"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
   Home,
   Plus,
   Settings,
@@ -38,6 +48,8 @@ import {
   Shield,
   ChevronUp,
   ChevronDown,
+  Link2,
+  Loader2,
 } from "lucide-react"
 import type { Group, Profile } from "@/lib/types"
 import { useTheme } from "next-themes"
@@ -75,6 +87,11 @@ const translations = {
     admin: "لوحة التحكم",
     directMessages: "الرسائل المباشرة",
     comingSoon: "قريباً",
+    joinByInvite: "انضم بدعوة",
+    inviteLinkPlaceholder: "الصق رابط الدعوة هنا...",
+    join: "انضم",
+    joining: "جاري الانضمام...",
+    invalidInviteLink: "رابط الدعوة غير صالح",
   },
   en: {
     home: "Home",
@@ -98,6 +115,11 @@ const translations = {
     admin: "Admin Panel",
     directMessages: "Direct Messages",
     comingSoon: "Coming Soon",
+    joinByInvite: "Join by Invite",
+    inviteLinkPlaceholder: "Paste invite link here...",
+    join: "Join",
+    joining: "Joining...",
+    invalidInviteLink: "Invalid invite link",
   },
   fr: {
     home: "Accueil",
@@ -121,6 +143,11 @@ const translations = {
     admin: "Panneau Admin",
     directMessages: "Messages Directs",
     comingSoon: "Bientôt",
+    joinByInvite: "Rejoindre par invitation",
+    inviteLinkPlaceholder: "Collez le lien d'invitation ici...",
+    join: "Rejoindre",
+    joining: "En cours...",
+    invalidInviteLink: "Lien d'invitation invalide",
   },
 }
 
@@ -133,6 +160,11 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
   const [isAdmin, setIsAdmin] = useState(false)
   const [touchStart, setTouchStart] = useState<number | null>(null)
   const [touchEnd, setTouchEnd] = useState<number | null>(null)
+  const [cellsExpanded, setCellsExpanded] = useState(true)
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
+  const [inviteLink, setInviteLink] = useState("")
+  const [isJoining, setIsJoining] = useState(false)
+  const [inviteError, setInviteError] = useState<string | null>(null)
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -208,6 +240,35 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     router.push("/")
+  }
+
+  const handleJoinByInvite = async () => {
+    if (!inviteLink.trim()) return
+
+    setIsJoining(true)
+    setInviteError(null)
+
+    try {
+      const urlPattern = /\/invite\/([a-zA-Z0-9-]+)/
+      const match = inviteLink.match(urlPattern)
+
+      if (!match || !match[1]) {
+        setInviteError(t.invalidInviteLink)
+        setIsJoining(false)
+        return
+      }
+
+      const groupId = match[1]
+      router.push(`/invite/${groupId}`)
+      setIsInviteDialogOpen(false)
+      setInviteLink("")
+      setMobileMenuOpen(false)
+    } catch (err) {
+      console.error("Error joining by invite:", err)
+      setInviteError(t.invalidInviteLink)
+    } finally {
+      setIsJoining(false)
+    }
   }
 
   const getGroupColor = (name: string) => {
@@ -292,13 +353,20 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
           </Link>
 
           {/* Cells Section */}
-          <div className="px-2 py-1.5 mt-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
-            {t.cells}
+          <div
+            className="px-2 py-1.5 mt-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center justify-between cursor-pointer hover:bg-muted/50 rounded-md"
+            onClick={() => setCellsExpanded(!cellsExpanded)}
+          >
+            <div className="flex items-center gap-1">
+              {cellsExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
+              {t.cells}
+            </div>
             <Button
               variant="ghost"
               size="icon"
               className="h-5 w-5"
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation()
                 router.push("/chat?new=true")
                 isMobile && setMobileMenuOpen(false)
               }}
@@ -307,48 +375,110 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
             </Button>
           </div>
 
-          {groups.map((group) => (
-            <Link key={group.id} href={`/chat/${group.id}`} onClick={() => isMobile && setMobileMenuOpen(false)}>
-              <Button
-                variant={isActiveGroup(group.id) ? "secondary" : "ghost"}
-                className="w-full justify-start gap-3 h-10"
-              >
-                <Avatar className="w-5 h-5">
-                  {group.avatar_url ? (
-                    <AvatarImage src={group.avatar_url || "/placeholder.svg"} />
-                  ) : (
-                    <AvatarFallback
-                      className={cn("text-[10px] text-white bg-gradient-to-br", getGroupColor(group.name))}
-                    >
-                      {group.name.substring(0, 2)}
-                    </AvatarFallback>
-                  )}
-                </Avatar>
-                <span className="truncate flex-1 text-right">{group.name}</span>
-                {unreadCounts[group.id] > 0 && (
-                  <Badge className="h-5 px-1.5 bg-destructive text-destructive-foreground text-[10px]">
-                    {unreadCounts[group.id]}
-                  </Badge>
-                )}
-              </Button>
-            </Link>
-          ))}
+          {cellsExpanded && (
+            <>
+              {groups.map((group) => (
+                <Link key={group.id} href={`/chat/${group.id}`} onClick={() => isMobile && setMobileMenuOpen(false)}>
+                  <Button
+                    variant={isActiveGroup(group.id) ? "secondary" : "ghost"}
+                    className="w-full justify-start gap-3 h-10"
+                  >
+                    <Avatar className="w-5 h-5">
+                      {group.avatar_url ? (
+                        <AvatarImage src={group.avatar_url || "/placeholder.svg"} />
+                      ) : (
+                        <AvatarFallback
+                          className={cn("text-[10px] text-white bg-gradient-to-br", getGroupColor(group.name))}
+                        >
+                          {group.name.substring(0, 2)}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                    <span className="truncate flex-1 text-right">{group.name}</span>
+                    {unreadCounts[group.id] > 0 && (
+                      <Badge className="h-5 px-1.5 bg-destructive text-destructive-foreground text-[10px]">
+                        {unreadCounts[group.id]}
+                      </Badge>
+                    )}
+                  </Button>
+                </Link>
+              ))}
 
-          {groups.length === 0 && (
-            <div className="px-3 py-6 text-center">
-              <Users className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
-              <p className="text-sm text-muted-foreground">لا توجد خلايا</p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-2 bg-transparent"
-                onClick={() => router.push("/chat?new=true")}
-              >
-                <Plus className="w-3 h-3 ml-1" />
-                {t.newCell}
-              </Button>
-            </div>
+              {groups.length === 0 && (
+                <div className="px-3 py-6 text-center">
+                  <Users className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                  <p className="text-sm text-muted-foreground">لا توجد خلايا</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 bg-transparent"
+                    onClick={() => router.push("/chat?new=true")}
+                  >
+                    <Plus className="w-3 h-3 ml-1" />
+                    {t.newCell}
+                  </Button>
+                </div>
+              )}
+            </>
           )}
+
+          {/* Join by Invite button below cells list */}
+          <Dialog
+            open={isInviteDialogOpen}
+            onOpenChange={(open) => {
+              setIsInviteDialogOpen(open)
+              setInviteError(null)
+              setInviteLink("")
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-3 h-10 mt-1 text-muted-foreground hover:text-foreground"
+              >
+                <Link2 className="w-5 h-5" />
+                <span className="truncate flex-1 text-right text-sm">{t.joinByInvite}</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>{t.joinByInvite}</DialogTitle>
+                <DialogDescription>
+                  {language === "ar" ? "الصق رابط الدعوة للانضمام إلى خلية" : "Paste invite link to join a cell"}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 mt-4">
+                {inviteError && (
+                  <div className="p-3 rounded-xl bg-destructive/10 text-destructive text-sm">{inviteError}</div>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="inviteLinkSidebar">{language === "ar" ? "رابط الدعوة" : "Invite Link"}</Label>
+                  <Input
+                    id="inviteLinkSidebar"
+                    value={inviteLink}
+                    onChange={(e) => setInviteLink(e.target.value)}
+                    placeholder={t.inviteLinkPlaceholder}
+                    className="bg-background rounded-xl"
+                    dir="ltr"
+                  />
+                </div>
+                <Button
+                  onClick={handleJoinByInvite}
+                  disabled={!inviteLink.trim() || isJoining}
+                  className="w-full rounded-xl h-11"
+                >
+                  {isJoining ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                      {t.joining}
+                    </>
+                  ) : (
+                    t.join
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </ScrollArea>
 
