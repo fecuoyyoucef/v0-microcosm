@@ -30,6 +30,8 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [refreshing, setRefreshing] = useState(false)
+  const [updatingScores, setUpdatingScores] = useState(false)
+  const [scoreUpdateMessage, setScoreUpdateMessage] = useState("")
 
   useEffect(() => {
     fetchUsers()
@@ -60,6 +62,32 @@ export default function UsersPage() {
     setRefreshing(false)
   }
 
+  const handleUpdateResponsibilityScores = async () => {
+    setUpdatingScores(true)
+    setScoreUpdateMessage("جاري حساب معايير المسؤولية...")
+    try {
+      const res = await fetch("/api/cron/update-responsibility", {
+        method: "POST",
+      })
+
+      if (!res.ok) {
+        throw new Error("فشل تحديث المعايير")
+      }
+
+      const data = await res.json()
+      setScoreUpdateMessage("✅ تم تحديث معايير المسؤولية بنجاح")
+
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      await fetchUsers()
+    } catch (error) {
+      console.error("Score update error:", error)
+      setScoreUpdateMessage("❌ خطأ في تحديث المعايير")
+    } finally {
+      setUpdatingScores(false)
+      setTimeout(() => setScoreUpdateMessage(""), 3000)
+    }
+  }
+
   const filteredUsers = users.filter(
     (u) =>
       u.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -83,17 +111,37 @@ export default function UsersPage() {
           <h1 className="text-2xl font-bold text-white">المستخدمين</h1>
           <p className="text-slate-400">{users.length} مستخدم مسجل</p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="gap-2 bg-slate-800 border-slate-700 text-white hover:bg-slate-700"
-        >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
-          تحديث
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleUpdateResponsibilityScores}
+            disabled={updatingScores}
+            className="gap-2 bg-purple-500/10 border-purple-500/30 text-purple-400 hover:bg-purple-500/20"
+            title="حساب معايير المسؤولية لجميع المستخدمين والخلايا"
+          >
+            <RefreshCw className={`w-4 h-4 ${updatingScores ? "animate-spin" : ""}`} />
+            حساب المسؤولية
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="gap-2 bg-slate-800 border-slate-700 text-white hover:bg-slate-700"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+            تحديث
+          </Button>
+        </div>
       </div>
+
+      {/* Score Update Message */}
+      {scoreUpdateMessage && (
+        <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400 text-sm">
+          {scoreUpdateMessage}
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative">
