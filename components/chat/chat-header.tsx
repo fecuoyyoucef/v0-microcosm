@@ -415,9 +415,10 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
                     <p className="text-center text-muted-foreground py-8">لا يوجد أعضاء</p>
                   ) : (
                     members.map((member) => (
-                      <div
+                      <Link
                         key={member.id}
-                        className="flex items-center gap-3 p-3 rounded-xl hover:bg-secondary transition-colors"
+                        href={`/chat/profile/${member.user_id}`}
+                        className="flex items-center gap-3 p-3 rounded-xl hover:bg-secondary transition-colors cursor-pointer"
                       >
                         <Avatar className="h-10 w-10 ring-2 ring-background">
                           {member.profile?.avatar_url && (
@@ -436,7 +437,7 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
                             أنت
                           </span>
                         )}
-                      </div>
+                      </Link>
                     ))
                   )}
                 </div>

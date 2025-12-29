@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Copy, Edit2, Trash2, Languages, Check, Pin, Reply } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ar } from "date-fns/locale"
+import Link from "next/link"
 import type { Message, GroupMember, ConversationNode } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { toast } from "@/components/ui/use-toast"
@@ -440,7 +441,12 @@ export const MessageList = React.memo(function MessageList({
 
                   <div className={cn("max-w-[75%] space-y-1", isOwn ? "items-end" : "items-start")}>
                     {!isOwn && message.sender?.username && (
-                      <span className="text-xs text-muted-foreground px-2">{message.sender.username}</span>
+                      <Link
+                        href={`/chat/profile/${message.sender_id}`}
+                        className="text-xs text-muted-foreground px-2 hover:underline hover:text-primary transition-colors"
+                      >
+                        {message.sender.username}
+                      </Link>
                     )}
 
                     {message.reply_to && (message as any).reply_preview ? (
@@ -553,7 +559,12 @@ export const MessageList = React.memo(function MessageList({
 
               <div className={cn("max-w-[75%] space-y-1", isOwn ? "items-end" : "items-start")}>
                 {!isOwn && message.sender?.username && (
-                  <span className="text-xs text-muted-foreground px-2">{message.sender.username}</span>
+                  <Link
+                    href={`/chat/profile/${message.sender_id}`}
+                    className="text-xs text-muted-foreground px-2 hover:underline hover:text-primary transition-colors"
+                  >
+                    {message.sender.username}
+                  </Link>
                 )}
 
                 {message.reply_to && (message as any).reply_preview ? (
