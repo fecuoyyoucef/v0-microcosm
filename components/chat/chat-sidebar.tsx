@@ -38,6 +38,7 @@ import {
   Shield,
   MessageCircle,
   X,
+  Link2,
 } from "lucide-react"
 import type { Profile } from "@/lib/types"
 import { useTheme } from "next-themes"
@@ -82,7 +83,13 @@ const translations = {
     unexpectedError: "حدث خطأ غير متوقع",
     user: "مستخدم",
     assistant: "المساعد الذكي",
-    supportAgent: "دعم العملاء", // Added support agent translation
+    supportAgent: "دعم العملاء",
+    joinByInvite: "انضم بواسطة رابط",
+    inviteLinkPlaceholder: "الصق رابط الدعوة هنا...",
+    join: "انضم",
+    joining: "جاري الانضمام...",
+    invalidInviteLink: "رابط الدعوة غير صالح",
+    joinSuccess: "تم الانضمام بنجاح!",
   },
   en: {
     profile: "My Profile",
@@ -110,7 +117,13 @@ const translations = {
     unexpectedError: "An unexpected error occurred",
     user: "User",
     assistant: "AI Assistant",
-    supportAgent: "Customer Support", // Added support agent translation
+    supportAgent: "Customer Support",
+    joinByInvite: "Join by Invite",
+    inviteLinkPlaceholder: "Paste invite link here...",
+    join: "Join",
+    joining: "Joining...",
+    invalidInviteLink: "Invalid invite link",
+    joinSuccess: "Joined successfully!",
   },
   fr: {
     profile: "Mon Profil",
@@ -138,7 +151,13 @@ const translations = {
     unexpectedError: "Une erreur inattendue s'est produite",
     user: "Utilisateur",
     assistant: "Assistant IA",
-    supportAgent: "Support Client", // Added support agent translation
+    supportAgent: "Support Client",
+    joinByInvite: "Rejoindre par Invitation",
+    inviteLinkPlaceholder: "Collez le lien d'invitation ici...",
+    join: "Rejoindre",
+    joining: "Rejoignez...",
+    invalidInviteLink: "Lien d'invitation invalide",
+    joinSuccess: "Rejoint avec succès!",
   },
 }
 
@@ -162,7 +181,10 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
   const { theme, setTheme } = useTheme()
   const { language } = useSettings()
   const t = translations[language]
-  const [showSupportChat, setShowSupportChat] = useState(false) // Added state for support chat
+  const [showSupportChat, setShowSupportChat] = useState(false)
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
+  const [inviteLink, setInviteLink] = useState("")
+  const [isJoining, setIsJoining] = useState(false)
 
   const touchStartX = useRef<number>(0)
   const touchStartY = useRef<number>(0)
@@ -503,6 +525,58 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
             </DialogContent>
           </Dialog>
 
+          <Dialog
+            open={isInviteDialogOpen}
+            onOpenChange={(open) => {
+              setIsInviteDialogOpen(open)
+              setError(null)
+              setInviteLink("")
+            }}
+          >
+            <DialogTrigger asChild>
+              <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
+                <Link2 className="w-5 h-5 text-muted-foreground" />
+                <span className="text-sm font-medium">{t.joinByInvite}</span>
+              </div>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>{t.joinByInvite}</DialogTitle>
+                <DialogDescription>
+                  {language === "ar" ? "الصق رابط الدعوة للانضمام إلى الخلية" : "Paste the invite link to join a cell"}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 mt-4">
+                {error && <div className="p-3 rounded-xl bg-destructive/10 text-destructive text-sm">{error}</div>}
+                <div className="space-y-2">
+                  <Label htmlFor="inviteLink">{language === "ar" ? "رابط الدعوة" : "Invite Link"}</Label>
+                  <Input
+                    id="inviteLink"
+                    value={inviteLink}
+                    onChange={(e) => setInviteLink(e.target.value)}
+                    placeholder={t.inviteLinkPlaceholder}
+                    className="bg-background rounded-xl"
+                    dir="ltr"
+                  />
+                </div>
+                <Button
+                  onClick={handleJoinByInvite}
+                  disabled={!inviteLink.trim() || isJoining}
+                  className="w-full rounded-xl h-11"
+                >
+                  {isJoining ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                      {t.joining}
+                    </>
+                  ) : (
+                    t.join
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer opacity-50">
             <Bookmark className="w-5 h-5 text-muted-foreground" />
             <span className="text-sm font-medium">{t.savedMessages}</span>
@@ -564,6 +638,34 @@ export function ChatSidebar({ userId, mobileOnly = false, isOpen, onOpenChange }
       </div>
     </div>
   )
+
+  const handleJoinByInvite = async () => {
+    if (!inviteLink.trim()) return
+
+    setIsJoining(true)
+    setError(null)
+
+    try {
+      const url = new URL(inviteLink.trim())
+      const pathParts = url.pathname.split("/")
+      const groupId = pathParts[pathParts.indexOf("invite") + 1]
+
+      if (!groupId) {
+        setError(t.invalidInviteLink)
+        return
+      }
+
+      router.push(`/invite/${groupId}`)
+      setInviteLink("")
+      setIsInviteDialogOpen(false)
+      setIsMobileMenuOpen(false)
+    } catch (err) {
+      console.error("Error parsing invite link:", err)
+      setError(t.invalidInviteLink)
+    } finally {
+      setIsJoining(false)
+    }
+  }
 
   if (mobileOnly) {
     return (
