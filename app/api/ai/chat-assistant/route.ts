@@ -32,8 +32,52 @@ export async function POST(req: Request) {
       .eq("id", user.id)
       .single()
 
-    // 2. إحصائيات نشاط المستخدم
-    const { data: userStats } = await serviceSupabase.from("user_stats").select("*").eq("user_id", user.id).single()
+    // عدد الرسائل المرسلة
+    const { count: messagesCount } = await serviceSupabase
+      .from("messages")
+      .select("*", { count: "exact", head: true })
+      .eq("sender_id", user.id)
+
+    // عدد العقد المنشأة
+    const { count: nodesCount } = await serviceSupabase
+      .from("conversation_nodes")
+      .select("*", { count: "exact", head: true })
+      .eq("created_by", user.id)
+
+    // عدد القرارات المصوت عليها
+    const { count: votesCount } = await serviceSupabase
+      .from("decision_votes")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id)
+
+    // عدد القرارات المنشأة
+    const { count: decisionsCreatedCount } = await serviceSupabase
+      .from("decisions")
+      .select("*", { count: "exact", head: true })
+      .eq("created_by", user.id)
+
+    // عدد التفاعلات
+    const { count: reactionsCount } = await serviceSupabase
+      .from("message_reactions")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id)
+
+    // عدد المهام المكتملة
+    const { count: tasksCompletedCount } = await serviceSupabase
+      .from("extracted_tasks")
+      .select("*", { count: "exact", head: true })
+      .eq("assigned_to", user.id)
+      .eq("status", "completed")
+
+    // بناء الإحصائيات المحسوبة
+    const calculatedStats = {
+      messages_sent: messagesCount || 0,
+      nodes_created: nodesCount || 0,
+      decisions_voted: votesCount || 0,
+      decisions_created: decisionsCreatedCount || 0,
+      reactions_given: reactionsCount || 0,
+      tasks_completed: tasksCompletedCount || 0,
+    }
 
     // 3. الخلايا المنضمة
     const { data: userGroups } = await serviceSupabase
@@ -156,20 +200,13 @@ export async function POST(req: Request) {
 النقاط الإجمالية: ${profile?.total_points || 0}
 مقياس المسؤولية: ${profile?.responsibility_score || 0}
 
-# إحصائيات النشاط
-${
-  userStats
-    ? `
-- الرسائل المرسلة: ${userStats.messages_sent || 0}
-- العقد المنشأة: ${userStats.nodes_created || 0}
-- القرارات المصوت عليها: ${userStats.decisions_voted || 0}
-- المشاكل المحلولة: ${userStats.problems_solved || 0}
-- الأسئلة المجابة: ${userStats.questions_answered || 0}
-- متوسط جودة الرسائل: ${userStats.avg_message_quality || 0}
-- مقياس الاتساق: ${userStats.consistency_score || 0}
-`
-    : "لا توجد إحصائيات"
-}
+# إحصائيات النشاط (محسوبة مباشرة)
+- الرسائل المرسلة: ${calculatedStats.messages_sent}
+- العقد/المواضيع المنشأة: ${calculatedStats.nodes_created}
+- القرارات المصوت عليها: ${calculatedStats.decisions_voted}
+- القرارات المنشأة: ${calculatedStats.decisions_created}
+- التفاعلات على الرسائل: ${calculatedStats.reactions_given}
+- المهام المكتملة: ${calculatedStats.tasks_completed}
 
 # الخلايا المنضمة (${userGroups?.length || 0})
 ${
@@ -276,6 +313,7 @@ ${
     const fullPrompt = `${context}\n\nالمحادثة:\n${conversationHistory}\n\nالمساعد:`
 
     console.log("[v0] Generating AI response with comprehensive context...")
+    console.log("[v0] Calculated stats:", calculatedStats)
     const response = await generateAIText(fullPrompt)
     console.log("[v0] AI response generated successfully")
 
