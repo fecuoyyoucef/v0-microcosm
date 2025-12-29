@@ -432,6 +432,8 @@ export function ChatContainer({
     visibleTo?: string[],
     attachmentUrl?: string,
     replyTo?: string | null,
+    replyPreview?: { id: string; content: string; user_name: string } | null,
+    attachments?: Array<{ url: string; type: string; name: string; size: number }>,
   ) => {
     const tempId = `temp-${Date.now()}`
     const currentProfile = members.find((m) => m.user_id === currentUserId)?.profile
@@ -441,7 +443,12 @@ export function ChatContainer({
           content: replyingTo.content,
           sender: replyingTo.sender ? { display_name: replyingTo.sender.display_name } : { display_name: "مستخدم" },
         }
-      : null
+      : replyPreview
+        ? {
+            content: replyPreview.content,
+            sender: { display_name: replyPreview.user_name },
+          }
+        : null
 
     const optimisticMessage: Message = {
       id: tempId,
@@ -464,6 +471,7 @@ export function ChatContainer({
         updated_at: "",
       },
       attachment_url: attachmentUrl || null,
+      attachments: attachments || null,
     }
 
     setMessages((prev) => [...prev, optimisticMessage])
@@ -478,10 +486,15 @@ export function ChatContainer({
       node_id: nodeId || null,
       visible_to: layer === "shadow" ? visibleTo : null,
       reply_to: replyTo || null,
+      reply_preview: replyPreview || null,
     }
 
     if (attachmentUrl) {
       insertData.attachment_url = attachmentUrl
+    }
+
+    if (attachments && attachments.length > 0) {
+      insertData.attachments = attachments
     }
 
     const { data, error } = await supabase.from("messages").insert(insertData).select().single()
@@ -495,38 +508,41 @@ export function ChatContainer({
       setMessages((prev) =>
         prev.map((m) =>
           m.id === tempId
-            ? { ...data, sender: optimisticMessage.sender, reply_to_message: optimisticMessage.reply_to_message }
+            ? {
+                ...data,
+                sender: optimisticMessage.sender,
+                reply_to_message: optimisticMessage.reply_to_message,
+                attachments: optimisticMessage.attachments,
+              }
             : m,
         ),
       )
 
-      if (layer !== "shadow") {
-        try {
-          const recipientIds = members.filter((m) => m.user_id !== currentUserId).map((m) => m.user_id)
+      try {
+        const recipientIds = members.filter((m) => m.user_id !== currentUserId).map((m) => m.user_id)
 
-          if (recipientIds.length > 0) {
-            fetch("/api/notifications/send", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                userIds: recipientIds,
-                type: "new_message",
-                title: `${currentProfile?.display_name || "مستخدم"} في ${group.name}`,
-                body: content.substring(0, 150),
-                data: {
-                  url: `/chat/${groupId}`,
-                  groupId,
-                  groupName: group.name,
-                  senderId: currentUserId,
-                  senderName: currentProfile?.display_name || "مستخدم",
-                  messageId: data.id,
-                },
-              }),
-            }).catch((err) => console.error("Failed to send notification:", err))
-          }
-        } catch (err) {
-          console.error("Notification error:", err)
+        if (recipientIds.length > 0) {
+          fetch("/api/notifications/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userIds: recipientIds,
+              type: "new_message",
+              title: `${currentProfile?.display_name || "مستخدم"} في ${group.name}`,
+              body: content.substring(0, 150),
+              data: {
+                url: `/chat/${groupId}`,
+                groupId,
+                groupName: group.name,
+                senderId: currentUserId,
+                senderName: currentProfile?.display_name || "مستخدم",
+                messageId: data.id,
+              },
+            }),
+          }).catch((err) => console.error("Failed to send notification:", err))
         }
+      } catch (err) {
+        console.error("Notification error:", err)
       }
     }
   }

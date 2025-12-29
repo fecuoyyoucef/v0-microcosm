@@ -28,6 +28,7 @@ interface MessageInputProps {
     attachmentUrl?: string,
     replyTo?: string | null,
     replyPreview?: { id: string; content: string; user_name: string } | null,
+    attachments?: Array<{ url: string; type: string; name: string; size: number }>,
   ) => Promise<void>
   members: GroupMember[]
   currentUserId: string
@@ -264,6 +265,7 @@ export function MessageInput({
   const handleSend = async () => {
     if ((!content.trim() && selectedFiles.length === 0) || isSending) return
 
+    setIsSending(true)
     const attachments: Array<{ url: string; type: string; name: string; size: number }> = []
 
     if (selectedFiles.length > 0) {
@@ -293,6 +295,7 @@ export function MessageInput({
         console.error("Error uploading files:", error)
         toast.error("فشل رفع الملفات")
         setIsUploadingFiles(false)
+        setIsSending(false)
         return
       }
       setIsUploadingFiles(false)
@@ -318,46 +321,30 @@ export function MessageInput({
         toast.success("تم تعديل الرسالة")
       }
     } else {
-      // Send new message with reply_to_message included
-      let replyToMessage = null
+      let replyPreview = null
       if (replyingTo) {
-        const { data } = await supabase
-          .from("messages")
-          .select("id, content, sender_id, profiles:sender_id(display_name, username)")
-          .eq("id", replyingTo.id)
-          .single()
-
-        if (data) {
-          replyToMessage = {
-            id: data.id,
-            content: data.content,
-            sender_name: data.profiles?.display_name || data.profiles?.username || "مستخدم",
-          }
+        replyPreview = {
+          id: replyingTo.id,
+          content: replyingTo.content,
+          user_name: replyingTo.sender?.display_name || "مستخدم",
         }
       }
 
-      const { data, error } = await supabase
-        .from("messages")
-        .insert({
-          group_id: groupId,
-          sender_id: currentUserId,
-          content: finalContent,
-          layer: selectedLayer,
-          node_id: messageNodeId,
-          reply_to: replyingTo?.id || null,
-          reply_preview: replyToMessage,
-          attachments: attachments.length > 0 ? attachments : null,
-          visible_to: selectedLayer === "shadow" ? visibleTo : null,
-        })
-        .select()
-        .single()
+      await onSend(
+        finalContent,
+        selectedLayer,
+        messageNodeId,
+        visibleTo,
+        undefined,
+        replyingTo?.id || null,
+        replyPreview,
+        attachments.length > 0 ? attachments : undefined,
+      )
 
-      if (!error) {
-        setContent("")
-        clearFiles()
-        onCancelReply?.()
-        setMentionedUsers([])
-      }
+      setContent("")
+      clearFiles()
+      onCancelReply?.()
+      setMentionedUsers([])
     }
 
     setIsSending(false)

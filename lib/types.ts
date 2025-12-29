@@ -106,6 +106,27 @@ export interface Message {
   pinned_at?: string | null
   attachment_url?: string | null
   attachment_type?: "image" | "file" | null
+  attachments?: Array<{
+    url: string
+    type: string
+    name: string
+    size: number
+  }> | null
+  reply_to_message?: {
+    content: string
+    sender?: { display_name: string }
+  } | null
+  reply_preview?: {
+    id: string
+    content: string
+    user_name: string
+  } | null
+  reactions?: Array<{
+    id: string
+    user_id: string
+    reaction: string
+  }>
+  read_count?: number
 }
 
 export interface MessageReaction {
