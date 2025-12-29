@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
-import { Copy, Edit2, Trash2, Languages, Check, Pin, Reply } from "lucide-react"
+import { Copy, Edit2, Trash2, Languages, Check, Pin, Reply, FileText, Download, File } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ar } from "date-fns/locale"
 import type { Message, GroupMember, ConversationNode } from "@/lib/types"
@@ -305,6 +305,66 @@ export const MessageList = React.memo(function MessageList({
     isTouchMoving.current = false
   }
 
+  // Helper function to render attachments
+  const renderAttachments = (attachments: any[], isOwn: boolean) => {
+    if (!attachments || !Array.isArray(attachments) || attachments.length === 0) return null
+
+    return (
+      <div className="mt-2 space-y-2">
+        {attachments.map((attachment: any, index: number) => {
+          if (attachment.type === "image") {
+            return (
+              <div key={index} className="relative rounded-lg overflow-hidden max-w-[250px]">
+                <img
+                  src={attachment.url || "/placeholder.svg"}
+                  alt={attachment.name || "صورة"}
+                  className="rounded-lg object-cover max-h-[200px] w-auto"
+                  loading="lazy"
+                />
+              </div>
+            )
+          } else {
+            // Document file (pdf, docx, md)
+            const getFileIcon = () => {
+              const ext = attachment.name?.split(".").pop()?.toLowerCase()
+              if (ext === "pdf") return <FileText className="w-5 h-5 text-red-500" />
+              if (ext === "docx" || ext === "doc") return <FileText className="w-5 h-5 text-blue-500" />
+              if (ext === "md") return <FileText className="w-5 h-5 text-gray-500" />
+              return <File className="w-5 h-5" />
+            }
+
+            return (
+              <a
+                key={index}
+                href={attachment.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                download={attachment.name}
+                className={cn(
+                  "flex items-center gap-2 p-2 rounded-lg border max-w-[250px]",
+                  isOwn ? "bg-white/10 border-white/20" : "bg-muted border-border",
+                )}
+              >
+                {getFileIcon()}
+                <div className="flex-1 min-w-0">
+                  <p className={cn("text-xs font-medium truncate", isOwn ? "text-white" : "text-foreground")}>
+                    {attachment.name}
+                  </p>
+                  {attachment.size && (
+                    <p className={cn("text-[10px]", isOwn ? "text-white/70" : "text-muted-foreground")}>
+                      {(attachment.size / 1024).toFixed(1)} KB
+                    </p>
+                  )}
+                </div>
+                <Download className={cn("w-4 h-4 shrink-0", isOwn ? "text-white/70" : "text-muted-foreground")} />
+              </a>
+            )
+          }
+        })}
+      </div>
+    )
+  }
+
   if (isLoading) {
     return (
       <div className="flex-1 p-4 space-y-4">
@@ -400,7 +460,10 @@ export const MessageList = React.memo(function MessageList({
                         isOwn ? style.ownBg + " text-white" : style.bg,
                       )}
                     >
-                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      {message.content && message.content !== "📁 مرفقات" && (
+                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      )}
+                      {renderAttachments((message as any).attachments, isOwn)}
                       {isTranslating && <p className="text-xs opacity-70 mt-1">جاري الترجمة...</p>}
                       {translation && <p className="text-xs opacity-70 mt-1 border-t pt-1">{translation}</p>}
                     </div>
@@ -507,7 +570,10 @@ export const MessageList = React.memo(function MessageList({
                 <div
                   className={cn("rounded-2xl px-4 py-2 break-words", isOwn ? style.ownBg + " text-white" : style.bg)}
                 >
-                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                  {message.content && message.content !== "📁 مرفقات" && (
+                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                  )}
+                  {renderAttachments((message as any).attachments, isOwn)}
                   {isTranslating && <p className="text-xs opacity-70 mt-1">جاري الترجمة...</p>}
                   {translation && <p className="text-xs opacity-70 mt-1 border-t pt-1">{translation}</p>}
                 </div>
