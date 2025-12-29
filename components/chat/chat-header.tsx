@@ -444,41 +444,47 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
 
               {members.length < group.max_members && (
                 <div className="p-4 border-t">
-                  <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
-                    <DialogTrigger asChild>
-                      <Button className="w-full rounded-xl h-11">
-                        <UserPlus className="w-4 h-4 ml-2" />
-                        دعوة أعضاء جدد
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-md">
-                      <DialogHeader>
-                        <DialogTitle>دعوة أعضاء جدد</DialogTitle>
-                        <DialogDescription>شارك رابط الدعوة مع أصدقائك للانضمام للمجموعة</DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4 mt-4">
-                        <div className="space-y-2">
-                          <Label>رابط الدعوة</Label>
-                          <div className="flex gap-2">
-                            <Input
-                              value={inviteLink}
-                              readOnly
-                              className="bg-background text-xs md:text-sm rounded-xl flex-1"
-                              dir="ltr"
-                            />
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              onClick={copyInviteLink}
-                              className="rounded-xl bg-transparent shrink-0"
-                            >
-                              {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
-                            </Button>
+                  {currentUserRole === "admin" ? (
+                    <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
+                      <DialogTrigger asChild>
+                        <Button className="w-full rounded-xl h-11">
+                          <UserPlus className="w-4 h-4 ml-2" />
+                          دعوة أعضاء جدد
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>دعوة أعضاء جدد</DialogTitle>
+                          <DialogDescription>شارك رابط الدعوة مع أصدقائك للانضمام للمجموعة</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 mt-4">
+                          <div className="space-y-2">
+                            <Label>رابط الدعوة</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                value={inviteLink}
+                                readOnly
+                                className="bg-background text-xs md:text-sm rounded-xl flex-1"
+                                dir="ltr"
+                              />
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={copyInviteLink}
+                                className="rounded-xl bg-transparent shrink-0"
+                              >
+                                {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
+                              </Button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                      </DialogContent>
+                    </Dialog>
+                  ) : (
+                    <div className="text-center text-sm text-muted-foreground py-3">
+                      <p>فقط المسؤول يمكنه دعوة أعضاء جدد</p>
+                    </div>
+                  )}
                 </div>
               )}
             </SheetContent>
