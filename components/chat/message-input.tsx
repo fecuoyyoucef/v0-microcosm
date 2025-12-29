@@ -14,6 +14,10 @@ import { Send, Eye, GitBranch, X, Loader2, Reply, Camera, Sparkles, AtSign, Edit
 import { createClient } from "@/lib/supabase/client"
 import type { MessageLayer, GroupMember, ConversationNode, GroupSettings, Message } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import Image from "next/image"
+import { toast } from "react-toastify"
+import { FileText } from "lucide-react"
+import { parseMentions } from "@/lib/utils" // Declare or import the parseMentions function
 
 interface MessageInputProps {
   onSend: (
@@ -67,10 +71,9 @@ export function MessageInput({
   const [isVisibilityOpen, setIsVisibilityOpen] = useState(false)
   const [isLayerOpen, setIsLayerOpen] = useState(false)
   const [messageNodeId, setMessageNodeId] = useState<string | null>(selectedNodeId)
-  const [selectedImage, setSelectedImage] = useState<File | null>(null)
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
-  const [isUploadingImage, setIsUploadingImage] = useState(false)
-  const [isCheckingContent, setIsCheckingContent] = useState(false)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [filePreviews, setFilePreviews] = useState<{ file: File; preview: string; type: string }[]>([])
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false)
   const [isCorrectingText, setIsCorrectingText] = useState(false)
   const [showCorrectionHint, setShowCorrectionHint] = useState(false)
   const [mentionedUsers, setMentionedUsers] = useState<string[]>([])
@@ -105,39 +108,54 @@ export function MessageInput({
     return true
   })
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setSelectedImage(file)
-      const reader = new FileReader()
-      reader.onload = (e) => setImagePreview(e.target?.result as string)
-      reader.readAsDataURL(file)
-    }
-  }
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
 
-  const clearImage = () => {
-    setSelectedImage(null)
-    setImagePreview(null)
-    if (fileInputRef.current) fileInputRef.current.value = ""
-  }
+    const newFiles = [...selectedFiles, ...files].slice(0, 10) // Max 10 files
+    setSelectedFiles(newFiles)
 
-  const parseMentions = (text: string): string[] => {
-    const mentionPattern = /@(\w+)/g
-    const mentions = []
-    let match
+    // Generate previews
+    const newPreviews: { file: File; preview: string; type: string }[] = []
 
-    while ((match = mentionPattern.exec(text)) !== null) {
-      const username = match[1]
-      const member = members.find(
-        (m) =>
-          m.profile?.username?.toLowerCase() === username.toLowerCase() ||
-          m.profile?.display_name?.replace(/\s+/g, "").toLowerCase() === username.toLowerCase(),
-      )
-      if (member && !mentions.includes(member.user_id)) {
-        mentions.push(member.user_id)
+    newFiles.forEach((file) => {
+      const fileType = file.type.startsWith("image/") ? "image" : "document"
+
+      if (fileType === "image") {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          newPreviews.push({
+            file,
+            preview: e.target?.result as string,
+            type: "image",
+          })
+          if (newPreviews.length === newFiles.length) {
+            setFilePreviews(newPreviews)
+          }
+        }
+        reader.readAsDataURL(file)
+      } else {
+        newPreviews.push({
+          file,
+          preview: "",
+          type: "document",
+        })
+        if (newPreviews.length === newFiles.length) {
+          setFilePreviews(newPreviews)
+        }
       }
-    }
-    return mentions
+    })
+  }
+
+  const removeFile = (index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
+    setFilePreviews((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const clearFiles = () => {
+    setSelectedFiles([])
+    setFilePreviews([])
+    if (fileInputRef.current) fileInputRef.current.value = ""
   }
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -244,105 +262,105 @@ export function MessageInput({
   }
 
   const handleSend = async () => {
-    if ((!content.trim() && !selectedImage) || isSending) return
+    if ((!content.trim() && selectedFiles.length === 0) || isSending) return
 
-    if (content.trim()) {
-      setIsCheckingContent(true)
+    const attachments: Array<{ url: string; type: string; name: string; size: number }> = []
+
+    if (selectedFiles.length > 0) {
+      setIsUploadingFiles(true)
       try {
-        const moderationResponse = await fetch("/api/ai/content-moderation", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: content.trim() }),
-        })
+        for (const file of selectedFiles) {
+          const fileExt = file.name.split(".").pop()
+          const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+          const filePath = `${groupId}/${fileName}`
 
-        if (moderationResponse.ok) {
-          const { isAppropriate, reason } = await moderationResponse.json()
-          // Only block if it's really inappropriate
-          if (!isAppropriate && reason.includes("خطير")) {
-            alert(`تنبيه: ${reason}\n\nيرجى مراجعة محتوى رسالتك.`)
-            setIsCheckingContent(false)
-            return
-          }
+          const { data, error } = await supabase.storage.from("message-attachments").upload(filePath, file)
+
+          if (error) throw error
+
+          const { data: urlData } = supabase.storage.from("message-attachments").getPublicUrl(filePath)
+
+          const fileType = file.type.startsWith("image/") ? "image" : "document"
+
+          attachments.push({
+            url: urlData.publicUrl,
+            type: fileType,
+            name: file.name,
+            size: file.size,
+          })
         }
       } catch (error) {
-        console.error("Content moderation error:", error)
-        // Continue sending even if moderation fails
+        console.error("Error uploading files:", error)
+        toast.error("فشل رفع الملفات")
+        setIsUploadingFiles(false)
+        return
       }
-      setIsCheckingContent(false)
+      setIsUploadingFiles(false)
     }
 
-    setIsSending(true)
-    try {
-      let attachmentUrl: string | undefined
+    const finalContent = content.trim() || (attachments.length > 0 ? "📁 مرفقات" : "")
 
-      if (selectedImage) {
-        setIsUploadingImage(true)
-        const fileExt = selectedImage.name.split(".").pop()
-        const fileName = `${groupId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+    if (editingMessage) {
+      // Update message
+      const { error } = await supabase
+        .from("messages")
+        .update({
+          content: finalContent,
+          updated_at: new Date().toISOString(),
+          ...(attachments.length > 0 && { attachments }),
+        })
+        .eq("id", editingMessage.id)
 
-        const { error: uploadError } = await supabase.storage
-          .from("message-attachments")
-          .upload(fileName, selectedImage)
-
-        if (uploadError) throw uploadError
-
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from("message-attachments").getPublicUrl(fileName)
-        attachmentUrl = publicUrl
-        setIsUploadingImage(false)
-      }
-
-      const messageContent = content.trim() || (attachmentUrl ? "📷 صورة" : "")
-
-      if (editingMessage) {
-        const { error } = await supabase
-          .from("messages")
-          .update({
-            content: messageContent,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", editingMessage.id)
-          .eq("sender_id", currentUserId)
-
-        if (!error) {
-          router.refresh()
-        }
+      if (!error) {
+        setContent("")
+        clearFiles()
         onCancelEdit?.()
-      } else {
-        const replyPreview = replyingTo
-          ? {
-              id: replyingTo.id,
-              content: replyingTo.content,
-              user_name: replyingTo.sender?.display_name || replyingTo.sender?.username || "مستخدم",
-            }
-          : null
+        toast.success("تم تعديل الرسالة")
+      }
+    } else {
+      // Send new message with reply_to_message included
+      let replyToMessage = null
+      if (replyingTo) {
+        const { data } = await supabase
+          .from("messages")
+          .select("id, content, sender_id, profiles:sender_id(display_name, username)")
+          .eq("id", replyingTo.id)
+          .single()
 
-        await onSend(
-          messageContent,
-          selectedLayer,
-          messageNodeId,
-          selectedLayer === "shadow" && visibleTo.length > 0 ? visibleTo : undefined,
-          attachmentUrl,
-          replyingTo?.id || null,
-          replyPreview, // Pass reply_preview
-        )
-
-        if (replyingTo) {
-          onCancelReply?.()
+        if (data) {
+          replyToMessage = {
+            id: data.id,
+            content: data.content,
+            sender_name: data.profiles?.display_name || data.profiles?.username || "مستخدم",
+          }
         }
       }
 
-      setContent("")
-      setVisibleTo([])
-      setMentionedUsers([])
-      clearImage()
-    } catch (error) {
-      console.error("Send error:", error)
-    } finally {
-      setIsSending(false)
-      setIsUploadingImage(false)
+      const { data, error } = await supabase
+        .from("messages")
+        .insert({
+          group_id: groupId,
+          sender_id: currentUserId,
+          content: finalContent,
+          layer: selectedLayer,
+          node_id: messageNodeId,
+          reply_to: replyingTo?.id || null,
+          reply_preview: replyToMessage,
+          attachments: attachments.length > 0 ? attachments : null,
+          visible_to: selectedLayer === "shadow" ? visibleTo : null,
+        })
+        .select()
+        .single()
+
+      if (!error) {
+        setContent("")
+        clearFiles()
+        onCancelReply?.()
+        setMentionedUsers([])
+      }
     }
+
+    setIsSending(false)
   }
 
   const toggleVisibleTo = (userId: string) => {
@@ -440,50 +458,34 @@ export function MessageInput({
       )}
 
       <div className="p-2 w-full max-w-full">
-        {/* Image preview */}
-        {imagePreview && (
-          <div className="mb-2 relative inline-block animate-in zoom-in-95 duration-200">
-            <img src={imagePreview || "/placeholder.svg"} alt="Preview" className="max-h-20 rounded-xl shadow-md" />
-            <button
-              onClick={clearImage}
-              className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center shadow-md hover:scale-110 transition-transform"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-        )}
-
-        {showMentionSuggestions && mentionSuggestions.length > 0 && (
-          <div className="absolute bottom-full left-2 right-2 mb-1 bg-card border border-border rounded-xl shadow-lg overflow-hidden animate-in slide-in-from-bottom-2 duration-200 max-h-48 overflow-y-auto z-50">
-            {mentionSuggestions.map((member, index) => (
-              <button
-                key={member.id}
-                className={cn(
-                  "w-full px-3 py-2 flex items-center gap-2 hover:bg-muted transition-colors text-left",
-                  index === selectedSuggestionIndex && "bg-muted",
+        {/* File previews */}
+        {filePreviews.length > 0 && (
+          <div className="flex flex-wrap gap-2 p-2 border-t border-border">
+            {filePreviews.map((item, index) => (
+              <div key={index} className="relative group">
+                {item.type === "image" ? (
+                  <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-border">
+                    <Image src={item.preview || "/placeholder.svg"} alt="Preview" fill className="object-cover" />
+                    <button
+                      onClick={() => removeFile(index)}
+                      className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative w-20 h-20 rounded-lg border border-border flex flex-col items-center justify-center bg-muted p-2">
+                    <FileText className="w-6 h-6 mb-1" />
+                    <span className="text-xs truncate w-full text-center">{item.file.name}</span>
+                    <button
+                      onClick={() => removeFile(index)}
+                      className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
                 )}
-                onClick={() => selectMention(member)}
-              >
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                  {member.profile?.avatar_url ? (
-                    <img
-                      src={member.profile.avatar_url || "/placeholder.svg"}
-                      alt=""
-                      className="w-full h-full rounded-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-sm font-medium text-primary">
-                      {(member.profile?.display_name || "U")[0].toUpperCase()}
-                    </span>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{member.profile?.display_name || "مستخدم"}</p>
-                  {member.profile?.username && (
-                    <p className="text-xs text-muted-foreground truncate">@{member.profile.username}</p>
-                  )}
-                </div>
-              </button>
+              </div>
             ))}
           </div>
         )}
@@ -496,11 +498,18 @@ export function MessageInput({
             size="icon"
             className="h-10 w-10 shrink-0 rounded-full border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-colors bg-transparent"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isUploadingImage}
+            disabled={isUploadingFiles}
           >
-            {isUploadingImage ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
+            {isUploadingFiles ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
           </Button>
-          <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,.pdf,.docx,.md"
+            multiple
+            onChange={handleFileSelect}
+            className="hidden"
+          />
 
           {/* Text input container */}
           <div className="flex-1 min-w-0 flex items-center gap-1 border border-border/80 bg-muted/30 rounded-full px-3 py-1 relative">
@@ -601,12 +610,12 @@ export function MessageInput({
               {/* Send button */}
               <Button
                 onClick={handleSend}
-                disabled={(!content.trim() && !selectedImage) || isSending || isCheckingContent}
+                disabled={(!content.trim() && selectedFiles.length === 0) || isSending || isCorrectingText}
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 rounded-full p-0 text-primary hover:text-primary"
               >
-                {isSending || isCheckingContent ? (
+                {isSending || isCorrectingText ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <Send className="w-4 h-4" />
