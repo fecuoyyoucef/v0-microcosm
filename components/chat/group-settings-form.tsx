@@ -28,6 +28,7 @@ import {
   Activity,
   Trash2,
   GitBranch,
+  AlertCircle,
 } from "lucide-react"
 import Link from "next/link"
 import type {
@@ -72,6 +73,11 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
   const [statistics, setStatistics] = useState<GroupStatistics | null>(null)
   const [isLoadingStats, setIsLoadingStats] = useState(false)
   const [metricsEnabled, setMetricsEnabled] = useState(false)
+  const [cellTypeChangeStatus, setCellTypeChangeStatus] = useState<{
+    can_change: boolean
+    days_remaining: number
+    message: string
+  } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const supabase = createClient()
@@ -81,7 +87,23 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
       mod.getSystemSetting("cell_classification_enabled").then(setClassificationEnabled)
       mod.getSystemSetting("metrics_enabled").then(setMetricsEnabled)
     })
-  }, [])
+
+    const checkCellTypeChange = async () => {
+      try {
+        const { data, error } = await supabase.rpc("can_change_cell_type", { group_id: group.id })
+
+        if (!error && data) {
+          setCellTypeChangeStatus(data)
+        }
+      } catch (err) {
+        console.error("Error checking cell type change status:", err)
+      }
+    }
+
+    if (isAdmin) {
+      checkCellTypeChange()
+    }
+  }, [group.id, isAdmin, supabase])
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -116,20 +138,33 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
   const handleSave = async () => {
     if (!isAdmin) return
 
+    if (cellCategory !== group.cell_category) {
+      if (!cellTypeChangeStatus?.can_change) {
+        alert(`لا يمكن تغيير نوع الخلية الآن.\n${cellTypeChangeStatus?.message}`)
+        setCellCategory(group.cell_category)
+        return
+      }
+    }
+
     setIsSaving(true)
     try {
-      const { error } = await supabase
-        .from("groups")
-        .update({
-          name,
-          description: description || null,
-          avatar_url: avatarUrl || null,
-          settings,
-          background_style: backgroundStyle,
-          cell_category: cellCategory,
-          goal: goal || null,
-        })
-        .eq("id", group.id)
+      const updateData: Record<string, any> = {
+        name,
+        description: description || null,
+        avatar_url: avatarUrl || null,
+        settings,
+        background_style: backgroundStyle,
+        goal: goal || null,
+      }
+
+      if (cellCategory !== group.cell_category) {
+        updateData.cell_category = cellCategory
+        updateData.last_cell_type_change = new Date().toISOString()
+      } else {
+        updateData.cell_category = cellCategory
+      }
+
+      const { error } = await supabase.from("groups").update(updateData).eq("id", group.id)
 
       if (error) throw error
 
@@ -318,6 +353,17 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
             <p className="text-sm text-muted-foreground">إدارة إعدادات خلية {group.name}</p>
           </div>
         </div>
+
+        {/* Cell Type Change Restriction Warning */}
+        {isAdmin && cellCategory !== group.cell_category && !cellTypeChangeStatus?.can_change && (
+          <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-orange-500" />
+              <p className="text-orange-700 font-medium">تحذير: تغيير نوع الخلية مقيد</p>
+            </div>
+            <p className="text-sm text-orange-600">{cellTypeChangeStatus?.message}</p>
+          </div>
+        )}
 
         <Tabs defaultValue="general" className="space-y-6">
           <TabsList className={`grid w-full ${isPrimaryCell && isAdmin ? "grid-cols-6" : "grid-cols-5"} h-auto p-1`}>
