@@ -431,21 +431,23 @@ export const MessageList = React.memo(function MessageList({
                   }}
                 >
                   {!isOwn && (
-                    <Avatar className="h-8 w-8 shrink-0">
-                      <AvatarImage src={message.sender?.avatar_url || undefined} />
-                      <AvatarFallback className={getAvatarColor(message.sender_id)}>
-                        {message.sender?.username?.[0]?.toUpperCase() || "؟"}
-                      </AvatarFallback>
-                    </Avatar>
+                    <Link href={`/chat/profile/${message.sender_id}`} className="shrink-0">
+                      <Avatar className="h-8 w-8 shrink-0 cursor-pointer hover:opacity-80 transition-opacity">
+                        <AvatarImage src={message.sender?.avatar_url || undefined} />
+                        <AvatarFallback className={getAvatarColor(message.sender_id)}>
+                          {message.sender?.username?.[0]?.toUpperCase() || "؟"}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Link>
                   )}
 
                   <div className={cn("max-w-[75%] space-y-1", isOwn ? "items-end" : "items-start")}>
-                    {!isOwn && message.sender?.username && (
+                    {!isOwn && (message.sender?.display_name || message.sender?.username) && (
                       <Link
                         href={`/chat/profile/${message.sender_id}`}
-                        className="text-xs text-muted-foreground px-2 hover:underline hover:text-primary transition-colors"
+                        className="text-xs font-medium text-foreground px-2 hover:underline hover:text-primary transition-colors"
                       >
-                        {message.sender.username}
+                        {message.sender?.display_name || message.sender?.username}
                       </Link>
                     )}
 
@@ -549,21 +551,23 @@ export const MessageList = React.memo(function MessageList({
               }}
             >
               {!isOwn && (
-                <Avatar className="h-8 w-8 shrink-0">
-                  <AvatarImage src={message.sender?.avatar_url || undefined} />
-                  <AvatarFallback className={getAvatarColor(message.sender_id)}>
-                    {message.sender?.username?.[0]?.toUpperCase() || "؟"}
-                  </AvatarFallback>
-                </Avatar>
+                <Link href={`/chat/profile/${message.sender_id}`} className="shrink-0">
+                  <Avatar className="h-8 w-8 shrink-0 cursor-pointer hover:opacity-80 transition-opacity">
+                    <AvatarImage src={message.sender?.avatar_url || undefined} />
+                    <AvatarFallback className={getAvatarColor(message.sender_id)}>
+                      {message.sender?.username?.[0]?.toUpperCase() || "؟"}
+                    </AvatarFallback>
+                  </Avatar>
+                </Link>
               )}
 
               <div className={cn("max-w-[75%] space-y-1", isOwn ? "items-end" : "items-start")}>
-                {!isOwn && message.sender?.username && (
+                {!isOwn && (message.sender?.display_name || message.sender?.username) && (
                   <Link
                     href={`/chat/profile/${message.sender_id}`}
-                    className="text-xs text-muted-foreground px-2 hover:underline hover:text-primary transition-colors"
+                    className="text-xs font-medium text-foreground px-2 hover:underline hover:text-primary transition-colors"
                   >
-                    {message.sender.username}
+                    {message.sender?.display_name || message.sender?.username}
                   </Link>
                 )}
 
