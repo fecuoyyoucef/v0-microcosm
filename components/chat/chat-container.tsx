@@ -278,6 +278,9 @@ export function ChatContainer({
           }
 
           if (newMsg.sender_id === currentUserId) {
+            // Get sender profile for the message
+            const senderProfile = members.find((m) => m.user_id === currentUserId)?.profile
+
             setMessages((prev) => {
               const hasTempMessage = prev.some((m) => m.id.startsWith("temp-") && m.sender_id === currentUserId)
               if (hasTempMessage) {
@@ -285,7 +288,11 @@ export function ChatContainer({
                 return prev.map((m) => {
                   if (!replaced && m.id.startsWith("temp-") && m.sender_id === currentUserId) {
                     replaced = true
-                    return { ...newMsg, sender: m.sender, reply_to_message: replyToMessage } as Message
+                    return {
+                      ...newMsg,
+                      sender: senderProfile || m.sender,
+                      reply_to_message: replyToMessage,
+                    } as Message
                   }
                   return m
                 })
