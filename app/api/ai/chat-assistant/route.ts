@@ -1,4 +1,4 @@
-import { createServiceClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { generateAIText } from "@/lib/ai"
 
 export async function POST(req: Request) {
@@ -11,7 +11,7 @@ export async function POST(req: Request) {
       return Response.json({ error: "رسائل غير صالحة" }, { status: 400 })
     }
 
-    const supabase = createServiceClient()
+    const supabase = await createClient()
 
     // التحقق من المستخدم
     const {
@@ -23,18 +23,20 @@ export async function POST(req: Request) {
       return Response.json({ error: "غير مصرح" }, { status: 401 })
     }
 
+    const serviceSupabase = createServiceClient()
+
     // 1. معلومات المستخدم الشاملة
-    const { data: profile } = await supabase
+    const { data: profile } = await serviceSupabase
       .from("profiles")
       .select("display_name, username, bio, total_points, responsibility_score")
       .eq("id", user.id)
       .single()
 
     // 2. إحصائيات نشاط المستخدم
-    const { data: userStats } = await supabase.from("user_stats").select("*").eq("user_id", user.id).single()
+    const { data: userStats } = await serviceSupabase.from("user_stats").select("*").eq("user_id", user.id).single()
 
     // 3. الخلايا المنضمة
-    const { data: userGroups } = await supabase
+    const { data: userGroups } = await serviceSupabase
       .from("group_members")
       .select(`
         role,
@@ -50,7 +52,7 @@ export async function POST(req: Request) {
       .eq("user_id", user.id)
 
     // 4. آخر 10 رسائل من المستخدم
-    const { data: recentMessages } = await supabase
+    const { data: recentMessages } = await serviceSupabase
       .from("messages")
       .select(`
         content,
@@ -64,7 +66,7 @@ export async function POST(req: Request) {
 
     // 5. آخر 5 قرارات من الخلايا المنضمة
     const groupIds = userGroups?.map((gm) => (gm.groups as any)?.id).filter(Boolean) || []
-    const { data: recentDecisions } = await supabase
+    const { data: recentDecisions } = await serviceSupabase
       .from("decisions")
       .select(`
         title,
@@ -79,7 +81,7 @@ export async function POST(req: Request) {
       .limit(5)
 
     // 6. آخر 5 عقد من الخلايا المنضمة
-    const { data: recentNodes } = await supabase
+    const { data: recentNodes } = await serviceSupabase
       .from("conversation_nodes")
       .select(`
         title,
@@ -93,7 +95,7 @@ export async function POST(req: Request) {
       .limit(5)
 
     // 7. الإنجازات والألقاب
-    const { data: userTitles } = await supabase
+    const { data: userTitles } = await serviceSupabase
       .from("user_titles")
       .select(`
         earned_at,
@@ -108,7 +110,7 @@ export async function POST(req: Request) {
       .eq("is_visible", true)
 
     // 8. آخر 3 ملخصات يومية
-    const { data: recentSummaries } = await supabase
+    const { data: recentSummaries } = await serviceSupabase
       .from("daily_summaries")
       .select(`
         summary_date,
@@ -122,7 +124,7 @@ export async function POST(req: Request) {
       .limit(3)
 
     // 9. المهام النشطة
-    const { data: activeTasks } = await supabase
+    const { data: activeTasks } = await serviceSupabase
       .from("extracted_tasks")
       .select(`
         task_content,
@@ -136,7 +138,7 @@ export async function POST(req: Request) {
       .limit(5)
 
     // 10. آخر الإشعارات غير المقروءة
-    const { data: unreadNotifications } = await supabase
+    const { data: unreadNotifications } = await serviceSupabase
       .from("notifications")
       .select("title, body, type, created_at")
       .eq("user_id", user.id)
