@@ -96,6 +96,26 @@ export function SupportAgentChat() {
     window.location.href = "/chat/support/report"
   }
 
+  useEffect(() => {
+    const script = document.createElement("script")
+    script.src = "https://www.chatbase.co/embed.min.js"
+    script.async = true
+    script.setAttribute("chatbotId", process.env.NEXT_PUBLIC_CHATBOT_ID || "")
+    script.setAttribute("domain", process.env.NEXT_PUBLIC_CHATBASE_HOST || "www.chatbase.co")
+
+    const container = document.getElementById("chatbase-widget-container")
+    if (container) {
+      container.appendChild(script)
+    }
+
+    return () => {
+      // Cleanup script if component unmounts
+      if (container && script.parentElement === container) {
+        container.removeChild(script)
+      }
+    }
+  }, [])
+
   return (
     <div className="flex flex-col h-full bg-background">
       <ScrollArea ref={scrollRef} className="flex-1 p-4">
@@ -146,6 +166,8 @@ export function SupportAgentChat() {
           الإبلاغ عن مشكلة تقنية
         </Button>
       </div>
+
+      <div id="chatbase-widget-container" className="w-full h-full" />
     </div>
   )
 }

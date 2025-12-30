@@ -14,11 +14,19 @@ export async function POST(request: NextRequest) {
 
     const { message, conversationId, history } = await request.json()
 
+    const chatbaseApiKey = process.env.CHATBASE_API_KEY
+
+    if (!chatbaseApiKey) {
+      console.error("CHATBASE_API_KEY is not set in environment variables")
+      return NextResponse.json({ error: "Chatbase API key not configured" }, { status: 500 })
+    }
+
     const chatbaseResponse = await fetch(
       `${process.env.NEXT_PUBLIC_CHATBASE_HOST || "https://www.chatbase.co"}/api/v1/chat`,
       {
         method: "POST",
         headers: {
+          Authorization: `Bearer ${chatbaseApiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -39,11 +47,18 @@ export async function POST(request: NextRequest) {
     )
 
     if (!chatbaseResponse.ok) {
-      throw new Error(`Chatbase API error: ${chatbaseResponse.statusText}`)
+      const errorText = await chatbaseResponse.text()
+      console.error(`Chatbase API error (${chatbaseResponse.status}):`, errorText)
+      throw new Error(`Chatbase API error: ${chatbaseResponse.statusText} - ${errorText}`)
     }
 
     const chatbaseData = await chatbaseResponse.json()
     const text = chatbaseData.text || chatbaseData.response || chatbaseData.message
+
+    if (!text) {
+      console.error("No response text from Chatbase:", chatbaseData)
+      throw new Error("No response from Chatbase")
+    }
 
     let savedConversationId = conversationId
 
