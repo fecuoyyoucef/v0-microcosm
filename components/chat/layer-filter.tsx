@@ -3,13 +3,13 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import {
   SparklesIcon,
-  MapIcon,
+  MapPinIcon,
   BookOpenIcon,
-  BrainIcon,
+  LightBulbIcon,
   CheckCircleIcon,
-  GitBranchIcon,
+  CodeBracketIcon,
   MagnifyingGlassIcon,
-  BarChartIcon,
+  ChartBarIcon,
   ArchiveBoxIcon,
   DocumentTextIcon,
   ArrowTrendingUpIcon,
@@ -156,7 +156,7 @@ export function LayerFilter({
                   size="sm"
                   className="h-8 text-xs gap-1.5 rounded-full hover:bg-violet-500/10"
                 >
-                  <GitBranchIcon className="w-3.5 h-3.5 text-violet-600" />
+                  <CodeBracketIcon className="w-3.5 h-3.5 text-violet-600" />
                   العقد
                 </Button>
               </SheetTrigger>
@@ -180,7 +180,7 @@ export function LayerFilter({
 
             <Link href={`/chat/${groupId}/map`}>
               <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-cyan-500/10">
-                <MapIcon className="w-3.5 h-3.5 text-cyan-600" />
+                <MapPinIcon className="w-3.5 h-3.5 text-cyan-600" />
                 الخريطة
               </Button>
             </Link>
@@ -194,7 +194,7 @@ export function LayerFilter({
 
             <Link href={`/chat/${groupId}/memory`}>
               <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-purple-500/10">
-                <BrainIcon className="w-3.5 h-3.5 text-purple-600" />
+                <LightBulbIcon className="w-3.5 h-3.5 text-purple-600" />
                 الذاكرة
               </Button>
             </Link>
@@ -229,7 +229,7 @@ export function LayerFilter({
 
             <Link href={`/chat/${groupId}/analytics`}>
               <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-pink-500/10">
-                <BarChartIcon className="w-3.5 h-3.5 text-pink-600" />
+                <ChartBarIcon className="w-3.5 h-3.5 text-pink-600" />
                 التحليلات
               </Button>
             </Link>
