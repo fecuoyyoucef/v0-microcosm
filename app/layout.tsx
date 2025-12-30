@@ -88,7 +88,12 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="ar" dir="rtl" suppressHydrationWarning>
+    <html
+      lang="ar"
+      dir="rtl"
+      suppressHydrationWarning
+      className={`${inter.variable} ${poppins.variable} ${ibmPlexArabic.variable} ${geistMono.variable}`}
+    >
       <head>
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -98,9 +103,7 @@ export default function RootLayout({
         <meta name="msapplication-TileColor" content="#1a1a2e" />
         <meta name="msapplication-tap-highlight" content="no" />
       </head>
-      <body
-        className={`${inter.variable} ${poppins.variable} ${ibmPlexArabic.variable} ${geistMono.variable} font-sans antialiased`}
-      >
+      <body className="font-sans antialiased">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <SettingsProvider>
             <FeaturesProvider>

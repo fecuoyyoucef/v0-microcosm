@@ -24,26 +24,19 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  Home,
-  Plus,
-  Settings,
-  Bell,
-  Search,
-  Sparkles,
-  User,
-  LogOut,
-  Moon,
-  Sun,
-  Hash,
-  Users,
-  Trophy,
-  HelpCircle,
-  Shield,
-  ChevronUp,
-  ChevronDown,
-  Link2,
-  Loader2,
-} from "lucide-react"
+  HomeIcon,
+  PlusIcon,
+  Cog6ToothIcon as SettingsIcon,
+  BellIcon,
+  MagnifyingGlassIcon as SearchIcon,
+  SparklesIcon,
+  XMarkIcon as XIcon,
+  ArrowRightStartOnRectangleIcon as LogOutIcon,
+  QuestionMarkCircleIcon as HelpCircleIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
+  LinkIcon as Link2Icon,
+} from "@heroicons/react/24/outline"
 import type { Group, Profile } from "@/lib/types"
 import { useTheme } from "next-themes"
 import { useSettings } from "@/components/settings-provider"
@@ -286,7 +279,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
           <Avatar className="w-10 h-10">
             <AvatarImage src={profile?.avatar_url || undefined} />
             <AvatarFallback className="bg-primary/10 text-primary">
-              {profile?.display_name?.charAt(0) || <User className="w-4 h-4" />}
+              {profile?.display_name?.charAt(0) || <XIcon className="w-4 h-4" />}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
@@ -299,7 +292,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
             className="h-8 w-8"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           >
-            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {theme === "dark" ? <XIcon className="h-4 w-4" /> : <XIcon className="h-4 w-4" />}
           </Button>
         </div>
       </div>
@@ -314,14 +307,14 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
 
           <Link href="/chat" onClick={() => isMobile && setMobileMenuOpen(false)}>
             <Button variant={pathname === "/chat" ? "secondary" : "ghost"} className="w-full justify-start gap-3 h-10">
-              <Home className="w-4 h-4" />
+              <HomeIcon className="w-4 h-4" />
               {t.home}
             </Button>
           </Link>
 
           <Link href="/chat/notifications" onClick={() => isMobile && setMobileMenuOpen(false)}>
             <Button variant="ghost" className="w-full justify-start gap-3 h-10 relative">
-              <Bell className="w-4 h-4" />
+              <BellIcon className="w-4 h-4" />
               {t.notifications}
               {unreadNotifications > 0 && (
                 <Badge className="mr-auto h-5 px-1.5 bg-destructive text-destructive-foreground">
@@ -333,14 +326,14 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
 
           <Link href="/chat/assistant" onClick={() => isMobile && setMobileMenuOpen(false)}>
             <Button variant="ghost" className="w-full justify-start gap-3 h-10">
-              <Sparkles className="w-4 h-4 text-amber-500" />
+              <SparklesIcon className="w-4 h-4 text-amber-500" />
               {t.assistant}
             </Button>
           </Link>
 
           <Link href="/chat/profile" onClick={() => isMobile && setMobileMenuOpen(false)}>
             <Button variant="ghost" className="w-full justify-start gap-3 h-10">
-              <Trophy className="w-4 h-4 text-yellow-500" />
+              <XIcon className="w-4 h-4 text-yellow-500" />
               {t.achievements}
             </Button>
           </Link>
@@ -351,7 +344,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
             onClick={() => setCellsExpanded(!cellsExpanded)}
           >
             <div className="flex items-center gap-1">
-              {cellsExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
+              {cellsExpanded ? <ChevronDownIcon className="w-3 h-3" /> : <ChevronUpIcon className="w-3 h-3" />}
               {t.cells}
             </div>
             <Button
@@ -364,7 +357,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
                 isMobile && setMobileMenuOpen(false)
               }}
             >
-              <Plus className="w-3 h-3" />
+              <PlusIcon className="w-3 h-3" />
             </Button>
           </div>
 
@@ -399,7 +392,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
 
               {groups.length === 0 && (
                 <div className="px-3 py-6 text-center">
-                  <Users className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                  <XIcon className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
                   <p className="text-sm text-muted-foreground">لا توجد خلايا</p>
                   <Button
                     variant="outline"
@@ -407,7 +400,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
                     className="mt-2 bg-transparent"
                     onClick={() => router.push("/chat?new=true")}
                   >
-                    <Plus className="w-3 h-3 ml-1" />
+                    <PlusIcon className="w-3 h-3 ml-1" />
                     {t.newCell}
                   </Button>
                 </div>
@@ -421,7 +414,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
             variant="ghost"
             className="w-full justify-start gap-3 h-10 mt-1 text-muted-foreground hover:text-foreground"
           >
-            <Link2 className="w-5 h-5" />
+            <Link2Icon className="w-5 h-5" />
             <span className="truncate flex-1 text-right text-sm">{t.joinByInvite}</span>
           </Button>
         </div>
@@ -432,7 +425,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
         {isAdmin && (
           <Link href="/admin" onClick={() => isMobile && setMobileMenuOpen(false)}>
             <Button variant="ghost" className="w-full justify-start gap-3 h-10 text-cyan-500">
-              <Shield className="w-4 h-4" />
+              <XIcon className="w-4 h-4" />
               {t.admin}
             </Button>
           </Link>
@@ -440,14 +433,14 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
 
         <Link href="/chat/settings" onClick={() => isMobile && setMobileMenuOpen(false)}>
           <Button variant="ghost" className="w-full justify-start gap-3 h-10">
-            <Settings className="w-4 h-4" />
+            <SettingsIcon className="w-4 h-4" />
             {t.settings}
           </Button>
         </Link>
 
         <Link href="/chat/about" onClick={() => isMobile && setMobileMenuOpen(false)}>
           <Button variant="ghost" className="w-full justify-start gap-3 h-10">
-            <HelpCircle className="w-4 h-4" />
+            <HelpCircleIcon className="w-4 h-4" />
             {t.help}
           </Button>
         </Link>
@@ -457,7 +450,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
           className="w-full justify-start gap-3 h-10 text-destructive hover:text-destructive"
           onClick={handleSignOut}
         >
-          <LogOut className="w-4 h-4" />
+          <LogOutIcon className="w-4 h-4" />
           {t.signOut}
         </Button>
       </div>
@@ -528,9 +521,9 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
               aria-label={isBottomNavCollapsed ? "إظهار الشريط السفلي" : "إخفاء الشريط السفلي"}
             >
               {isBottomNavCollapsed ? (
-                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                <ChevronUpIcon className="w-4 h-4 text-muted-foreground" />
               ) : (
-                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                <ChevronDownIcon className="w-4 h-4 text-muted-foreground" />
               )}
             </button>
 
@@ -539,21 +532,32 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className={cn("h-12 w-12 rounded-xl", pathname === "/chat" && "bg-primary/10 text-primary")}
+                  className={cn(
+                    "h-12 w-12 rounded-xl transition-all hover:scale-105",
+                    pathname === "/chat" && "bg-primary/10 text-primary",
+                  )}
                 >
-                  <Home className="w-5 h-5" />
+                  <HomeIcon className="w-5 h-5" />
                 </Button>
               </Link>
 
-              <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl" onClick={() => setCommandOpen(true)}>
-                <Search className="w-5 h-5" />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-12 w-12 rounded-xl transition-all hover:scale-105"
+                onClick={() => setCommandOpen(true)}
+              >
+                <SearchIcon className="w-5 h-5" />
               </Button>
 
               <Link href="/chat/notifications">
-                <Button size="icon" className="h-14 w-14 rounded-xl bg-primary text-primary-foreground relative">
-                  <Bell className="w-6 h-6" />
+                <Button
+                  size="icon"
+                  className="h-14 w-14 rounded-xl bg-primary text-primary-foreground relative transition-all hover:scale-105 hover:shadow-lg"
+                >
+                  <BellIcon className="w-6 h-6" />
                   {unreadNotifications > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground text-[10px] rounded-full flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground text-[10px] rounded-full flex items-center justify-center animate-pulse">
                       {unreadNotifications > 9 ? "9+" : unreadNotifications}
                     </span>
                   )}
@@ -561,8 +565,8 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
               </Link>
 
               <Link href="/chat/assistant">
-                <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl">
-                  <Sparkles className="w-5 h-5 text-amber-500" />
+                <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl transition-all hover:scale-105">
+                  <SparklesIcon className="w-5 h-5 text-amber-500" />
                 </Button>
               </Link>
 
@@ -571,7 +575,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
                   <Avatar className="w-10 h-10 cursor-pointer">
                     <AvatarImage src={profile?.avatar_url || undefined} />
                     <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                      {profile?.display_name?.charAt(0) || <User className="w-4 h-4" />}
+                      {profile?.display_name?.charAt(0) || <XIcon className="w-4 h-4" />}
                     </AvatarFallback>
                   </Avatar>
                 </SheetTrigger>
@@ -595,7 +599,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
                   setCommandOpen(false)
                 }}
               >
-                <Home className="ml-2 h-4 w-4" />
+                <HomeIcon className="ml-2 h-4 w-4" />
                 {t.home}
               </CommandItem>
               <CommandItem
@@ -604,7 +608,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
                   setCommandOpen(false)
                 }}
               >
-                <Bell className="ml-2 h-4 w-4" />
+                <BellIcon className="ml-2 h-4 w-4" />
                 {t.notifications}
               </CommandItem>
               <CommandItem
@@ -613,7 +617,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
                   setCommandOpen(false)
                 }}
               >
-                <Sparkles className="ml-2 h-4 w-4" />
+                <SparklesIcon className="ml-2 h-4 w-4" />
                 {t.assistant}
               </CommandItem>
               <CommandItem
@@ -622,7 +626,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
                   setCommandOpen(false)
                 }}
               >
-                <Settings className="ml-2 h-4 w-4" />
+                <SettingsIcon className="ml-2 h-4 w-4" />
                 {t.settings}
               </CommandItem>
               {isAdmin && (
@@ -632,7 +636,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
                     setCommandOpen(false)
                   }}
                 >
-                  <Shield className="ml-2 h-4 w-4" />
+                  <XIcon className="ml-2 h-4 w-4" />
                   {t.admin}
                 </CommandItem>
               )}
@@ -646,7 +650,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
                     setCommandOpen(false)
                   }}
                 >
-                  <Hash className="ml-2 h-4 w-4" />
+                  <XIcon className="ml-2 h-4 w-4" />
                   {group.name}
                 </CommandItem>
               ))}
@@ -658,11 +662,11 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
                   setCommandOpen(false)
                 }}
               >
-                <Plus className="ml-2 h-4 w-4" />
+                <PlusIcon className="ml-2 h-4 w-4" />
                 {t.newCell}
               </CommandItem>
               <CommandItem onSelect={() => setTheme(theme === "dark" ? "light" : "dark")}>
-                {theme === "dark" ? <Sun className="ml-2 h-4 w-4" /> : <Moon className="ml-2 h-4 w-4" />}
+                {theme === "dark" ? <XIcon className="ml-2 h-4 w-4" /> : <XIcon className="ml-2 h-4 w-4" />}
                 {theme === "dark" ? t.lightMode : t.darkMode}
               </CommandItem>
             </CommandGroup>
@@ -709,7 +713,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
               >
                 {isJoining ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                    <XIcon className="w-4 h-4 animate-spin ml-2" />
                     {t.joining}
                   </>
                 ) : (

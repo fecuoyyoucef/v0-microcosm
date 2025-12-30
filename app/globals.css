@@ -155,8 +155,8 @@ body {
 
 /* Updated font configuration for Inter + Poppins */
 @theme inline {
-  --font-sans: "Inter", "IBM Plex Sans Arabic", system-ui, sans-serif;
-  --font-heading: "Poppins", "IBM Plex Sans Arabic", system-ui, sans-serif;
+  --font-sans: "Inter", var(--font-inter), "IBM Plex Sans Arabic", system-ui, sans-serif;
+  --font-heading: "Poppins", var(--font-poppins), "IBM Plex Sans Arabic", system-ui, sans-serif;
   --font-mono: "Geist Mono", "Geist Mono Fallback", monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -210,6 +210,7 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans);
   }
 
   /* Apply heading font to all headings */
@@ -220,6 +221,12 @@ body {
   h5,
   h6 {
     font-family: var(--font-heading);
+    font-weight: 600;
+  }
+
+  /* Ensure buttons use sans font */
+  button {
+    font-family: var(--font-sans);
   }
 }
 

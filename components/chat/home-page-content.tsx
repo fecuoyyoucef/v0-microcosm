@@ -22,7 +22,14 @@ import {
 import { SmartRecommendations } from "@/components/groups/smart-recommendations"
 import { SuggestedCells } from "@/components/groups/suggested-cells"
 import { CellSurveyDialog } from "@/components/groups/cell-survey-dialog"
-import { Plus, Users, Search, Loader2, MessageCircle, Link2 } from "lucide-react"
+import {
+  PlusIcon,
+  UsersIcon,
+  MagnifyingGlassIcon as Search,
+  ArrowPathIcon as Loader2,
+  ChatBubbleLeftIcon as MessageCircle,
+  LinkIcon as Link2,
+} from "@heroicons/react/24/outline"
 import type { Group, Profile } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { useSettings } from "@/components/settings-provider"
@@ -414,7 +421,7 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
               </DialogContent>
             </Dialog>
             <Button onClick={() => setIsCreateDialogOpen(true)} size="icon" className="rounded-full h-10 w-10">
-              <Plus className="w-5 h-5" />
+              <PlusIcon className="w-5 h-5" />
             </Button>
           </div>
         </div>
@@ -441,7 +448,7 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
             >
               <CardContent className="p-4 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <Plus className="w-5 h-5 text-primary" />
+                  <PlusIcon className="w-5 h-5 text-primary" />
                 </div>
                 <span className="font-medium">{t.newCell}</span>
               </CardContent>
@@ -467,13 +474,13 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
           {filteredGroups.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center mb-4">
-                <Users className="w-10 h-10 text-muted-foreground" />
+                <UsersIcon className="w-10 h-10 text-muted-foreground" />
               </div>
               <h2 className="text-lg font-semibold mb-2">{searchQuery ? t.noResults : t.noCells}</h2>
               <p className="text-sm text-muted-foreground mb-6 max-w-xs">{!searchQuery && t.createFirst}</p>
               {!searchQuery && (
                 <Button onClick={() => setIsCreateDialogOpen(true)} className="gap-2 rounded-xl">
-                  <Plus className="w-4 h-4" />
+                  <PlusIcon className="w-4 h-4" />
                   {t.createCell}
                 </Button>
               )}
