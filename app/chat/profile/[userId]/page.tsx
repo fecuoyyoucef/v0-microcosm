@@ -2,7 +2,9 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect, notFound } from "next/navigation"
 import { ExpandedProfile } from "@/components/profile/expanded-profile"
 
-export default async function UserProfilePage({ params }: { params: { userId: string } }) {
+export default async function UserProfilePage({ params }: { params: Promise<{ userId: string }> }) {
+  const { userId } = await params
+
   const supabase = await createClient()
   const {
     data: { user },
@@ -13,7 +15,7 @@ export default async function UserProfilePage({ params }: { params: { userId: st
   }
 
   // التحقق من وجود المستخدم
-  const { data: targetUser } = await supabase.from("profiles").select("id").eq("id", params.userId).single()
+  const { data: targetUser } = await supabase.from("profiles").select("id").eq("id", userId).single()
 
   if (!targetUser) {
     notFound()
@@ -21,7 +23,7 @@ export default async function UserProfilePage({ params }: { params: { userId: st
 
   return (
     <div className="flex-1 overflow-auto">
-      <ExpandedProfile userId={params.userId} viewerId={user.id} />
+      <ExpandedProfile userId={userId} viewerId={user.id} />
     </div>
   )
 }
