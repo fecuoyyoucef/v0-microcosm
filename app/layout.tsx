@@ -1,6 +1,6 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
-import { IBM_Plex_Sans_Arabic, Geist_Mono } from "next/font/google"
+import { IBM_Plex_Sans_Arabic, Geist_Mono, Inter, Poppins } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/theme-provider"
 import { SettingsProvider } from "@/components/settings-provider"
@@ -8,15 +8,30 @@ import { FeaturesProvider } from "@/components/features/features-provider"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import "./globals.css"
 
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+})
+
+const poppins = Poppins({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-poppins",
+  display: "swap",
+})
+
 const ibmPlexArabic = IBM_Plex_Sans_Arabic({
   subsets: ["arabic", "latin"],
   weight: ["400", "500", "600", "700"],
-  variable: "--font-sans",
+  variable: "--font-arabic",
+  display: "swap",
 })
 
 const geistMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
+  display: "swap",
 })
 
 export const metadata: Metadata = {
@@ -83,7 +98,9 @@ export default function RootLayout({
         <meta name="msapplication-TileColor" content="#1a1a2e" />
         <meta name="msapplication-tap-highlight" content="no" />
       </head>
-      <body className={`${ibmPlexArabic.variable} ${geistMono.variable} font-sans antialiased`}>
+      <body
+        className={`${inter.variable} ${poppins.variable} ${ibmPlexArabic.variable} ${geistMono.variable} font-sans antialiased`}
+      >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <SettingsProvider>
             <FeaturesProvider>

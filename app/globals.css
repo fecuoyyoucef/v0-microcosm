@@ -15,93 +15,148 @@ body {
   min-height: 100dvh;
 }
 
-/* Updated version marker for deployment */
-/* Last rebuild: 2025-12-15T13:54:00Z - API fixes for support and sentry */
+/* Enhanced color system with better primary, accent, and neutrals */
 :root {
-  --background: oklch(0.98 0.005 270);
-  --foreground: oklch(0.2 0.02 270);
+  /* Primary - Deep Indigo Blue */
+  --background: oklch(0.985 0.002 265);
+  --foreground: oklch(0.145 0.025 265);
+
+  /* Cards & Surfaces */
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0.02 270);
+  --card-foreground: oklch(0.145 0.025 265);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.02 270);
-  --primary: oklch(0.55 0.2 250);
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.94 0.01 270);
-  --secondary-foreground: oklch(0.3 0.02 270);
-  --muted: oklch(0.94 0.01 270);
-  --muted-foreground: oklch(0.5 0.02 270);
-  --accent: oklch(0.55 0.2 250);
-  --accent-foreground: oklch(0.98 0 0);
-  --destructive: oklch(0.55 0.22 25);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.9 0.01 270);
-  --input: oklch(0.9 0.01 270);
-  --ring: oklch(0.55 0.2 250);
+  --popover-foreground: oklch(0.145 0.025 265);
+
+  /* Primary Brand Color - Vibrant Indigo */
+  --primary: oklch(0.52 0.24 265);
+  --primary-foreground: oklch(0.99 0 0);
+
+  /* Secondary - Soft Gray */
+  --secondary: oklch(0.965 0.005 265);
+  --secondary-foreground: oklch(0.25 0.02 265);
+
+  /* Muted - Subtle Gray */
+  --muted: oklch(0.96 0.005 265);
+  --muted-foreground: oklch(0.48 0.015 265);
+
+  /* Accent - Warm Amber for interactions */
+  --accent: oklch(0.75 0.18 65);
+  --accent-foreground: oklch(0.18 0.04 65);
+
+  /* Destructive - Clean Red */
+  --destructive: oklch(0.58 0.22 25);
+  --destructive-foreground: oklch(0.99 0 0);
+
+  /* Success - Fresh Green */
+  --success: oklch(0.65 0.2 145);
+  --success-foreground: oklch(0.99 0 0);
+
+  /* Warning - Bright Amber */
+  --warning: oklch(0.8 0.18 80);
+  --warning-foreground: oklch(0.25 0.05 80);
+
+  /* Borders & Inputs */
+  --border: oklch(0.92 0.005 265);
+  --input: oklch(0.92 0.005 265);
+  --ring: oklch(0.52 0.24 265);
 
   /* Layer colors for temporal threads */
-  --upper-layer: oklch(0.7 0.18 55);
-  --standard-layer: oklch(0.55 0.2 250);
-  --shadow-layer: oklch(0.6 0.02 270);
+  --upper-layer: oklch(0.72 0.17 55);
+  --standard-layer: oklch(0.52 0.24 265);
+  --shadow-layer: oklch(0.58 0.02 265);
 
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --radius: 0.75rem;
-  --sidebar: oklch(0.98 0.005 270);
-  --sidebar-foreground: oklch(0.2 0.02 270);
-  --sidebar-primary: oklch(0.55 0.2 250);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.94 0.01 270);
-  --sidebar-accent-foreground: oklch(0.3 0.02 270);
-  --sidebar-border: oklch(0.9 0.01 270);
-  --sidebar-ring: oklch(0.55 0.2 250);
+  /* Chart colors */
+  --chart-1: oklch(0.65 0.22 41);
+  --chart-2: oklch(0.62 0.12 185);
+  --chart-3: oklch(0.4 0.07 227);
+  --chart-4: oklch(0.83 0.19 84);
+  --chart-5: oklch(0.77 0.19 70);
+
+  --radius: 0.625rem;
+
+  /* Sidebar */
+  --sidebar: oklch(0.985 0.002 265);
+  --sidebar-foreground: oklch(0.145 0.025 265);
+  --sidebar-primary: oklch(0.52 0.24 265);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.965 0.005 265);
+  --sidebar-accent-foreground: oklch(0.25 0.02 265);
+  --sidebar-border: oklch(0.92 0.005 265);
+  --sidebar-ring: oklch(0.52 0.24 265);
 }
 
+/* Enhanced dark mode colors */
 .dark {
-  --background: oklch(0.12 0.015 270);
-  --foreground: oklch(0.95 0.01 270);
-  --card: oklch(0.15 0.015 270);
-  --card-foreground: oklch(0.95 0.01 270);
-  --popover: oklch(0.15 0.015 270);
-  --popover-foreground: oklch(0.95 0.01 270);
-  --primary: oklch(0.65 0.2 250);
-  --primary-foreground: oklch(0.15 0 0);
-  --secondary: oklch(0.22 0.015 270);
-  --secondary-foreground: oklch(0.95 0.01 270);
-  --muted: oklch(0.22 0.015 270);
-  --muted-foreground: oklch(0.65 0.02 270);
-  --accent: oklch(0.65 0.2 250);
-  --accent-foreground: oklch(0.15 0 0);
-  --destructive: oklch(0.55 0.22 25);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.25 0.015 270);
-  --input: oklch(0.25 0.015 270);
-  --ring: oklch(0.65 0.2 250);
+  /* Background - Deep Navy */
+  --background: oklch(0.13 0.02 265);
+  --foreground: oklch(0.96 0.008 265);
+
+  /* Cards & Surfaces */
+  --card: oklch(0.16 0.02 265);
+  --card-foreground: oklch(0.96 0.008 265);
+  --popover: oklch(0.16 0.02 265);
+  --popover-foreground: oklch(0.96 0.008 265);
+
+  /* Primary - Bright Indigo */
+  --primary: oklch(0.68 0.22 265);
+  --primary-foreground: oklch(0.12 0 0);
+
+  /* Secondary */
+  --secondary: oklch(0.2 0.02 265);
+  --secondary-foreground: oklch(0.96 0.008 265);
+
+  /* Muted */
+  --muted: oklch(0.2 0.02 265);
+  --muted-foreground: oklch(0.68 0.015 265);
+
+  /* Accent - Warm Amber */
+  --accent: oklch(0.78 0.16 65);
+  --accent-foreground: oklch(0.15 0.04 65);
+
+  /* Destructive */
+  --destructive: oklch(0.58 0.22 25);
+  --destructive-foreground: oklch(0.99 0 0);
+
+  /* Success */
+  --success: oklch(0.68 0.18 145);
+  --success-foreground: oklch(0.12 0 0);
+
+  /* Warning */
+  --warning: oklch(0.78 0.16 80);
+  --warning-foreground: oklch(0.2 0.05 80);
+
+  /* Borders & Inputs */
+  --border: oklch(0.24 0.02 265);
+  --input: oklch(0.24 0.02 265);
+  --ring: oklch(0.68 0.22 265);
 
   /* Layer colors for dark mode */
-  --upper-layer: oklch(0.75 0.18 55);
-  --standard-layer: oklch(0.65 0.2 250);
-  --shadow-layer: oklch(0.55 0.02 270);
+  --upper-layer: oklch(0.76 0.17 55);
+  --standard-layer: oklch(0.68 0.22 265);
+  --shadow-layer: oklch(0.56 0.02 265);
 
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.15 0.015 270);
-  --sidebar-foreground: oklch(0.95 0.01 270);
-  --sidebar-primary: oklch(0.65 0.2 250);
-  --sidebar-primary-foreground: oklch(0.15 0 0);
-  --sidebar-accent: oklch(0.22 0.015 270);
-  --sidebar-accent-foreground: oklch(0.95 0.01 270);
-  --sidebar-border: oklch(0.25 0.015 270);
-  --sidebar-ring: oklch(0.65 0.2 250);
+  /* Chart colors */
+  --chart-1: oklch(0.5 0.24 264);
+  --chart-2: oklch(0.7 0.17 162);
+  --chart-3: oklch(0.77 0.19 70);
+  --chart-4: oklch(0.63 0.27 304);
+  --chart-5: oklch(0.65 0.25 16);
+
+  /* Sidebar */
+  --sidebar: oklch(0.16 0.02 265);
+  --sidebar-foreground: oklch(0.96 0.008 265);
+  --sidebar-primary: oklch(0.68 0.22 265);
+  --sidebar-primary-foreground: oklch(0.12 0 0);
+  --sidebar-accent: oklch(0.2 0.02 265);
+  --sidebar-accent-foreground: oklch(0.96 0.008 265);
+  --sidebar-border: oklch(0.24 0.02 265);
+  --sidebar-ring: oklch(0.68 0.22 265);
 }
 
+/* Updated font configuration for Inter + Poppins */
 @theme inline {
-  --font-sans: "IBM Plex Sans Arabic", "Geist", "Geist Fallback", sans-serif;
+  --font-sans: "Inter", "IBM Plex Sans Arabic", system-ui, sans-serif;
+  --font-heading: "Poppins", "IBM Plex Sans Arabic", system-ui, sans-serif;
   --font-mono: "Geist Mono", "Geist Mono Fallback", monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -119,6 +174,10 @@ body {
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -152,6 +211,16 @@ body {
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Apply heading font to all headings */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-heading);
+  }
 }
 
 /* Add custom scrollbar hiding utility */
@@ -163,11 +232,11 @@ body {
   display: none;
 }
 
-/* Add smooth animations for messages */
+/* Enhanced animations and transitions */
 @keyframes slideInFromBottom {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -175,8 +244,66 @@ body {
   }
 }
 
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
 .animate-slide-in {
   animation: slideInFromBottom 0.3s ease-out;
+}
+
+.animate-slide-in-rtl {
+  animation: slideInFromRight 0.3s ease-out;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, var(--muted) 25%, var(--secondary) 50%, var(--muted) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
 }
 
 /* Added slow pulse animation for backgrounds */
@@ -225,4 +352,51 @@ body {
   100% {
     background-color: transparent;
   }
+}
+
+/* Enhanced hover and focus states */
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.hover-glow {
+  transition: box-shadow 0.2s ease;
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+/* Smooth transitions for interactive elements */
+button,
+a,
+[role="button"] {
+  transition: all 0.2s ease;
+}
+
+/* Enhanced card styles */
+.card-interactive {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.card-interactive:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border-color: var(--primary);
+}
+
+/* Glass effect for modern look */
+.glass {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.dark .glass {
+  background: rgba(22, 22, 35, 0.8);
 }
