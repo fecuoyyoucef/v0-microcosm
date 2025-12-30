@@ -2,21 +2,18 @@
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import {
-  Layers,
-  Map,
-  BookOpen,
-  Brain,
-  Vote,
-  GitBranch,
-  Search,
-  BarChart,
-  Sparkles,
-  FileText,
-  TrendingUp,
-  Archive,
-  ChevronUp,
-  ChevronDown,
-} from "lucide-react"
+  SparklesIcon,
+  MapIcon,
+  BookOpenIcon,
+  BrainIcon,
+  CheckCircleIcon,
+  GitBranchIcon,
+  MagnifyingGlassIcon,
+  BarChartIcon,
+  ArchiveBoxIcon,
+  DocumentTextIcon,
+  ArrowTrendingUpIcon,
+} from "@heroicons/react/24/solid"
 import type { MessageLayer, ConversationNode } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
@@ -83,9 +80,9 @@ export function LayerFilter({
           className="h-6 w-6 p-0 hover:bg-secondary transition-all duration-200"
         >
           {isCollapsed ? (
-            <ChevronDown className="w-4 h-4 transition-transform duration-200" />
+            <ArrowTrendingUpIcon className="w-4 h-4 transition-transform duration-200" />
           ) : (
-            <ChevronUp className="w-4 h-4 transition-transform duration-200" />
+            <ArrowTrendingUpIcon className="w-4 h-4 transition-transform duration-200" />
           )}
         </Button>
       </div>
@@ -101,7 +98,9 @@ export function LayerFilter({
               onClick={() => onLayerChange("all")}
               className={cn("h-8 text-xs gap-1.5 rounded-full", activeLayer === "all" && "shadow-sm")}
             >
-              <Layers className="w-3.5 h-3.5" />
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M6 4h12v2H6V4zm0 7h12v2H6v-2zm0 7h12v2H6v-2z" />
+              </svg>
               الكل
             </Button>
 
@@ -145,7 +144,7 @@ export function LayerFilter({
 
             <Link href={`/chat/${groupId}/decisions`}>
               <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-amber-500/10">
-                <Vote className="w-3.5 h-3.5 text-amber-600" />
+                <CheckCircleIcon className="w-3.5 h-3.5 text-amber-600" />
                 القرارات
               </Button>
             </Link>
@@ -157,7 +156,7 @@ export function LayerFilter({
                   size="sm"
                   className="h-8 text-xs gap-1.5 rounded-full hover:bg-violet-500/10"
                 >
-                  <GitBranch className="w-3.5 h-3.5 text-violet-600" />
+                  <GitBranchIcon className="w-3.5 h-3.5 text-violet-600" />
                   العقد
                 </Button>
               </SheetTrigger>
@@ -181,63 +180,63 @@ export function LayerFilter({
 
             <Link href={`/chat/${groupId}/map`}>
               <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-cyan-500/10">
-                <Map className="w-3.5 h-3.5 text-cyan-600" />
+                <MapIcon className="w-3.5 h-3.5 text-cyan-600" />
                 الخريطة
               </Button>
             </Link>
 
             <Link href={`/chat/${groupId}/notebook`}>
               <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-emerald-500/10">
-                <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
+                <BookOpenIcon className="w-3.5 h-3.5 text-emerald-600" />
                 المفكرة
               </Button>
             </Link>
 
             <Link href={`/chat/${groupId}/memory`}>
               <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-purple-500/10">
-                <Brain className="w-3.5 h-3.5 text-purple-600" />
+                <BrainIcon className="w-3.5 h-3.5 text-purple-600" />
                 الذاكرة
               </Button>
             </Link>
 
             <Link href={`/chat/${groupId}/archive`}>
               <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-stone-500/10">
-                <Archive className="w-3.5 h-3.5 text-stone-600" />
+                <ArchiveBoxIcon className="w-3.5 h-3.5 text-stone-600" />
                 الأرشيف
               </Button>
             </Link>
 
             <Link href={`/chat/${groupId}/summary`}>
               <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-blue-500/10">
-                <FileText className="w-3.5 h-3.5 text-blue-600" />
+                <DocumentTextIcon className="w-3.5 h-3.5 text-blue-600" />
                 الملخص
               </Button>
             </Link>
 
             <Link href={`/chat/${groupId}/quality`}>
               <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-green-500/10">
-                <TrendingUp className="w-3.5 h-3.5 text-green-600" />
+                <ArrowTrendingUpIcon className="w-3.5 h-3.5 text-green-600" />
                 جودة النقاش
               </Button>
             </Link>
 
             <Link href={`/chat/${groupId}/search`}>
               <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-blue-500/10">
-                <Search className="w-3.5 h-3.5 text-blue-600" />
+                <MagnifyingGlassIcon className="w-3.5 h-3.5 text-blue-600" />
                 البحث
               </Button>
             </Link>
 
             <Link href={`/chat/${groupId}/analytics`}>
               <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-pink-500/10">
-                <BarChart className="w-3.5 h-3.5 text-pink-600" />
+                <BarChartIcon className="w-3.5 h-3.5 text-pink-600" />
                 التحليلات
               </Button>
             </Link>
 
             <Link href={`/chat/${groupId}/assistant`}>
               <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-yellow-500/10">
-                <Sparkles className="w-3.5 h-3.5 text-yellow-600" />
+                <SparklesIcon className="w-3.5 h-3.5 text-yellow-600" />
                 المساعد
               </Button>
             </Link>

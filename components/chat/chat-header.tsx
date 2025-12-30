@@ -23,19 +23,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import {
-  Users,
-  MoreVertical,
-  UserPlus,
-  Settings,
-  Copy,
-  Check,
-  LogOut,
-  Download,
-  Sparkles,
-  Gauge,
-  Loader2,
-} from "lucide-react"
+import { Users, MoreVertical, UserPlus, Settings, Copy, Check, LogOut, Download, Gauge, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import type { Group, GroupMember } from "@/lib/types"
@@ -363,7 +351,9 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
         <div className="flex items-center gap-1 shrink-0">
           <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" asChild title="المساعد الذكي">
             <Link href="/chat/assistant">
-              <Sparkles className="h-4 w-4 text-amber-500" />
+              <svg className="h-4 w-4 text-amber-500" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M5 3a1 1 0 011-1h2a1 1 0 011 1v1h6V3a1 1 0 011-1h2a1 1 0 011 1v1h2a2 2 0 012 2v2h1a1 1 0 110 2h-1v6h1a1 1 0 110 2h-1v2a2 2 0 01-2 2h-2v1a1 1 0 01-1 1h-2a1 1 0 01-1-1v-1H8v1a1 1 0 01-1 1H5a1 1 0 01-1-1v-1H2a2 2 0 01-2-2v-2H0a1 1 0 110-2h1V9H0a1 1 0 110-2h1V5a2 2 0 012-2h2V3z" />
+              </svg>
             </Link>
           </Button>
 
