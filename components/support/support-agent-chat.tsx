@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Send, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
 
@@ -31,6 +30,27 @@ export function SupportAgentChat() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [messages])
+
+  useEffect(() => {
+    const script = document.createElement("script")
+    script.src = "https://www.chatbase.co/embed.min.js"
+    script.async = true
+    script.setAttribute("chatbotId", process.env.NEXT_PUBLIC_CHATBOT_ID || "")
+    script.setAttribute("domain", process.env.NEXT_PUBLIC_CHATBASE_HOST || "")
+
+    const container = document.getElementById("chatbase-widget-container")
+    if (container) {
+      container.appendChild(script)
+    }
+
+    return () => {
+      // Cleanup script if component unmounts
+      const existingScript = container?.querySelector("script[chatbotId]")
+      if (existingScript) {
+        existingScript.remove()
+      }
+    }
+  }, [])
 
   const handleSend = async () => {
     if (!input.trim() || loading) return
@@ -96,57 +116,13 @@ export function SupportAgentChat() {
     window.location.href = "/chat/support/report"
   }
 
-  useEffect(() => {
-    const script = document.createElement("script")
-    script.src = "https://www.chatbase.co/embed.min.js"
-    script.async = true
-    script.setAttribute("chatbotId", process.env.NEXT_PUBLIC_CHATBOT_ID || "")
-    script.setAttribute("domain", process.env.NEXT_PUBLIC_CHATBASE_HOST || "www.chatbase.co")
-
-    const container = document.getElementById("chatbase-widget-container")
-    if (container) {
-      container.appendChild(script)
-    }
-
-    return () => {
-      // Cleanup script if component unmounts
-      if (container && script.parentElement === container) {
-        container.removeChild(script)
-      }
-    }
-  }, [])
-
   return (
     <div className="flex flex-col h-full bg-background">
-      <ScrollArea ref={scrollRef} className="flex-1 p-4">
-        <div className="space-y-4">
-          {messages.map((msg, idx) => (
-            <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div
-                className={`max-w-[80%] p-3 rounded-lg ${
-                  msg.role === "user" ? "bg-cyan-600 text-white" : "bg-secondary"
-                }`}
-              >
-                <p className="text-sm">{msg.content}</p>
-                <span className="text-xs text-muted-foreground mt-1 block">
-                  {msg.timestamp.toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}
-                </span>
-              </div>
-            </div>
-          ))}
-          {loading && (
-            <div className="flex justify-start">
-              <div className="bg-secondary p-3 rounded-lg">
-                <div className="flex gap-1">
-                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" />
-                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce delay-100" />
-                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce delay-200" />
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </ScrollArea>
+      <div
+        id="chatbase-widget-container"
+        className="flex-1 w-full"
+        style={{ display: "flex", flexDirection: "column", height: "100%" }}
+      />
 
       <div className="p-4 border-t border-border space-y-2">
         <div className="flex gap-2">
@@ -166,8 +142,6 @@ export function SupportAgentChat() {
           الإبلاغ عن مشكلة تقنية
         </Button>
       </div>
-
-      <div id="chatbase-widget-container" className="w-full h-full" />
     </div>
   )
 }

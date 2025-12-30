@@ -14,51 +14,38 @@ export async function POST(request: NextRequest) {
 
     const { message, conversationId, history } = await request.json()
 
-    const chatbaseApiKey = process.env.CHATBASE_API_KEY
+    const chatbaseApiUrl = `${process.env.NEXT_PUBLIC_CHATBASE_HOST || "https://www.chatbase.co"}/api/v1/chat`
 
-    if (!chatbaseApiKey) {
-      console.error("CHATBASE_API_KEY is not set in environment variables")
-      return NextResponse.json({ error: "Chatbase API key not configured" }, { status: 500 })
-    }
-
-    const chatbaseResponse = await fetch(
-      `${process.env.NEXT_PUBLIC_CHATBASE_HOST || "https://www.chatbase.co"}/api/v1/chat`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${chatbaseApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          chatbotId: process.env.NEXT_PUBLIC_CHATBOT_ID,
-          messages: [
-            ...history.map((msg: any) => ({
-              role: msg.role,
-              content: msg.content,
-            })),
-            {
-              role: "user",
-              content: message,
-            },
-          ],
-          stream: false,
-        }),
+    const chatbaseResponse = await fetch(chatbaseApiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-    )
+      body: JSON.stringify({
+        chatbotId: process.env.NEXT_PUBLIC_CHATBOT_ID,
+        messages: [
+          ...history.map((msg: any) => ({
+            role: msg.role,
+            content: msg.content,
+          })),
+          {
+            role: "user",
+            content: message,
+          },
+        ],
+        stream: false,
+      }),
+    })
 
     if (!chatbaseResponse.ok) {
       const errorText = await chatbaseResponse.text()
-      console.error(`Chatbase API error (${chatbaseResponse.status}):`, errorText)
-      throw new Error(`Chatbase API error: ${chatbaseResponse.statusText} - ${errorText}`)
+      console.error("[v0] Chatbase API error:", chatbaseResponse.status, errorText)
+      throw new Error(`Chatbase API error: ${chatbaseResponse.status}`)
     }
 
     const chatbaseData = await chatbaseResponse.json()
-    const text = chatbaseData.text || chatbaseData.response || chatbaseData.message
-
-    if (!text) {
-      console.error("No response text from Chatbase:", chatbaseData)
-      throw new Error("No response from Chatbase")
-    }
+    const text =
+      chatbaseData.message?.content || chatbaseData.text || chatbaseData.response || "Sorry, I couldn't process that."
 
     let savedConversationId = conversationId
 
@@ -109,7 +96,7 @@ export async function POST(request: NextRequest) {
       issueDetected,
     })
   } catch (error) {
-    console.error("Support chat error:", error)
+    console.error("[v0] Support chat error:", error)
     return NextResponse.json({ error: "Failed to process message" }, { status: 500 })
   }
 }
