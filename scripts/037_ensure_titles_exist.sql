@@ -42,5 +42,6 @@ ON CONFLICT (key) DO UPDATE SET
   required_points = EXCLUDED.required_points,
   required_activities = EXCLUDED.required_activities,
   is_active = EXCLUDED.is_active,
-  sort_order = EXCLUDED.sort_order,
-  updated_at = NOW();
+  sort_order = EXCLUDED.sort_order
+  -- removed updated_at = NOW() since titles table doesn't have this column
+;
