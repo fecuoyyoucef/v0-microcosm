@@ -30,6 +30,9 @@ import {
   BellIcon,
   MagnifyingGlassIcon as SearchIcon,
   SparklesIcon,
+  TrophyIcon,
+  MoonIcon,
+  SunIcon,
   XMarkIcon as XIcon,
   ArrowRightStartOnRectangleIcon as LogOutIcon,
   QuestionMarkCircleIcon as HelpCircleIcon,
@@ -287,12 +290,12 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
             {profile?.username && <p className="text-xs text-muted-foreground truncate">@{profile.username}</p>}
           </div>
           <Button
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             variant="ghost"
             size="icon"
             className="h-8 w-8"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           >
-            {theme === "dark" ? <XIcon className="h-4 w-4" /> : <XIcon className="h-4 w-4" />}
+            {theme === "dark" ? <SunIcon className="h-4 w-4" /> : <MoonIcon className="h-4 w-4" />}
           </Button>
         </div>
       </div>
@@ -333,7 +336,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
 
           <Link href="/chat/profile" onClick={() => isMobile && setMobileMenuOpen(false)}>
             <Button variant="ghost" className="w-full justify-start gap-3 h-10">
-              <XIcon className="w-4 h-4 text-yellow-500" />
+              <TrophyIcon className="w-4 h-4 text-amber-500" />
               {t.achievements}
             </Button>
           </Link>
@@ -666,7 +669,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
                 {t.newCell}
               </CommandItem>
               <CommandItem onSelect={() => setTheme(theme === "dark" ? "light" : "dark")}>
-                {theme === "dark" ? <XIcon className="ml-2 h-4 w-4" /> : <XIcon className="ml-2 h-4 w-4" />}
+                {theme === "dark" ? <SunIcon className="ml-2 h-4 w-4" /> : <MoonIcon className="ml-2 h-4 w-4" />}
                 {theme === "dark" ? t.lightMode : t.darkMode}
               </CommandItem>
             </CommandGroup>
