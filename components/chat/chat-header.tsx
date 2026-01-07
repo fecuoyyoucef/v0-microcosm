@@ -23,7 +23,18 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Users, MoreVertical, UserPlus, Settings, Copy, Check, LogOut, Download, Gauge, Loader2 } from "lucide-react"
+import {
+  Users as UsersIcon,
+  EllipsisVertical as MoreVerticalIcon,
+  UserPlus as UserPlusIcon,
+  Cog6Tooth as SettingsIcon,
+  ClipboardDocument as CopyIcon,
+  Check as CheckIcon,
+  ArrowLeftOnRectangle as LogOutIcon,
+  ArrowDownTray as DownloadIcon,
+  GaugeIcon as GaugeIconHero,
+  ArrowPath as Loader2Icon,
+} from "@heroicons/react/24/outline"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import type { Group, GroupMember } from "@/lib/types"
@@ -319,7 +330,7 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Gauge className="w-5 h-5 text-blue-500" />
+                <GaugeIconHero className="w-5 h-5 text-blue-500" />
                 تقييم جودة النقاش
               </DialogTitle>
             </DialogHeader>
@@ -349,14 +360,6 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
         </Dialog>
 
         <div className="flex items-center gap-1 shrink-0">
-          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" asChild title="المساعد الذكي">
-            <Link href="/chat/assistant">
-              <svg className="h-4 w-4 text-amber-500" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M5 3a1 1 0 011-1h2a1 1 0 011 1v1h6V3a1 1 0 011-1h2a1 1 0 011 1v1h2a2 2 0 012 2v2h1a1 1 0 110 2h-1v6h1a1 1 0 110 2h-1v2a2 2 0 01-2 2h-2v1a1 1 0 01-1 1h-2a1 1 0 01-1-1v-1H8v1a1 1 0 01-1 1H5a1 1 0 01-1-1v-1H2a2 2 0 01-2-2v-2H0a1 1 0 110-2h1V9H0a1 1 0 110-2h1V5a2 2 0 012-2h2V3z" />
-              </svg>
-            </Link>
-          </Button>
-
           {/* Discussion Quality Assessment Button */}
           <Button
             variant="ghost"
@@ -367,9 +370,9 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
             title="تقييم جودة النقاش"
           >
             {isAssessingQuality ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2Icon className="h-4 w-4 animate-spin" />
             ) : (
-              <Gauge className="h-4 w-4 text-blue-500" />
+              <GaugeIconHero className="h-4 w-4 text-blue-500" />
             )}
           </Button>
 
@@ -381,7 +384,7 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
               onClick={handleInstall}
               title="تثبيت التطبيق"
             >
-              <Download className="h-4 w-4" />
+              <DownloadIcon className="h-4 w-4" />
             </Button>
           )}
 
@@ -389,7 +392,7 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
           <Sheet open={isMembersOpen} onOpenChange={setIsMembersOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" title="الأعضاء">
-                <Users className="h-4 w-4" />
+                <UsersIcon className="h-4 w-4" />
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-[85vw] max-w-sm p-0">
@@ -439,7 +442,7 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
                     <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
                       <DialogTrigger asChild>
                         <Button className="w-full rounded-xl h-11">
-                          <UserPlus className="w-4 h-4 ml-2" />
+                          <UserPlusIcon className="w-4 h-4 ml-2" />
                           دعوة أعضاء جدد
                         </Button>
                       </DialogTrigger>
@@ -464,7 +467,11 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
                                 onClick={copyInviteLink}
                                 className="rounded-xl bg-transparent shrink-0"
                               >
-                                {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
+                                {copied ? (
+                                  <CheckIcon className="h-4 w-4 text-emerald-500" />
+                                ) : (
+                                  <CopyIcon className="h-4 w-4" />
+                                )}
                               </Button>
                             </div>
                           </div>
@@ -485,13 +492,13 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" title="المزيد">
-                <MoreVertical className="h-4 w-4" />
+                <MoreVerticalIcon className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-48">
               <DropdownMenuItem asChild>
                 <Link href={`/chat/${group.id}/settings`} className="flex items-center cursor-pointer">
-                  <Settings className="h-4 w-4 ml-2" />
+                  <SettingsIcon className="h-4 w-4 ml-2" />
                   إعدادات المجموعة
                 </Link>
               </DropdownMenuItem>
@@ -501,7 +508,7 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
                 onClick={handleLeaveGroup}
                 disabled={isLeaving}
               >
-                <LogOut className="h-4 w-4 ml-2" />
+                <LogOutIcon className="h-4 w-4 ml-2" />
                 {isLeaving ? "جاري المغادرة..." : "مغادرة المجموعة"}
               </DropdownMenuItem>
             </DropdownMenuContent>

@@ -10,14 +10,25 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select"
-import { Send, Eye, GitBranch, X, Loader2, Reply, Camera, Sparkles, AtSign, Edit2 } from "lucide-react"
+import {
+  PaperAirplane as SendIcon,
+  Eye as EyeIcon,
+  XMark as XIcon,
+  ArrowPath as Loader2Icon,
+  ArrowUturnLeft as ReplyIcon,
+  Plus as PlusIcon,
+  Sparkles as SparklesIcon,
+  AtSymbol as AtSignIcon,
+  PencilSquare as Edit2Icon,
+  GitBranch as GitBranchIcon,
+  DocumentText as FileTextIcon,
+} from "@heroicons/react/24/outline"
 import { createClient } from "@/lib/supabase/client"
 import type { MessageLayer, GroupMember, ConversationNode, GroupSettings, Message } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import Image from "next/image"
 import { toast } from "react-toastify"
-import { FileText } from "lucide-react"
-import { parseMentions } from "@/lib/utils" // Declare or import the parseMentions function
+import { parseMentions } from "@/lib/utils"
 
 interface MessageInputProps {
   onSend: (
@@ -387,14 +398,14 @@ export function MessageInput({
         <div className="px-3 py-1.5 bg-muted/50 border-b border-border/50 flex items-center justify-between animate-in slide-in-from-bottom-2 duration-200">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <div className="w-0.5 h-6 bg-primary rounded-full shrink-0" />
-            <Edit2 className="w-3.5 h-3.5 text-primary shrink-0" />
+            <Edit2Icon className="w-3.5 h-3.5 text-primary shrink-0" />
             <div className="min-w-0 flex-1">
               <p className="text-[11px] font-medium text-primary truncate">تعديل الرسالة</p>
               <p className="text-[11px] text-muted-foreground truncate">{editingMessage.content}</p>
             </div>
           </div>
           <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 rounded-full" onClick={onCancelEdit}>
-            <X className="w-3.5 h-3.5" />
+            <XIcon className="w-3.5 h-3.5" />
           </Button>
         </div>
       )}
@@ -404,7 +415,7 @@ export function MessageInput({
         <div className="px-3 py-1.5 bg-muted/50 border-b border-border/50 flex items-center justify-between animate-in slide-in-from-bottom-2 duration-200">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <div className="w-0.5 h-6 bg-primary rounded-full shrink-0" />
-            <Reply className="w-3.5 h-3.5 text-primary shrink-0" />
+            <ReplyIcon className="w-3.5 h-3.5 text-primary shrink-0" />
             <div className="min-w-0 flex-1">
               <p className="text-[11px] font-medium text-primary truncate">
                 {replyingTo.sender?.display_name || "مستخدم"}
@@ -413,7 +424,7 @@ export function MessageInput({
             </div>
           </div>
           <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 rounded-full" onClick={onCancelReply}>
-            <X className="w-3.5 h-3.5" />
+            <XIcon className="w-3.5 h-3.5" />
           </Button>
         </div>
       )}
@@ -421,7 +432,7 @@ export function MessageInput({
       {showCorrectionHint && !isCorrectingText && (
         <div className="px-3 py-1 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 flex items-center justify-between animate-in slide-in-from-top-2 duration-200">
           <p className="text-[11px] text-amber-700 dark:text-amber-300 flex items-center gap-1">
-            <Sparkles className="w-3 h-3" />
+            <SparklesIcon className="w-3 h-3" />
             <span>هل تريد تصحيح النص بالذكاء الاصطناعي؟</span>
           </p>
           <Button
@@ -437,7 +448,7 @@ export function MessageInput({
 
       {hasMentions && (
         <div className="px-3 py-1 bg-violet-50 dark:bg-violet-900/20 border-b border-violet-200 dark:border-violet-800 flex items-center gap-2 animate-in slide-in-from-top-2 duration-200">
-          <AtSign className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400 shrink-0" />
+          <AtSignIcon className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400 shrink-0" />
           <p className="text-[11px] text-violet-700 dark:text-violet-300 flex-1">
             ذكرت {mentionedUsers.length} {mentionedUsers.length === 1 ? "شخص" : "أشخاص"}
           </p>
@@ -457,18 +468,18 @@ export function MessageInput({
                       onClick={() => removeFile(index)}
                       className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                     >
-                      <X className="w-3 h-3" />
+                      <XIcon className="w-3 h-3" />
                     </button>
                   </div>
                 ) : (
                   <div className="relative w-20 h-20 rounded-lg border border-border flex flex-col items-center justify-center bg-muted p-2">
-                    <FileText className="w-6 h-6 mb-1" />
+                    <FileTextIcon className="w-6 h-6 mb-1" />
                     <span className="text-xs truncate w-full text-center">{item.file.name}</span>
                     <button
                       onClick={() => removeFile(index)}
                       className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                     >
-                      <X className="w-3 h-3" />
+                      <XIcon className="w-3 h-3" />
                     </button>
                   </div>
                 )}
@@ -486,8 +497,9 @@ export function MessageInput({
             className="h-10 w-10 shrink-0 rounded-full border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-colors bg-transparent"
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploadingFiles}
+            title="إرفاق ملفات"
           >
-            {isUploadingFiles ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
+            {isUploadingFiles ? <Loader2Icon className="w-5 h-5 animate-spin" /> : <PlusIcon className="w-5 h-5" />}
           </Button>
           <input
             ref={fileInputRef}
@@ -546,7 +558,9 @@ export function MessageInput({
                   onValueChange={(v) => setMessageNodeId(v === "none" ? null : v)}
                 >
                   <SelectTrigger className="h-7 w-7 p-0 border-0 bg-transparent rounded-full">
-                    <GitBranch className={cn("w-4 h-4", messageNodeId ? "text-primary" : "text-muted-foreground")} />
+                    <GitBranchIcon
+                      className={cn("w-4 h-4", messageNodeId ? "text-primary" : "text-muted-foreground")}
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">بدون عقدة</SelectItem>
@@ -567,7 +581,9 @@ export function MessageInput({
                 <Popover open={isVisibilityOpen} onOpenChange={setIsVisibilityOpen}>
                   <PopoverTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full p-0">
-                      <Eye className={cn("w-4 h-4", visibleTo.length > 0 ? "text-primary" : "text-muted-foreground")} />
+                      <EyeIcon
+                        className={cn("w-4 h-4", visibleTo.length > 0 ? "text-primary" : "text-muted-foreground")}
+                      />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-56" align="end">
@@ -603,9 +619,9 @@ export function MessageInput({
                 className="h-7 w-7 rounded-full p-0 text-primary hover:text-primary"
               >
                 {isSending || isCorrectingText ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2Icon className="w-4 h-4 animate-spin" />
                 ) : (
-                  <Send className="w-4 h-4" />
+                  <SendIcon className="w-4 h-4" />
                 )}
               </Button>
             </div>

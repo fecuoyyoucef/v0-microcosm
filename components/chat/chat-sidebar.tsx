@@ -21,25 +21,26 @@ import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import {
-  Users,
-  LogOut,
-  Loader2,
-  Settings,
-  User,
-  Bookmark,
-  Moon,
-  Sun,
-  UserPlus,
-  HelpCircle,
-  Home,
-  Info,
-  Bell,
-  Sparkles,
-  Shield,
-  MessageCircle,
-  X,
-  Link2,
-} from "lucide-react"
+  Users as UsersIcon,
+  ArrowLeftOnRectangle as LogOutIcon,
+  ArrowPath as Loader2Icon,
+  Cog6Tooth as SettingsIcon,
+  User as UserIcon,
+  Bookmark as BookmarkIcon,
+  Moon as MoonIcon,
+  Sun as SunIcon,
+  UserPlus as UserPlusIcon,
+  QuestionMarkCircle as HelpCircleIcon,
+  Home as HomeIcon,
+  InformationCircle as InfoIcon,
+  Bell as BellIcon,
+  Sparkles as SparklesIcon,
+  ShieldCheck as ShieldIcon,
+  ChatBubbleLeftRight as MessageCircleIcon,
+  XMark as XIcon,
+  Link as Link2Icon,
+  Trophy as AchievementsIcon,
+} from "@heroicons/react/24/outline"
 import type { Profile } from "@/lib/types"
 import { useTheme } from "next-themes"
 import { CellSurveyDialog } from "@/components/groups/cell-survey-dialog"
@@ -397,7 +398,7 @@ export function ChatSidebar({ currentUserId, groups, onSignOut }: ChatSidebarPro
           <Avatar className="h-16 w-16 border-2 border-primary/20">
             {profile?.avatar_url && <AvatarImage src={profile.avatar_url || "/placeholder.svg"} />}
             <AvatarFallback className="bg-primary text-primary-foreground text-xl font-bold">
-              {profile?.display_name?.charAt(0) || <User className="w-6 h-6" />}
+              {profile?.display_name?.charAt(0) || <UserIcon className="w-6 h-6" />}
             </AvatarFallback>
           </Avatar>
           <Button
@@ -406,9 +407,10 @@ export function ChatSidebar({ currentUserId, groups, onSignOut }: ChatSidebarPro
             className="h-10 w-10 rounded-full"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           >
-            {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            {theme === "dark" ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
           </Button>
         </div>
+
         <div>
           <p className="font-semibold text-lg">{profile?.display_name || t.user}</p>
           {profile?.username && <p className="text-sm text-muted-foreground">@{profile.username}</p>}
@@ -420,7 +422,7 @@ export function ChatSidebar({ currentUserId, groups, onSignOut }: ChatSidebarPro
         <div className="py-2">
           <Link href="/chat" onClick={closeSidebar}>
             <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
-              <Home className="w-5 h-5 text-muted-foreground" />
+              <HomeIcon className="w-5 h-5 text-muted-foreground" />
               <span className="text-sm font-medium">{t.home}</span>
             </div>
           </Link>
@@ -428,7 +430,7 @@ export function ChatSidebar({ currentUserId, groups, onSignOut }: ChatSidebarPro
           {isOwner && (
             <Link href="/admin" onClick={closeSidebar}>
               <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer bg-cyan-500/10 border-l-4 border-cyan-500">
-                <Shield className="w-5 h-5 text-cyan-500" />
+                <ShieldIcon className="w-5 h-5 text-cyan-500" />
                 <span className="text-sm font-medium text-cyan-500">لوحة التحكم</span>
               </div>
             </Link>
@@ -437,7 +439,7 @@ export function ChatSidebar({ currentUserId, groups, onSignOut }: ChatSidebarPro
           <Link href="/chat/notifications" onClick={closeSidebar}>
             <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
               <div className="relative">
-                <Bell className="w-5 h-5 text-muted-foreground" />
+                <BellIcon className="w-5 h-5 text-muted-foreground" />
                 {unreadNotifications > 0 && (
                   <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground text-[10px] flex items-center justify-center">
                     {unreadNotifications > 9 ? "9+" : unreadNotifications}
@@ -455,14 +457,14 @@ export function ChatSidebar({ currentUserId, groups, onSignOut }: ChatSidebarPro
 
           <Link href="/chat/assistant" onClick={closeSidebar}>
             <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
-              <Sparkles className="w-5 h-5 text-amber-500" />
+              <SparklesIcon className="w-5 h-5 text-amber-500" />
               <span className="text-sm font-medium">{t.assistant}</span>
             </div>
           </Link>
 
           <Link href="/chat/profile" onClick={closeSidebar}>
             <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
-              <User className="w-5 h-5 text-muted-foreground" />
+              <UserIcon className="w-5 h-5 text-muted-foreground" />
               <span className="text-sm font-medium">{t.profile}</span>
             </div>
           </Link>
@@ -477,7 +479,7 @@ export function ChatSidebar({ currentUserId, groups, onSignOut }: ChatSidebarPro
           >
             <DialogTrigger asChild>
               <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
-                <Users className="w-5 h-5 text-muted-foreground" />
+                <UsersIcon className="w-5 h-5 text-muted-foreground" />
                 <span className="text-sm font-medium">{t.newGroup}</span>
               </div>
             </DialogTrigger>
@@ -516,7 +518,7 @@ export function ChatSidebar({ currentUserId, groups, onSignOut }: ChatSidebarPro
                 >
                   {isCreating ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                      <Loader2Icon className="w-4 h-4 animate-spin ml-2" />
                       {t.creating}
                     </>
                   ) : (
@@ -538,7 +540,7 @@ export function ChatSidebar({ currentUserId, groups, onSignOut }: ChatSidebarPro
           >
             <DialogTrigger asChild>
               <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
-                <Link2 className="w-5 h-5 text-muted-foreground" />
+                <Link2Icon className="w-5 h-5 text-muted-foreground" />
                 <span className="text-sm font-medium">{t.joinByInvite}</span>
               </div>
             </DialogTrigger>
@@ -569,7 +571,7 @@ export function ChatSidebar({ currentUserId, groups, onSignOut }: ChatSidebarPro
                 >
                   {isJoining ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                      <Loader2Icon className="w-4 h-4 animate-spin ml-2" />
                       {t.joining}
                     </>
                   ) : (
@@ -581,28 +583,37 @@ export function ChatSidebar({ currentUserId, groups, onSignOut }: ChatSidebarPro
           </Dialog>
 
           <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer opacity-50">
-            <Bookmark className="w-5 h-5 text-muted-foreground" />
+            <BookmarkIcon className="w-5 h-5 text-muted-foreground" />
             <span className="text-sm font-medium">{t.savedMessages}</span>
             <span className="text-xs text-muted-foreground mr-auto">{t.comingSoon}</span>
           </div>
 
           <Link href="/chat/about" onClick={closeSidebar}>
             <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
-              <Info className="w-5 h-5 text-muted-foreground" />
+              <InfoIcon className="w-5 h-5 text-muted-foreground" />
               <span className="text-sm font-medium">{t.about}</span>
+            </div>
+          </Link>
+
+          <Link href="/chat/achievements" onClick={closeSidebar}>
+            <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
+              <AchievementsIcon className="w-5 h-5 text-yellow-500" />
+              <span className="text-sm font-medium">
+                {language === "ar" ? "الإنجازات" : language === "fr" ? "Réalisations" : "Achievements"}
+              </span>
             </div>
           </Link>
 
           <Separator className="my-2" />
 
           <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer opacity-50">
-            <UserPlus className="w-5 h-5 text-muted-foreground" />
+            <UserPlusIcon className="w-5 h-5 text-muted-foreground" />
             <span className="text-sm font-medium">{t.inviteFriends}</span>
             <span className="text-xs text-muted-foreground mr-auto">{t.comingSoon}</span>
           </div>
 
           <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer opacity-50">
-            <HelpCircle className="w-5 h-5 text-muted-foreground" />
+            <HelpCircleIcon className="w-5 h-5 text-muted-foreground" />
             <span className="text-sm font-medium">{t.help}</span>
             <span className="text-xs text-muted-foreground mr-auto">{t.comingSoon}</span>
           </div>
@@ -617,13 +628,13 @@ export function ChatSidebar({ currentUserId, groups, onSignOut }: ChatSidebarPro
             closeSidebar()
           }}
         >
-          <MessageCircle className="w-5 h-5 text-cyan-500" />
+          <MessageCircleIcon className="w-5 h-5 text-cyan-500" />
           <span className="text-sm font-medium">{t.supportAgent}</span>
         </div>
 
         <Link href="/chat/settings" onClick={closeSidebar}>
           <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
-            <Settings className="w-5 h-5 text-muted-foreground" />
+            <SettingsIcon className="w-5 h-5 text-muted-foreground" />
             <span className="text-sm font-medium">{t.settings}</span>
           </div>
         </Link>
@@ -635,7 +646,7 @@ export function ChatSidebar({ currentUserId, groups, onSignOut }: ChatSidebarPro
           className="w-full justify-start gap-3 text-destructive hover:text-destructive hover:bg-destructive/10"
           onClick={handleSignOut}
         >
-          <LogOut className="w-5 h-5" />
+          <LogOutIcon className="w-5 h-5" />
           {t.signOut}
         </Button>
       </div>
@@ -694,11 +705,11 @@ export function ChatSidebar({ currentUserId, groups, onSignOut }: ChatSidebarPro
             <div className="h-full bg-card rounded-t-xl overflow-hidden">
               <div className="flex items-center justify-between p-4 border-b border-border">
                 <div className="flex items-center gap-2">
-                  <MessageCircle className="w-5 h-5 text-cyan-500" />
+                  <MessageCircleIcon className="w-5 h-5 text-cyan-500" />
                   <h3 className="font-semibold">{t.supportAgent}</h3>
                 </div>
                 <Button variant="ghost" size="icon" onClick={() => setShowSupportChat(false)}>
-                  <X className="w-5 h-5" />
+                  <XIcon className="w-5 h-5" />
                 </Button>
               </div>
               <iframe src="/chat/support/agent" className="w-full h-[calc(100%-65px)] border-0" />
