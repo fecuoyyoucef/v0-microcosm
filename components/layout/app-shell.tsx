@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -155,7 +155,8 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
   const [isJoining, setIsJoining] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [showBottomNav, setShowBottomNav] = useState(true)
-  const [lastScrollY, setLastScrollY] = useState(0)
+  const [isBottomNavVisible, setIsBottomNavVisible] = useState(true)
+  const lastScrollY = useRef(0)
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -488,22 +489,27 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
   }
 
   useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY
+    const handleScroll = (e: Event) => {
+      const target = e.target as HTMLElement
+      if (!target.classList.contains("chat-scroll-container")) return
 
-      // Show nav when scrolling up, hide when scrolling down
-      if (currentScrollY < lastScrollY || currentScrollY < 50) {
-        setShowBottomNav(true)
-      } else if (currentScrollY > lastScrollY && currentScrollY > 50) {
-        setShowBottomNav(false)
+      const currentScrollY = target.scrollTop
+
+      if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
+        // Scrolling down - hide nav
+        setIsBottomNavVisible(false)
+      } else if (currentScrollY < lastScrollY.current) {
+        // Scrolling up - show nav
+        setIsBottomNavVisible(true)
       }
 
-      setLastScrollY(currentScrollY)
+      lastScrollY.current = currentScrollY
     }
 
-    window.addEventListener("scroll", handleScroll, { passive: true })
-    return () => window.removeEventListener("scroll", handleScroll)
-  }, [lastScrollY])
+    // Listen to scroll on all chat containers
+    document.addEventListener("scroll", handleScroll, true)
+    return () => document.removeEventListener("scroll", handleScroll, true)
+  }, [])
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -522,23 +528,24 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <div
-            className={cn(
-              "flex-1 overflow-auto transition-all duration-300",
-              isBottomNavCollapsed ? "pb-0 md:pb-0" : "pb-20 md:pb-0",
-            )}
-          >
-            {children}
-          </div>
+        <main
+          className={cn(
+            "flex-1 lg:pr-0 transition-all duration-300",
+            isBottomNavVisible ? (isBottomNavCollapsed ? "pb-16" : "pb-24") : "pb-0",
+          )}
+        >
+          {children}
+        </main>
 
-          <nav
-            className={cn(
-              "md:hidden fixed inset-x-0 bottom-0 bg-background/95 backdrop-blur-xl border-t border-border shadow-2xl transition-transform duration-300 ease-in-out",
-              showBottomNav ? "translate-y-0" : "translate-y-full",
-              isBottomNavCollapsed && "translate-y-[calc(100%-2.5rem)]",
-            )}
-          >
+        {/* Bottom Navigation - Mobile */}
+        <nav
+          className={cn(
+            "lg:hidden fixed bottom-0 left-0 right-0 z-40 transition-all duration-300 ease-in-out",
+            !isBottomNavVisible && "translate-y-full",
+            isBottomNavCollapsed ? "h-16" : "h-24",
+          )}
+        >
+          <div className="relative h-full bg-gradient-to-t from-background via-background to-background/95 backdrop-blur-lg border-t border-border/40">
             <button
               onClick={() => setIsBottomNavCollapsed(!isBottomNavCollapsed)}
               className="absolute -top-10 left-1/2 -translate-x-1/2 w-12 h-10 bg-background/95 backdrop-blur-xl border border-border rounded-t-xl flex items-center justify-center shadow-lg hover:bg-muted transition-colors"
@@ -608,146 +615,148 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
                 </SheetContent>
               </Sheet>
             </div>
-          </nav>
-        </main>
-
-        {/* Command Palette */}
-        <CommandDialog open={commandOpen} onOpenChange={setCommandOpen}>
-          <CommandInput placeholder={t.searchPlaceholder} />
-          <CommandList>
-            <CommandEmpty>{t.noResults}</CommandEmpty>
-            <CommandGroup heading={t.goTo}>
-              <CommandItem
-                onSelect={() => {
-                  router.push("/chat")
-                  setCommandOpen(false)
-                }}
-              >
-                <HomeIcon className="ml-2 h-4 w-4" />
-                {t.home}
-              </CommandItem>
-              <CommandItem
-                onSelect={() => {
-                  router.push("/chat/notifications")
-                  setCommandOpen(false)
-                }}
-              >
-                <BellIcon className="ml-2 h-4 w-4" />
-                {t.notifications}
-              </CommandItem>
-              <CommandItem
-                onSelect={() => {
-                  router.push("/chat/assistant")
-                  setCommandOpen(false)
-                }}
-              >
-                <SparklesIcon className="ml-2 h-4 w-4" />
-                {t.assistant}
-              </CommandItem>
-              <CommandItem
-                onSelect={() => {
-                  router.push("/chat/settings/appearance")
-                  setCommandOpen(false)
-                }}
-              >
-                <SettingsIcon className="ml-2 h-4 w-4" />
-                {t.settings}
-              </CommandItem>
-              {isAdmin && (
-                <CommandItem
-                  onSelect={() => {
-                    router.push("/admin")
-                    setCommandOpen(false)
-                  }}
-                >
-                  <XIcon className="ml-2 h-4 w-4" />
-                  {t.admin}
-                </CommandItem>
-              )}
-            </CommandGroup>
-            <CommandGroup heading={t.cells}>
-              {groups.map((group) => (
-                <CommandItem
-                  key={group.id}
-                  onSelect={() => {
-                    router.push(`/chat/${group.id}`)
-                    setCommandOpen(false)
-                  }}
-                >
-                  <XIcon className="ml-2 h-4 w-4" />
-                  {group.name}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-            <CommandGroup heading={t.actions}>
-              <CommandItem
-                onSelect={() => {
-                  router.push("/chat?new=true")
-                  setCommandOpen(false)
-                }}
-              >
-                <PlusIcon className="ml-2 h-4 w-4" />
-                {t.newCell}
-              </CommandItem>
-              <CommandItem onSelect={() => setTheme(theme === "dark" ? "light" : "dark")}>
-                {theme === "dark" ? <SunIcon className="ml-2 h-4 w-4" /> : <MoonIcon className="ml-2 h-4 w-4" />}
-                {theme === "dark" ? t.lightMode : t.darkMode}
-              </CommandItem>
-            </CommandGroup>
-          </CommandList>
-        </CommandDialog>
-
-        {/* Join by Invite Dialog */}
-        <Dialog
-          open={isInviteDialogOpen}
-          onOpenChange={(open) => {
-            setIsInviteDialogOpen(open)
-            if (!open) {
-              setInviteError(null)
-              setInviteLink("")
-            }
-          }}
-        >
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>{t.joinByInvite}</DialogTitle>
-              <DialogDescription>
-                {language === "ar" ? "الصق رابط الدعوة للانضمام إلى خلية" : "Paste invite link to join a cell"}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 mt-4">
-              {inviteError && (
-                <div className="p-3 rounded-xl bg-destructive/10 text-destructive text-sm">{inviteError}</div>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="inviteLinkSidebar">{language === "ar" ? "رابط الدعوة" : "Invite Link"}</Label>
-                <Input
-                  id="inviteLinkSidebar"
-                  value={inviteLink}
-                  onChange={(e) => setInviteLink(e.target.value)}
-                  placeholder={t.inviteLinkPlaceholder}
-                  className="bg-background rounded-xl"
-                  dir="ltr"
-                />
-              </div>
-              <Button
-                onClick={handleJoinByInvite}
-                disabled={!inviteLink.trim() || isJoining}
-                className="w-full rounded-xl h-11"
-              >
-                {isJoining ? (
-                  <>
-                    <XIcon className="w-4 h-4 animate-spin ml-2" />
-                    {t.joining}
-                  </>
-                ) : (
-                  t.join
-                )}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+          </div>
+        </nav>
       </div>
+
+      {/* Command Palette */}
+      <CommandDialog open={commandOpen} onOpenChange={setCommandOpen}>
+        <CommandInput placeholder={t.searchPlaceholder} />
+        <CommandList>
+          <CommandEmpty>{t.noResults}</CommandEmpty>
+          <CommandGroup heading={t.goTo}>
+            <CommandItem
+              onSelect={() => {
+                router.push("/chat")
+                setCommandOpen(false)
+              }}
+            >
+              <HomeIcon className="ml-2 h-4 w-4" />
+              {t.home}
+            </CommandItem>
+            <CommandItem
+              onSelect={() => {
+                router.push("/chat/notifications")
+                setCommandOpen(false)
+              }}
+            >
+              <BellIcon className="ml-2 h-4 w-4" />
+              {t.notifications}
+            </CommandItem>
+            <CommandItem
+              onSelect={() => {
+                router.push("/chat/assistant")
+                setCommandOpen(false)
+              }}
+            >
+              <SparklesIcon className="ml-2 h-4 w-4" />
+              {t.assistant}
+            </CommandItem>
+            <CommandItem
+              onSelect={() => {
+                router.push("/chat/settings/appearance")
+                setCommandOpen(false)
+              }}
+            >
+              <SettingsIcon className="ml-2 h-4 w-4" />
+              {t.settings}
+            </CommandItem>
+            {isAdmin && (
+              <CommandItem
+                onSelect={() => {
+                  router.push("/admin")
+                  setCommandOpen(false)
+                }}
+              >
+                <XIcon className="ml-2 h-4 w-4" />
+                {t.admin}
+              </CommandItem>
+            )}
+          </CommandGroup>
+          <CommandGroup heading={t.cells}>
+            {groups.map((group) => (
+              <CommandItem
+                key={group.id}
+                onSelect={() => {
+                  router.push(`/chat/${group.id}`)
+                  setCommandOpen(false)
+                }}
+              >
+                <XIcon className="ml-2 h-4 w-4" />
+                {group.name}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+          <CommandGroup heading={t.actions}>
+            <CommandItem
+              onSelect={() => {
+                router.push("/chat?new=true")
+                setCommandOpen(false)
+              }}
+            >
+              <PlusIcon className="ml-2 h-4 w-4" />
+              {t.newCell}
+            </CommandItem>
+            <CommandItem onSelect={() => setTheme(theme === "dark" ? "light" : "dark")}>
+              {theme === "dark" ? <SunIcon className="ml-2 h-4 w-4" /> : <MoonIcon className="ml-2 h-4 w-4" />}
+              {theme === "dark" ? t.lightMode : t.darkMode}
+            </CommandItem>
+          </CommandGroup>
+        </CommandList>
+      </CommandDialog>
+
+      {/* Join by Invite Dialog */}
+      <Dialog
+        open={isInviteDialogOpen}
+        onOpenChange={(open) => {
+          setIsInviteDialogOpen(open)
+          if (!open) {
+            setInviteError(null)
+            setInviteLink("")
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t.joinByInvite}</DialogTitle>
+            <DialogDescription>
+              {language === "ar" ? "الصق رابط الدعوة للانضمام إلى خلية" : "Paste invite link to join a cell"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            {inviteError && (
+              <div className="p-3 rounded-xl bg-destructive/10 text-destructive text-sm">{inviteError}</div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="inviteLinkSidebar">{language === "ar" ? "رابط الدعوة" : "Invite Link"}</Label>
+              <Input
+                id="inviteLinkSidebar"
+                value={inviteLink}
+                onChange={(e) => setInviteLink(e.target.value)}
+                placeholder={t.inviteLinkPlaceholder}
+                className="bg-background rounded-xl"
+                dir="ltr"
+              />
+            </div>
+            <Button
+              onClick={handleJoinByInvite}
+              disabled={!inviteLink.trim() || isJoining}
+              className="w-full rounded-xl h-11"
+            >
+              {isJoining ? (
+                <>
+                  <XIcon className="w-4 h-4 animate-spin ml-2" />
+                  {t.joining}
+                </>
+              ) : (
+                t.join
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   )
 }
+
+export default AppShell
