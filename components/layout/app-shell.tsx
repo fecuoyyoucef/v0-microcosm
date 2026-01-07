@@ -154,6 +154,8 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
   const [inviteLink, setInviteLink] = useState("")
   const [isJoining, setIsJoining] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
+  const [showBottomNav, setShowBottomNav] = useState(true)
+  const [lastScrollY, setLastScrollY] = useState(0)
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -485,6 +487,24 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
     setTouchEnd(null)
   }
 
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY
+
+      // Show nav when scrolling up, hide when scrolling down
+      if (currentScrollY < lastScrollY || currentScrollY < 50) {
+        setShowBottomNav(true)
+      } else if (currentScrollY > lastScrollY && currentScrollY > 50) {
+        setShowBottomNav(false)
+      }
+
+      setLastScrollY(currentScrollY)
+    }
+
+    window.addEventListener("scroll", handleScroll, { passive: true })
+    return () => window.removeEventListener("scroll", handleScroll)
+  }, [lastScrollY])
+
   return (
     <TooltipProvider delayDuration={0}>
       <PushNotificationManager userId={userId} />
@@ -514,8 +534,9 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
 
           <nav
             className={cn(
-              "md:hidden fixed inset-x-0 bottom-0 bg-background/95 backdrop-blur-xl border-t border-border z-50 transition-all duration-300 safe-area-inset-bottom",
-              isBottomNavCollapsed ? "translate-y-full" : "translate-y-0",
+              "md:hidden fixed inset-x-0 bottom-0 bg-background/95 backdrop-blur-xl border-t border-border shadow-2xl transition-transform duration-300 ease-in-out",
+              showBottomNav ? "translate-y-0" : "translate-y-full",
+              isBottomNavCollapsed && "translate-y-[calc(100%-2.5rem)]",
             )}
           >
             <button
