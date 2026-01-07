@@ -22,7 +22,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import {
   UsersIcon,
-  ArrowPathIcon as Loader2Icon,
   Cog6ToothIcon as SettingsIcon,
   UserIcon,
   BookmarkIcon,
@@ -39,7 +38,8 @@ import {
   XMarkIcon as XIcon,
   LinkIcon as Link2Icon,
   TrophyIcon,
-} from "@heroicons/react/24/outline"
+} from "@heroicons/react/24/solid"
+import { ArrowPathIcon as Loader2Icon } from "@heroicons/react/24/outline"
 import type { Profile } from "@/lib/types"
 import { useTheme } from "next-themes"
 import { CellSurveyDialog } from "@/components/groups/cell-survey-dialog"
