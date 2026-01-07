@@ -22,7 +22,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import {
   UsersIcon,
-  ArrowLeftOnRectangleIcon as LogOutIcon,
   ArrowPathIcon as Loader2Icon,
   Cog6ToothIcon as SettingsIcon,
   UserIcon,
@@ -39,7 +38,7 @@ import {
   ChatBubbleLeftRightIcon as MessageCircleIcon,
   XMarkIcon as XIcon,
   LinkIcon as Link2Icon,
-  TrophyIcon as AchievementsIcon,
+  TrophyIcon,
 } from "@heroicons/react/24/outline"
 import type { Profile } from "@/lib/types"
 import { useTheme } from "next-themes"
@@ -597,7 +596,7 @@ export function ChatSidebar({ currentUserId, groups, onSignOut }: ChatSidebarPro
 
           <Link href="/chat/achievements" onClick={closeSidebar}>
             <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
-              <AchievementsIcon className="w-5 h-5 text-yellow-500" />
+              <TrophyIcon className="w-5 h-5 text-yellow-500" />
               <span className="text-sm font-medium">
                 {language === "ar" ? "الإنجازات" : language === "fr" ? "Réalisations" : "Achievements"}
               </span>
@@ -638,17 +637,6 @@ export function ChatSidebar({ currentUserId, groups, onSignOut }: ChatSidebarPro
             <span className="text-sm font-medium">{t.settings}</span>
           </div>
         </Link>
-      </div>
-
-      <div className="p-3 border-t border-border">
-        <Button
-          variant="ghost"
-          className="w-full justify-start gap-3 text-destructive hover:text-destructive hover:bg-destructive/10"
-          onClick={handleSignOut}
-        >
-          <LogOutIcon className="w-5 h-5" />
-          {t.signOut}
-        </Button>
       </div>
     </div>
   )
