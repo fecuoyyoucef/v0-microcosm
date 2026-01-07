@@ -24,16 +24,16 @@ import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
-  Users as UsersIcon,
-  EllipsisVertical as MoreVerticalIcon,
-  UserPlus as UserPlusIcon,
-  Cog6Tooth as SettingsIcon,
-  ClipboardDocument as CopyIcon,
-  Check as CheckIcon,
-  ArrowLeftOnRectangle as LogOutIcon,
-  ArrowDownTray as DownloadIcon,
-  GaugeIcon as GaugeIconHero,
-  ArrowPath as Loader2Icon,
+  UsersIcon,
+  EllipsisVerticalIcon as MoreVerticalIcon,
+  UserPlusIcon,
+  Cog6ToothIcon as SettingsIcon,
+  ClipboardDocumentIcon as CopyIcon,
+  CheckIcon,
+  ArrowLeftOnRectangleIcon as LogOutIcon,
+  ArrowDownTrayIcon as DownloadIcon,
+  ChartBarIcon as GaugeIconHero,
+  ArrowPathIcon as Loader2Icon,
 } from "@heroicons/react/24/outline"
 import Link from "next/link"
 import { useRouter } from "next/navigation"

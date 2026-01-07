@@ -11,17 +11,17 @@ import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select"
 import {
-  PaperAirplane as SendIcon,
-  Eye as EyeIcon,
-  XMark as XIcon,
-  ArrowPath as Loader2Icon,
-  ArrowUturnLeft as ReplyIcon,
-  Plus as PlusIcon,
-  Sparkles as SparklesIcon,
-  AtSymbol as AtSignIcon,
-  PencilSquare as Edit2Icon,
-  GitBranch as GitBranchIcon,
-  DocumentText as FileTextIcon,
+  PaperAirplaneIcon as SendIcon,
+  EyeIcon,
+  XMarkIcon as XIcon,
+  ArrowPathIcon as Loader2Icon,
+  ArrowUturnLeftIcon as ReplyIcon,
+  PlusIcon,
+  SparklesIcon,
+  AtSymbolIcon as AtSignIcon,
+  PencilSquareIcon as Edit2Icon,
+  CodeBracketIcon as GitBranchIcon,
+  DocumentTextIcon as FileTextIcon,
 } from "@heroicons/react/24/outline"
 import { createClient } from "@/lib/supabase/client"
 import type { MessageLayer, GroupMember, ConversationNode, GroupSettings, Message } from "@/lib/types"
