@@ -106,7 +106,7 @@ export async function trackActivity(
 async function updateSpecificStats(userId: string, activityType: ActivityType) {
   const supabase = await createClient()
 
-  const updates: Record<string, number> = {}
+  const updates: Record<string, any> = {}
 
   // تحديد أي إحصائية يجب تحديثها بناءً على نوع النشاط
   switch (activityType) {
@@ -158,14 +158,27 @@ async function updateSpecificStats(userId: string, activityType: ActivityType) {
   }
 
   if (Object.keys(updates).length > 0) {
-    // بناء SQL لتحديث الحقول
-    const updateFields = Object.entries(updates)
-      .map(([key]) => `${key} = COALESCE(${key}, 0) + 1`)
-      .join(", ")
+    // Get current stats
+    const { data: currentStats } = await supabase.from("user_stats").select("*").eq("user_id", userId).single()
 
-    await supabase.rpc("update_user_stats", {
-      p_user_id: userId,
-      p_updates: updateFields,
+    // Calculate new values
+    const newStats: Record<string, any> = { user_id: userId }
+
+    for (const [key, increment] of Object.entries(updates)) {
+      newStats[key] = (currentStats?.[key] || 0) + increment
+    }
+
+    // Calculate total points from activity log
+    const { data: activityLog } = await supabase.from("user_activity_log").select("points_earned").eq("user_id", userId)
+
+    const totalPoints = activityLog?.reduce((sum, log) => sum + (log.points_earned || 0), 0) || 0
+    newStats.total_points = totalPoints
+    newStats.last_calculated_at = new Date().toISOString()
+    newStats.updated_at = new Date().toISOString()
+
+    // Upsert the stats
+    await supabase.from("user_stats").upsert(newStats, {
+      onConflict: "user_id",
     })
   }
 }
@@ -173,15 +186,44 @@ async function updateSpecificStats(userId: string, activityType: ActivityType) {
 async function checkAndAwardTitles(userId: string) {
   const supabase = await createClient()
 
+  console.log("[v0] Checking titles for user:", userId)
+
   // جلب إحصائيات المستخدم
-  const { data: stats } = await supabase.from("user_stats").select("*").eq("user_id", userId).single()
+  const { data: stats, error: statsError } = await supabase
+    .from("user_stats")
+    .select("*")
+    .eq("user_id", userId)
+    .single()
 
-  if (!stats) return
+  if (statsError || !stats) {
+    console.log("[v0] No stats found for user, initializing...")
+    // إنشاء إحصائيات فارغة إذا لم تكن موجودة
+    await supabase.from("user_stats").insert({
+      user_id: userId,
+      total_points: 0,
+      messages_sent: 0,
+      nodes_created: 0,
+      decisions_voted: 0,
+      questions_answered: 0,
+    })
+    return
+  }
 
-  // جلب جميع الألقاب
-  const { data: titles } = await supabase.from("titles").select("*").eq("is_active", true)
+  console.log("[v0] User stats:", stats)
 
-  if (!titles) return
+  // جلب جميع الألقاب النشطة
+  const { data: titles } = await supabase
+    .from("titles")
+    .select("*")
+    .eq("is_active", true)
+    .order("required_points", { ascending: true })
+
+  if (!titles || titles.length === 0) {
+    console.log("[v0] No active titles found")
+    return
+  }
+
+  console.log("[v0] Checking", titles.length, "titles")
 
   // التحقق من كل لقب
   for (const title of titles) {
@@ -191,36 +233,50 @@ async function checkAndAwardTitles(userId: string) {
       .select("id")
       .eq("user_id", userId)
       .eq("title_id", title.id)
-      .single()
+      .maybeSingle()
 
-    if (hasTitle) continue
+    if (hasTitle) {
+      console.log("[v0] User already has title:", title.name_ar)
+      continue
+    }
 
-    // التحقق من المتطلبات
-    const requirements = title.required_activities as Record<string, number>
+    // التحقق من النقاط أولاً
+    if (stats.total_points < title.required_points) {
+      console.log(`[v0] Not enough points for ${title.name_ar}:`, stats.total_points, "<", title.required_points)
+      continue
+    }
+
+    // التحقق من المتطلبات الإضافية
+    const requirements = (title.required_activities || {}) as Record<string, number>
     let meetsRequirements = true
 
-    if (requirements) {
+    if (requirements && Object.keys(requirements).length > 0) {
       for (const [key, value] of Object.entries(requirements)) {
         const statValue = (stats as any)[key] || 0
         if (statValue < value) {
+          console.log(`[v0] Requirement not met for ${title.name_ar}:`, key, "=", statValue, "<", value)
           meetsRequirements = false
           break
         }
       }
     }
 
-    // التحقق من النقاط
-    if (stats.total_points < title.required_points) {
-      meetsRequirements = false
-    }
-
-    // منح اللقب
+    // منح اللقب إذا استوفى جميع الشروط
     if (meetsRequirements) {
-      await supabase.from("user_titles").insert({
+      console.log("[v0] Awarding title:", title.name_ar)
+
+      const { error: insertError } = await supabase.from("user_titles").insert({
         user_id: userId,
         title_id: title.id,
         earned_at: new Date().toISOString(),
+        is_visible: true,
+        progress_data: {},
       })
+
+      if (insertError) {
+        console.error("[v0] Error inserting title:", insertError)
+        continue
+      }
 
       // إنشاء إشعار
       await supabase.from("notifications").insert({
@@ -233,7 +289,10 @@ async function checkAndAwardTitles(userId: string) {
           title_name: title.name_ar,
           title_icon: title.icon,
         },
+        is_read: false,
       })
+
+      console.log("[v0] Title awarded successfully:", title.name_ar)
     }
   }
 }
