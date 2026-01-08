@@ -559,7 +559,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
               "md:hidden fixed inset-x-0 bottom-0 bg-background/95 backdrop-blur-xl border-t border-border shadow-2xl transition-transform duration-300 ease-in-out",
               showBottomNav ? "translate-y-0" : "translate-y-full",
               isBottomNavCollapsed && "translate-y-[calc(100%-2.5rem)]",
-              scrollDirection === "down" && !isBottomNavCollapsed && "translate-y-full",
+              scrollDirection === "down" && !isBottomNavCollapsed && "translate-y-full pointer-events-none",
             )}
           >
             <button
