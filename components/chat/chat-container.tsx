@@ -12,6 +12,7 @@ import { TypingIndicator } from "./typing-indicator"
 import { OnlineIndicator } from "./online-indicator"
 import { ImportantMessageToast } from "./important-message-toast"
 import type { Group, GroupMember, Message, MessageLayer, ConversationNode, GroupSettings } from "@/lib/types"
+import { cn } from "@/lib/utils"
 
 interface ChatContainerProps {
   groupId: string
@@ -641,7 +642,12 @@ export function ChatContainer({
           <TypingIndicator userNames={typingUserNames} />
         </div>
 
-        <div className="relative z-50 w-full">
+        <div
+          className={cn(
+            "relative z-50 w-full transition-all duration-300",
+            scrollDirection === "up" ? "mb-16" : "mb-0",
+          )}
+        >
           <MessageInput
             onSend={sendMessage}
             members={members}
