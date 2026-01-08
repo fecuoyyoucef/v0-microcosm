@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -23,7 +23,6 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { BottomNavProvider } from "@/lib/contexts/bottom-nav-context"
 import {
   HomeIcon,
   PlusIcon,
@@ -31,15 +30,12 @@ import {
   BellIcon,
   MagnifyingGlassIcon as SearchIcon,
   SparklesIcon,
-  TrophyIcon,
-  MoonIcon,
-  SunIcon,
   XMarkIcon as XIcon,
   ArrowRightStartOnRectangleIcon as LogOutIcon,
   QuestionMarkCircleIcon as HelpCircleIcon,
-  LinkIcon as Link2Icon,
-  ChevronDownIcon,
   ChevronUpIcon,
+  ChevronDownIcon,
+  LinkIcon as Link2Icon,
 } from "@heroicons/react/24/outline"
 import type { Group, Profile } from "@/lib/types"
 import { useTheme } from "next-themes"
@@ -146,27 +142,26 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
   const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [isBottomNavCollapsed, setIsBottomNavCollapsed] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [touchStart, setTouchStart] = useState<number | null>(null)
+  const [touchEnd, setTouchEnd] = useState<number | null>(null)
   const [cellsExpanded, setCellsExpanded] = useState(true)
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
   const [inviteLink, setInviteLink] = useState("")
   const [isJoining, setIsJoining] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
-  const [isScrollable, setIsScrollable] = useState(false)
-  const [isBottomNavVisible, setIsBottomNavVisible] = useState(true)
-  const lastScrollY = useRef(0)
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
   const { theme, setTheme } = useTheme()
   const { language } = useSettings()
   const t = translations[language]
-  const [touchStart, setTouchStart] = useState<number | null>(null)
-  const [touchEnd, setTouchEnd] = useState<number | null>(null)
 
   useEffect(() => {
     const checkAdmin = async () => {
       const { data } = await supabase.from("profiles").select("role").eq("id", userId).single()
-      // Assuming isAdmin is used elsewhere, we keep this state
+      setIsAdmin(data?.role === "admin" || data?.role === "owner")
     }
     checkAdmin()
   }, [userId, supabase])
@@ -292,12 +287,12 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
             {profile?.username && <p className="text-xs text-muted-foreground truncate">@{profile.username}</p>}
           </div>
           <Button
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             variant="ghost"
             size="icon"
             className="h-8 w-8"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           >
-            {theme === "dark" ? <SunIcon className="h-4 w-4" /> : <MoonIcon className="h-4 w-4" />}
+            {theme === "dark" ? <XIcon className="h-4 w-4" /> : <XIcon className="h-4 w-4" />}
           </Button>
         </div>
       </div>
@@ -338,7 +333,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
 
           <Link href="/chat/profile" onClick={() => isMobile && setMobileMenuOpen(false)}>
             <Button variant="ghost" className="w-full justify-start gap-3 h-10">
-              <TrophyIcon className="w-4 h-4 text-amber-500" />
+              <XIcon className="w-4 h-4 text-yellow-500" />
               {t.achievements}
             </Button>
           </Link>
@@ -427,13 +422,14 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
 
       {/* Bottom Actions */}
       <div className="p-2 border-t border-border space-y-1">
-        {/* Assuming isAdmin is used elsewhere, we keep this logic */}
-        <Link href="/admin" onClick={() => isMobile && setMobileMenuOpen(false)}>
-          <Button variant="ghost" className="w-full justify-start gap-3 h-10 text-cyan-500">
-            <XIcon className="w-4 h-4" />
-            {t.admin}
-          </Button>
-        </Link>
+        {isAdmin && (
+          <Link href="/admin" onClick={() => isMobile && setMobileMenuOpen(false)}>
+            <Button variant="ghost" className="w-full justify-start gap-3 h-10 text-cyan-500">
+              <XIcon className="w-4 h-4" />
+              {t.admin}
+            </Button>
+          </Link>
+        )}
 
         <Link href="/chat/settings" onClick={() => isMobile && setMobileMenuOpen(false)}>
           <Button variant="ghost" className="w-full justify-start gap-3 h-10">
@@ -486,161 +482,110 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
     setTouchEnd(null)
   }
 
-  useEffect(() => {
-    const checkScrollable = () => {
-      const scrollContainers = document.querySelectorAll(".chat-scroll-container")
-      let hasScrollableContent = false
-
-      scrollContainers.forEach((container) => {
-        if (container.scrollHeight > container.clientHeight) {
-          hasScrollableContent = true
-        }
-      })
-
-      setIsScrollable(hasScrollableContent)
-
-      // If not scrollable, always show bottom nav
-      if (!hasScrollableContent) {
-        setIsBottomNavVisible(true)
-      }
-    }
-
-    checkScrollable()
-
-    // Recheck on window resize or DOM changes
-    const observer = new MutationObserver(checkScrollable)
-    observer.observe(document.body, { childList: true, subtree: true })
-
-    window.addEventListener("resize", checkScrollable)
-
-    return () => {
-      observer.disconnect()
-      window.removeEventListener("resize", checkScrollable)
-    }
-  }, [])
-
-  useEffect(() => {
-    const handleScroll = (e: Event) => {
-      if (!isScrollable) return // Don't hide if not scrollable
-
-      const target = e.target as HTMLElement
-      if (!target.classList.contains("chat-scroll-container")) return
-
-      const currentScrollY = target.scrollTop
-
-      if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
-        // Scrolling down - hide nav
-        setIsBottomNavVisible(false)
-      } else if (currentScrollY < lastScrollY.current) {
-        // Scrolling up - show nav
-        setIsBottomNavVisible(true)
-      }
-
-      lastScrollY.current = currentScrollY
-    }
-
-    document.addEventListener("scroll", handleScroll, true)
-    return () => document.removeEventListener("scroll", handleScroll, true)
-  }, [isScrollable])
-
-  useEffect(() => {
-    const event = new CustomEvent("bottomNavStateChange", {
-      detail: {
-        height: isBottomNavVisible ? 96 : 0, // 96px = h-24
-        visible: isBottomNavVisible,
-      },
-    })
-    window.dispatchEvent(event)
-  }, [isBottomNavVisible])
-
   return (
-    <BottomNavProvider>
-      <TooltipProvider delayDuration={0}>
-        <PushNotificationManager userId={userId} />
-        <FirebasePushProvider userId={userId} />
+    <TooltipProvider delayDuration={0}>
+      <PushNotificationManager userId={userId} />
+      <FirebasePushProvider userId={userId} />
 
-        <div
-          className="relative h-dvh flex bg-background overflow-hidden"
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-        >
-          {/* Desktop Sidebar */}
-          <aside className="hidden md:flex w-64 flex-col bg-card border-l border-border">
-            <SidebarContent />
-          </aside>
+      <div
+        className="relative h-dvh flex bg-background overflow-hidden"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
+        {/* Desktop Sidebar */}
+        <aside className="hidden md:flex w-64 flex-col bg-card border-l border-border">
+          <SidebarContent />
+        </aside>
 
-          {/* Main Content */}
-          <main className="flex-1 lg:pr-0">{children}</main>
-
-          {/* Bottom Navigation - Mobile */}
-          <nav
+        {/* Main Content */}
+        <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          <div
             className={cn(
-              "lg:hidden fixed bottom-0 left-0 right-0 z-40 transition-all duration-300 ease-in-out h-24",
-              !isBottomNavVisible && "translate-y-full",
+              "flex-1 overflow-auto transition-all duration-300",
+              isBottomNavCollapsed ? "pb-0 md:pb-0" : "pb-20 md:pb-0",
             )}
           >
-            <div className="relative h-full bg-gradient-to-t from-background via-background to-background/95 backdrop-blur-lg border-t border-border/40">
-              <div className="flex items-center justify-around py-3 px-4">
-                <Link href="/chat">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={cn(
-                      "h-12 w-12 rounded-xl transition-all hover:scale-105",
-                      pathname === "/chat" && "bg-primary/10 text-primary",
-                    )}
-                  >
-                    <HomeIcon className="w-5 h-5" />
-                  </Button>
-                </Link>
+            {children}
+          </div>
 
+          <nav
+            className={cn(
+              "md:hidden fixed inset-x-0 bottom-0 bg-background/95 backdrop-blur-xl border-t border-border z-50 transition-all duration-300 safe-area-inset-bottom",
+              isBottomNavCollapsed ? "translate-y-full" : "translate-y-0",
+            )}
+          >
+            <button
+              onClick={() => setIsBottomNavCollapsed(!isBottomNavCollapsed)}
+              className="absolute -top-10 left-1/2 -translate-x-1/2 w-12 h-10 bg-background/95 backdrop-blur-xl border border-border rounded-t-xl flex items-center justify-center shadow-lg hover:bg-muted transition-colors"
+              aria-label={isBottomNavCollapsed ? "إظهار الشريط السفلي" : "إخفاء الشريط السفلي"}
+            >
+              {isBottomNavCollapsed ? (
+                <ChevronUpIcon className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronDownIcon className="w-4 h-4 text-muted-foreground" />
+              )}
+            </button>
+
+            <div className="flex items-center justify-around py-3 px-4">
+              <Link href="/chat">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-12 w-12 rounded-xl transition-all hover:scale-105"
-                  onClick={() => setCommandOpen(true)}
+                  className={cn(
+                    "h-12 w-12 rounded-xl transition-all hover:scale-105",
+                    pathname === "/chat" && "bg-primary/10 text-primary",
+                  )}
                 >
-                  <SearchIcon className="w-5 h-5" />
+                  <HomeIcon className="w-5 h-5" />
                 </Button>
+              </Link>
 
-                <Link href="/chat/notifications">
-                  <Button
-                    size="icon"
-                    className="h-14 w-14 rounded-xl bg-primary text-primary-foreground relative transition-all hover:scale-105 hover:shadow-lg"
-                  >
-                    <BellIcon className="w-6 h-6" />
-                    {unreadNotifications > 0 && (
-                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground text-[10px] rounded-full flex items-center justify-center animate-pulse">
-                        {unreadNotifications > 9 ? "9+" : unreadNotifications}
-                      </span>
-                    )}
-                  </Button>
-                </Link>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-12 w-12 rounded-xl transition-all hover:scale-105"
+                onClick={() => setCommandOpen(true)}
+              >
+                <SearchIcon className="w-5 h-5" />
+              </Button>
 
-                <Link href="/chat/assistant">
-                  <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl transition-all hover:scale-105">
-                    <SparklesIcon className="w-5 h-5 text-amber-500" />
-                  </Button>
-                </Link>
+              <Link href="/chat/notifications">
+                <Button
+                  size="icon"
+                  className="h-14 w-14 rounded-xl bg-primary text-primary-foreground relative transition-all hover:scale-105 hover:shadow-lg"
+                >
+                  <BellIcon className="w-6 h-6" />
+                  {unreadNotifications > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground text-[10px] rounded-full flex items-center justify-center animate-pulse">
+                      {unreadNotifications > 9 ? "9+" : unreadNotifications}
+                    </span>
+                  )}
+                </Button>
+              </Link>
 
-                <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-                  <SheetTrigger asChild>
-                    <Avatar className="w-10 h-10 cursor-pointer">
-                      <AvatarImage src={profile?.avatar_url || undefined} />
-                      <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                        {profile?.display_name?.charAt(0) || <XIcon className="w-4 h-4" />}
-                      </AvatarFallback>
-                    </Avatar>
-                  </SheetTrigger>
-                  <SheetContent side="right" className="w-72 p-0">
-                    <SidebarContent isMobile />
-                  </SheetContent>
-                </Sheet>
-              </div>
+              <Link href="/chat/assistant">
+                <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl transition-all hover:scale-105">
+                  <SparklesIcon className="w-5 h-5 text-amber-500" />
+                </Button>
+              </Link>
+
+              <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Avatar className="w-10 h-10 cursor-pointer">
+                    <AvatarImage src={profile?.avatar_url || undefined} />
+                    <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                      {profile?.display_name?.charAt(0) || <XIcon className="w-4 h-4" />}
+                    </AvatarFallback>
+                  </Avatar>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-72 p-0">
+                  <SidebarContent isMobile />
+                </SheetContent>
+              </Sheet>
             </div>
           </nav>
-        </div>
+        </main>
 
         {/* Command Palette */}
         <CommandDialog open={commandOpen} onOpenChange={setCommandOpen}>
@@ -684,16 +629,17 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
                 <SettingsIcon className="ml-2 h-4 w-4" />
                 {t.settings}
               </CommandItem>
-              {/* Assuming isAdmin is used elsewhere, we keep this logic */}
-              <CommandItem
-                onSelect={() => {
-                  router.push("/admin")
-                  setCommandOpen(false)
-                }}
-              >
-                <XIcon className="ml-2 h-4 w-4" />
-                {t.admin}
-              </CommandItem>
+              {isAdmin && (
+                <CommandItem
+                  onSelect={() => {
+                    router.push("/admin")
+                    setCommandOpen(false)
+                  }}
+                >
+                  <XIcon className="ml-2 h-4 w-4" />
+                  {t.admin}
+                </CommandItem>
+              )}
             </CommandGroup>
             <CommandGroup heading={t.cells}>
               {groups.map((group) => (
@@ -720,7 +666,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
                 {t.newCell}
               </CommandItem>
               <CommandItem onSelect={() => setTheme(theme === "dark" ? "light" : "dark")}>
-                {theme === "dark" ? <SunIcon className="ml-2 h-4 w-4" /> : <MoonIcon className="ml-2 h-4 w-4" />}
+                {theme === "dark" ? <XIcon className="ml-2 h-4 w-4" /> : <XIcon className="ml-2 h-4 w-4" />}
                 {theme === "dark" ? t.lightMode : t.darkMode}
               </CommandItem>
             </CommandGroup>
@@ -777,9 +723,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
             </div>
           </DialogContent>
         </Dialog>
-      </TooltipProvider>
-    </BottomNavProvider>
+      </div>
+    </TooltipProvider>
   )
 }
-
-export default AppShell

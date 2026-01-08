@@ -11,7 +11,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Card, CardContent } from "@/components/ui/card"
 import { ArrowRight, Sparkles, Loader2, User, Bot } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useBottomNav } from "@/lib/contexts/bottom-nav-context"
 
 interface Message {
   role: "user" | "assistant"
@@ -25,7 +24,6 @@ export default function AssistantPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
-  const { bottomNavHeight, isBottomNavVisible } = useBottomNav()
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -77,7 +75,7 @@ export default function AssistantPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] bg-background">
+    <div className="flex flex-col h-screen bg-background">
       {/* Header */}
       <div className="shrink-0 border-b border-border bg-card/50 backdrop-blur-xl">
         <div className="h-14 px-4 flex items-center gap-3">
@@ -92,8 +90,8 @@ export default function AssistantPage() {
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 overflow-x-hidden chat-scroll-container">
-        <div className="max-w-3xl mx-auto space-y-4 px-4 py-4">
+      <ScrollArea className="flex-1 p-4">
+        <div className="max-w-3xl mx-auto space-y-4">
           {messages.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center mx-auto mb-4">
@@ -188,12 +186,7 @@ export default function AssistantPage() {
       </ScrollArea>
 
       {/* Input */}
-      <div
-        className="shrink-0 border-t border-border bg-background/95 backdrop-blur-lg p-4 pb-safe fixed bottom-0 left-0 right-0 lg:relative transition-all duration-300"
-        style={{
-          bottom: `${bottomNavHeight}px`,
-        }}
-      >
+      <div className="shrink-0 border-t border-border bg-background p-4">
         <div className="max-w-3xl mx-auto flex gap-2">
           <Textarea
             value={input}
