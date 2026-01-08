@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -9,12 +9,26 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { Badge } from "@/components/ui/badge"
+import {
+  CommandDialog,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+} from "@/components/ui/command"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   HomeIcon,
   PlusIcon,
   Cog6ToothIcon as SettingsIcon,
   BellIcon,
+  MagnifyingGlassIcon as SearchIcon,
   SparklesIcon,
   TrophyIcon,
   MoonIcon,
@@ -29,7 +43,8 @@ import {
 import type { Group, Profile } from "@/lib/types"
 import { useTheme } from "next-themes"
 import { useSettings } from "@/components/settings-provider"
-import { BottomNavProvider, useBottomNav } from "@/lib/contexts/bottom-nav-context"
+import { PushNotificationManager } from "@/components/notifications/push-notification-manager"
+import { FirebasePushProvider } from "@/components/notifications/firebase-push-provider"
 
 interface AppShellProps {
   children: React.ReactNode
@@ -125,116 +140,96 @@ const translations = {
   },
 }
 
-const getGroupColor = (name: string) => {
-  const colors = [
-    "from-blue-500 to-blue-600",
-    "from-emerald-500 to-emerald-600",
-    "from-violet-500 to-violet-600",
-    "from-amber-500 to-amber-600",
-    "from-rose-500 to-rose-600",
-    "from-cyan-500 to-cyan-600",
-  ]
-  return colors[name.charCodeAt(0) % colors.length]
-}
-
-function BottomNavController() {
-  const { setIsVisible } = useBottomNav()
-  const [lastScrollY, setLastScrollY] = useState(0)
-  const [isScrollable, setIsScrollable] = useState(false)
-
-  useEffect(() => {
-    let ticking = false
-    const threshold = 10 // minimum scroll distance to trigger
-
-    const handleScroll = (e: Event) => {
-      if (!ticking) {
-        window.requestAnimationFrame(() => {
-          const target = e.target as HTMLElement
-
-          // Check if content is scrollable
-          const scrollable = target.scrollHeight > target.clientHeight
-          setIsScrollable(scrollable)
-
-          // Only hide/show if content is scrollable
-          if (scrollable) {
-            const currentScrollY = target.scrollTop
-            const scrollDiff = currentScrollY - lastScrollY
-
-            if (Math.abs(scrollDiff) > threshold) {
-              if (scrollDiff > 0) {
-                // Scrolling down - hide nav
-                setIsVisible(false)
-              } else {
-                // Scrolling up - show nav
-                setIsVisible(true)
-              }
-              setLastScrollY(currentScrollY)
-            }
-          } else {
-            // Not scrollable - always show nav
-            setIsVisible(true)
-          }
-
-          ticking = false
-        })
-        ticking = true
-      }
-    }
-
-    // Listen to scroll events from chat containers
-    const scrollContainers = document.querySelectorAll(".chat-scroll-container")
-    scrollContainers.forEach((container) => {
-      container.addEventListener("scroll", handleScroll, { passive: true })
-    })
-
-    // Check initial scrollable state
-    setTimeout(() => {
-      scrollContainers.forEach((container) => {
-        const scrollable = container.scrollHeight > container.clientHeight
-        setIsScrollable(scrollable)
-        if (!scrollable) {
-          setIsVisible(true)
-        }
-      })
-    }, 100)
-
-    return () => {
-      scrollContainers.forEach((container) => {
-        container.removeEventListener("scroll", handleScroll)
-      })
-    }
-  }, [lastScrollY, setIsVisible])
-
-  return null
-}
-
-function BottomNavigationBar({
-  pathname,
-  unreadCounts,
-  userId,
-  profile,
-  t,
-}: {
-  pathname: string
-  unreadCounts: Record<string, number>
-  userId: string
-  profile: Profile | null
-  t: typeof translations.ar
-}) {
-  const { isVisible } = useBottomNav()
-  const { theme, setTheme } = useTheme()
-  const router = useRouter()
+export function AppShell({ children, userId, profile, groups }: AppShellProps) {
+  const [commandOpen, setCommandOpen] = useState(false)
+  const [unreadNotifications, setUnreadNotifications] = useState(0)
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [isBottomNavCollapsed, setIsBottomNavCollapsed] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [touchStart, setTouchStart] = useState<number | null>(null)
+  const [touchEnd, setTouchEnd] = useState<number | null>(null)
   const [cellsExpanded, setCellsExpanded] = useState(true)
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
   const [inviteLink, setInviteLink] = useState("")
   const [isJoining, setIsJoining] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
-  const [groups, setGroups] = useState<Group[]>([])
-  const [isAdmin, setIsAdmin] = useState(false)
+  const [showBottomNav, setShowBottomNav] = useState(true)
+  const [lastScrollY, setLastScrollY] = useState(0)
+  const pathname = usePathname()
+  const router = useRouter()
+  const supabase = createClient()
+  const { theme, setTheme } = useTheme()
+  const { language } = useSettings()
+  const t = translations[language]
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      const { data } = await supabase.from("profiles").select("role").eq("id", userId).single()
+      setIsAdmin(data?.role === "admin" || data?.role === "owner")
+    }
+    checkAdmin()
+  }, [userId, supabase])
+
+  // Keyboard shortcut for command palette
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        setCommandOpen((open) => !open)
+      }
+    }
+    document.addEventListener("keydown", down)
+    return () => document.removeEventListener("keydown", down)
+  }, [])
+
+  // Fetch notifications and unread counts
+  const fetchUnreadData = useCallback(async () => {
+    const [notifResult, unreadResult] = await Promise.all([
+      supabase
+        .from("notifications")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("is_read", false),
+      supabase.from("group_unread_counts").select("group_id, unread_count").eq("user_id", userId),
+    ])
+
+    setUnreadNotifications(notifResult.count || 0)
+
+    if (unreadResult.data) {
+      const counts: Record<string, number> = {}
+      unreadResult.data.forEach((item) => {
+        counts[item.group_id] = item.unread_count
+      })
+      setUnreadCounts(counts)
+    }
+  }, [userId, supabase])
+
+  useEffect(() => {
+    fetchUnreadData()
+
+    // Real-time subscriptions
+    const channel = supabase
+      .channel("app-shell-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },
+        fetchUnreadData,
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "group_unread_counts", filter: `user_id=eq.${userId}` },
+        fetchUnreadData,
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [userId, supabase, fetchUnreadData])
 
   const handleSignOut = async () => {
-    await createClient().auth.signOut()
+    await supabase.auth.signOut()
     router.push("/")
   }
 
@@ -249,7 +244,7 @@ function BottomNavigationBar({
       const match = inviteLink.match(urlPattern)
 
       if (!match || !match[1]) {
-        setInviteError(translations.ar.invalidInviteLink)
+        setInviteError(t.invalidInviteLink)
         setIsJoining(false)
         return
       }
@@ -261,32 +256,30 @@ function BottomNavigationBar({
       setMobileMenuOpen(false)
     } catch (err) {
       console.error("Error joining by invite:", err)
-      setInviteError(translations.ar.invalidInviteLink)
+      setInviteError(t.invalidInviteLink)
     } finally {
       setIsJoining(false)
     }
   }
 
+  const getGroupColor = (name: string) => {
+    const colors = [
+      "from-blue-500 to-blue-600",
+      "from-emerald-500 to-emerald-600",
+      "from-violet-500 to-violet-600",
+      "from-amber-500 to-amber-600",
+      "from-rose-500 to-rose-600",
+      "from-cyan-500 to-cyan-600",
+    ]
+    return colors[name.charCodeAt(0) % colors.length]
+  }
+
   const isActiveGroup = (groupId: string) => pathname?.includes(groupId)
 
-  useEffect(() => {
-    const checkAdmin = async () => {
-      const { data } = await createClient().from("profiles").select("role").eq("id", userId).single()
-      setIsAdmin(data?.role === "admin" || data?.role === "owner")
-    }
-    checkAdmin()
-  }, [userId])
-
-  return (
-    <nav
-      className={cn(
-        "border-t border-border bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/80",
-        "transition-transform duration-300 ease-in-out md:hidden",
-        !isVisible && "translate-y-full",
-      )}
-    >
-      {/* Top bar */}
-      <div className="p-2 border-b border-border">
+  const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
+    <div className="flex flex-col h-full">
+      {/* User Profile Header */}
+      <div className="p-4 border-b border-border">
         <div className="flex items-center gap-3">
           <Avatar className="w-10 h-10">
             <AvatarImage src={profile?.avatar_url || undefined} />
@@ -317,33 +310,33 @@ function BottomNavigationBar({
             {t.goTo}
           </div>
 
-          <Link href="/chat" onClick={() => setMobileMenuOpen(false)}>
+          <Link href="/chat" onClick={() => isMobile && setMobileMenuOpen(false)}>
             <Button variant={pathname === "/chat" ? "secondary" : "ghost"} className="w-full justify-start gap-3 h-10">
               <HomeIcon className="w-4 h-4" />
               {t.home}
             </Button>
           </Link>
 
-          <Link href="/chat/notifications" onClick={() => setMobileMenuOpen(false)}>
+          <Link href="/chat/notifications" onClick={() => isMobile && setMobileMenuOpen(false)}>
             <Button variant="ghost" className="w-full justify-start gap-3 h-10 relative">
               <BellIcon className="w-4 h-4" />
               {t.notifications}
-              {unreadCounts["notifications"] > 0 && (
+              {unreadNotifications > 0 && (
                 <Badge className="mr-auto h-5 px-1.5 bg-destructive text-destructive-foreground">
-                  {unreadCounts["notifications"] > 99 ? "99+" : unreadCounts["notifications"]}
+                  {unreadNotifications > 99 ? "99+" : unreadNotifications}
                 </Badge>
               )}
             </Button>
           </Link>
 
-          <Link href="/chat/assistant" onClick={() => setMobileMenuOpen(false)}>
+          <Link href="/chat/assistant" onClick={() => isMobile && setMobileMenuOpen(false)}>
             <Button variant="ghost" className="w-full justify-start gap-3 h-10">
               <SparklesIcon className="w-4 h-4 text-amber-500" />
               {t.assistant}
             </Button>
           </Link>
 
-          <Link href="/chat/profile" onClick={() => setMobileMenuOpen(false)}>
+          <Link href="/chat/profile" onClick={() => isMobile && setMobileMenuOpen(false)}>
             <Button variant="ghost" className="w-full justify-start gap-3 h-10">
               <TrophyIcon className="w-4 h-4 text-amber-500" />
               {t.achievements}
@@ -366,7 +359,7 @@ function BottomNavigationBar({
               onClick={(e) => {
                 e.stopPropagation()
                 router.push("/chat?new=true")
-                setMobileMenuOpen(false)
+                isMobile && setMobileMenuOpen(false)
               }}
             >
               <PlusIcon className="w-3 h-3" />
@@ -376,7 +369,7 @@ function BottomNavigationBar({
           {cellsExpanded && (
             <>
               {groups.map((group) => (
-                <Link key={group.id} href={`/chat/${group.id}`} onClick={() => setMobileMenuOpen(false)}>
+                <Link key={group.id} href={`/chat/${group.id}`} onClick={() => isMobile && setMobileMenuOpen(false)}>
                   <Button
                     variant={isActiveGroup(group.id) ? "secondary" : "ghost"}
                     className="w-full justify-start gap-3 h-10"
@@ -435,7 +428,7 @@ function BottomNavigationBar({
       {/* Bottom Actions */}
       <div className="p-2 border-t border-border space-y-1">
         {isAdmin && (
-          <Link href="/admin" onClick={() => setMobileMenuOpen(false)}>
+          <Link href="/admin" onClick={() => isMobile && setMobileMenuOpen(false)}>
             <Button variant="ghost" className="w-full justify-start gap-3 h-10 text-cyan-500">
               <XIcon className="w-4 h-4" />
               {t.admin}
@@ -443,14 +436,14 @@ function BottomNavigationBar({
           </Link>
         )}
 
-        <Link href="/chat/settings" onClick={() => setMobileMenuOpen(false)}>
+        <Link href="/chat/settings" onClick={() => isMobile && setMobileMenuOpen(false)}>
           <Button variant="ghost" className="w-full justify-start gap-3 h-10">
             <SettingsIcon className="w-4 h-4" />
             {t.settings}
           </Button>
         </Link>
 
-        <Link href="/chat/about" onClick={() => setMobileMenuOpen(false)}>
+        <Link href="/chat/about" onClick={() => isMobile && setMobileMenuOpen(false)}>
           <Button variant="ghost" className="w-full justify-start gap-3 h-10">
             <HelpCircleIcon className="w-4 h-4" />
             {t.help}
@@ -466,270 +459,295 @@ function BottomNavigationBar({
           {t.signOut}
         </Button>
       </div>
-    </nav>
+    </div>
   )
-}
 
-export function AppShell({ children, userId, profile, groups }: AppShellProps) {
-  const [commandOpen, setCommandOpen] = useState(false)
-  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [cellsExpanded, setCellsExpanded] = useState(true)
-  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
-  const [inviteLink, setInviteLink] = useState("")
-  const [isJoining, setIsJoining] = useState(false)
-  const [inviteError, setInviteError] = useState<string | null>(null)
-  const pathname = usePathname()
-  const router = useRouter()
-  const supabase = createClient()
-  const { theme, setTheme } = useTheme()
-  const { language } = useSettings()
-  const t = translations[language]
-  const [isAdmin, setIsAdmin] = useState(false)
+  const minSwipeDistance = 50
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null)
+    setTouchStart(e.targetTouches[0].clientX)
+  }
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX)
+  }
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return
+
+    const distance = touchStart - touchEnd
+    const isRightSwipe = distance < -minSwipeDistance
+
+    if (isRightSwipe) {
+      setMobileMenuOpen(true)
+    }
+
+    setTouchStart(null)
+    setTouchEnd(null)
+  }
 
   useEffect(() => {
-    const fetchUnreadData = async () => {
-      const unreadResult = await supabase
-        .from("group_unread_counts")
-        .select("group_id, unread_count")
-        .eq("user_id", userId)
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY
 
-      if (unreadResult.data) {
-        const counts: Record<string, number> = {}
-        unreadResult.data.forEach((item) => {
-          counts[item.group_id] = item.unread_count
-        })
-        setUnreadCounts(counts)
+      // Show nav when scrolling up, hide when scrolling down
+      if (currentScrollY < lastScrollY || currentScrollY < 50) {
+        setShowBottomNav(true)
+      } else if (currentScrollY > lastScrollY && currentScrollY > 50) {
+        setShowBottomNav(false)
       }
+
+      setLastScrollY(currentScrollY)
     }
 
-    fetchUnreadData()
-
-    // Real-time subscriptions
-    const channel = supabase
-      .channel("app-shell-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "group_unread_counts", filter: `user_id=eq.${userId}` },
-        fetchUnreadData,
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [userId, supabase])
-
-  useEffect(() => {
-    const checkAdmin = async () => {
-      const { data } = await createClient().from("profiles").select("role").eq("id", userId).single()
-      setIsAdmin(data?.role === "admin" || data?.role === "owner")
-    }
-    checkAdmin()
-  }, [userId])
+    window.addEventListener("scroll", handleScroll, { passive: true })
+    return () => window.removeEventListener("scroll", handleScroll)
+  }, [lastScrollY])
 
   return (
-    <BottomNavProvider>
-      <BottomNavController />
-      <div className="relative h-dvh flex bg-background">
+    <TooltipProvider delayDuration={0}>
+      <PushNotificationManager userId={userId} />
+      <FirebasePushProvider userId={userId} />
+
+      <div
+        className="relative h-dvh flex bg-background overflow-hidden"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
         {/* Desktop Sidebar */}
         <aside className="hidden md:flex w-64 flex-col bg-card border-l border-border">
-          <div className="flex flex-col h-full">
-            {/* User Profile Header */}
-            <div className="p-4 border-b border-border">
-              <div className="flex items-center gap-3">
-                <Avatar className="w-10 h-10">
-                  <AvatarImage src={profile?.avatar_url || undefined} />
-                  <AvatarFallback className="bg-primary/10 text-primary">
-                    {profile?.display_name?.charAt(0) || <XIcon className="w-4 h-4" />}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold truncate">{profile?.display_name || "User"}</p>
-                  {profile?.username && <p className="text-xs text-muted-foreground truncate">@{profile.username}</p>}
-                </div>
+          <SidebarContent />
+        </aside>
+
+        {/* Main Content */}
+        <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          <div
+            className={cn(
+              "flex-1 overflow-auto transition-all duration-300",
+              isBottomNavCollapsed ? "pb-0 md:pb-0" : "pb-20 md:pb-0",
+            )}
+          >
+            {children}
+          </div>
+
+          <nav
+            className={cn(
+              "md:hidden fixed inset-x-0 bottom-0 bg-background/95 backdrop-blur-xl border-t border-border shadow-2xl transition-transform duration-300 ease-in-out",
+              showBottomNav ? "translate-y-0" : "translate-y-full",
+              isBottomNavCollapsed && "translate-y-[calc(100%-2.5rem)]",
+            )}
+          >
+            <button
+              onClick={() => setIsBottomNavCollapsed(!isBottomNavCollapsed)}
+              className="absolute -top-10 left-1/2 -translate-x-1/2 w-12 h-10 bg-background/95 backdrop-blur-xl border border-border rounded-t-xl flex items-center justify-center shadow-lg hover:bg-muted transition-colors"
+              aria-label={isBottomNavCollapsed ? "إظهار الشريط السفلي" : "إخفاء الشريط السفلي"}
+            >
+              {isBottomNavCollapsed ? (
+                <ChevronUpIcon className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronDownIcon className="w-4 h-4 text-muted-foreground" />
+              )}
+            </button>
+
+            <div className="flex items-center justify-around py-3 px-4">
+              <Link href="/chat">
                 <Button
-                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
+                  className={cn(
+                    "h-12 w-12 rounded-xl transition-all hover:scale-105",
+                    pathname === "/chat" && "bg-primary/10 text-primary",
+                  )}
                 >
-                  {theme === "dark" ? <SunIcon className="h-4 w-4" /> : <MoonIcon className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-
-            {/* Main Navigation */}
-            <ScrollArea className="flex-1">
-              <div className="p-2 space-y-1">
-                {/* Quick Actions */}
-                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  {t.goTo}
-                </div>
-
-                <Link href="/chat">
-                  <Button
-                    variant={pathname === "/chat" ? "secondary" : "ghost"}
-                    className="w-full justify-start gap-3 h-10"
-                  >
-                    <HomeIcon className="w-4 h-4" />
-                    {t.home}
-                  </Button>
-                </Link>
-
-                <Link href="/chat/notifications">
-                  <Button variant="ghost" className="w-full justify-start gap-3 h-10 relative">
-                    <BellIcon className="w-4 h-4" />
-                    {t.notifications}
-                    {unreadCounts["notifications"] > 0 && (
-                      <Badge className="ml-auto h-5 px-1.5 bg-destructive text-destructive-foreground">
-                        {unreadCounts["notifications"] > 99 ? "99+" : unreadCounts["notifications"]}
-                      </Badge>
-                    )}
-                  </Button>
-                </Link>
-
-                <Link href="/chat/assistant">
-                  <Button variant="ghost" className="w-full justify-start gap-3 h-10">
-                    <SparklesIcon className="w-4 h-4 text-amber-500" />
-                    {t.assistant}
-                  </Button>
-                </Link>
-
-                <Link href="/chat/profile">
-                  <Button variant="ghost" className="w-full justify-start gap-3 h-10">
-                    <TrophyIcon className="w-4 h-4 text-amber-500" />
-                    {t.achievements}
-                  </Button>
-                </Link>
-
-                {/* Cells Section */}
-                <div
-                  className="px-2 py-1.5 mt-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center justify-between cursor-pointer hover:bg-muted/50 rounded-md"
-                  onClick={() => setCellsExpanded(!cellsExpanded)}
-                >
-                  <div className="flex items-center gap-1">
-                    {cellsExpanded ? <ChevronDownIcon className="w-3 h-3" /> : <ChevronUpIcon className="w-3 h-3" />}
-                    {t.cells}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-5 w-5"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      router.push("/chat?new=true")
-                    }}
-                  >
-                    <PlusIcon className="w-3 h-3" />
-                  </Button>
-                </div>
-
-                {cellsExpanded && (
-                  <>
-                    {groups.map((group) => (
-                      <Link key={group.id} href={`/chat/${group.id}`}>
-                        <Button
-                          variant={pathname.includes(group.id) ? "secondary" : "ghost"}
-                          className="w-full justify-start gap-3 h-10"
-                        >
-                          <Avatar className="w-5 h-5">
-                            {group.avatar_url ? (
-                              <AvatarImage src={group.avatar_url || "/placeholder.svg"} />
-                            ) : (
-                              <AvatarFallback
-                                className={cn("text-[10px] text-white bg-gradient-to-br", getGroupColor(group.name))}
-                              >
-                                {group.name.substring(0, 2)}
-                              </AvatarFallback>
-                            )}
-                          </Avatar>
-                          <span className="truncate flex-1 text-right">{group.name}</span>
-                          {unreadCounts[group.id] > 0 && (
-                            <Badge className="h-5 px-1.5 bg-destructive text-destructive-foreground text-[10px]">
-                              {unreadCounts[group.id]}
-                            </Badge>
-                          )}
-                        </Button>
-                      </Link>
-                    ))}
-
-                    {groups.length === 0 && (
-                      <div className="px-3 py-6 text-center">
-                        <XIcon className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
-                        <p className="text-sm text-muted-foreground">لا توجد خلايا</p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="mt-2 bg-transparent"
-                          onClick={() => router.push("/chat?new=true")}
-                        >
-                          <PlusIcon className="w-3 h-3 ml-1" />
-                          {t.newCell}
-                        </Button>
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {/* Join by Invite */}
-                <Button
-                  onClick={() => setIsInviteDialogOpen(true)}
-                  variant="ghost"
-                  className="w-full justify-start gap-3 h-10 mt-1 text-muted-foreground hover:text-foreground"
-                >
-                  <Link2Icon className="w-5 h-5" />
-                  <span className="truncate flex-1 text-right text-sm">{t.joinByInvite}</span>
-                </Button>
-              </div>
-            </ScrollArea>
-
-            {/* Bottom Actions */}
-            <div className="p-2 border-t border-border space-y-1">
-              {isAdmin && (
-                <Link href="/admin">
-                  <Button variant="ghost" className="w-full justify-start gap-3 h-10 text-cyan-500">
-                    <XIcon className="w-4 h-4" />
-                    {t.admin}
-                  </Button>
-                </Link>
-              )}
-
-              <Link href="/chat/settings">
-                <Button variant="ghost" className="w-full justify-start gap-3 h-10">
-                  <SettingsIcon className="w-4 h-4" />
-                  {t.settings}
-                </Button>
-              </Link>
-
-              <Link href="/chat/about">
-                <Button variant="ghost" className="w-full justify-start gap-3 h-10">
-                  <HelpCircleIcon className="w-4 h-4" />
-                  {t.help}
+                  <HomeIcon className="w-5 h-5" />
                 </Button>
               </Link>
 
               <Button
                 variant="ghost"
-                className="w-full justify-start gap-3 h-10 text-destructive hover:text-destructive"
-                onClick={() => {
-                  createClient().auth.signOut()
-                  router.push("/")
+                size="icon"
+                className="h-12 w-12 rounded-xl transition-all hover:scale-105"
+                onClick={() => setCommandOpen(true)}
+              >
+                <SearchIcon className="w-5 h-5" />
+              </Button>
+
+              <Link href="/chat/notifications">
+                <Button
+                  size="icon"
+                  className="h-14 w-14 rounded-xl bg-primary text-primary-foreground relative transition-all hover:scale-105 hover:shadow-lg"
+                >
+                  <BellIcon className="w-6 h-6" />
+                  {unreadNotifications > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground text-[10px] rounded-full flex items-center justify-center animate-pulse">
+                      {unreadNotifications > 9 ? "9+" : unreadNotifications}
+                    </span>
+                  )}
+                </Button>
+              </Link>
+
+              <Link href="/chat/assistant">
+                <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl transition-all hover:scale-105">
+                  <SparklesIcon className="w-5 h-5 text-amber-500" />
+                </Button>
+              </Link>
+
+              <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Avatar className="w-10 h-10 cursor-pointer">
+                    <AvatarImage src={profile?.avatar_url || undefined} />
+                    <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                      {profile?.display_name?.charAt(0) || <XIcon className="w-4 h-4" />}
+                    </AvatarFallback>
+                  </Avatar>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-72 p-0">
+                  <SidebarContent isMobile />
+                </SheetContent>
+              </Sheet>
+            </div>
+          </nav>
+        </main>
+
+        {/* Command Palette */}
+        <CommandDialog open={commandOpen} onOpenChange={setCommandOpen}>
+          <CommandInput placeholder={t.searchPlaceholder} />
+          <CommandList>
+            <CommandEmpty>{t.noResults}</CommandEmpty>
+            <CommandGroup heading={t.goTo}>
+              <CommandItem
+                onSelect={() => {
+                  router.push("/chat")
+                  setCommandOpen(false)
                 }}
               >
-                <LogOutIcon className="w-4 h-4" />
-                {t.signOut}
+                <HomeIcon className="ml-2 h-4 w-4" />
+                {t.home}
+              </CommandItem>
+              <CommandItem
+                onSelect={() => {
+                  router.push("/chat/notifications")
+                  setCommandOpen(false)
+                }}
+              >
+                <BellIcon className="ml-2 h-4 w-4" />
+                {t.notifications}
+              </CommandItem>
+              <CommandItem
+                onSelect={() => {
+                  router.push("/chat/assistant")
+                  setCommandOpen(false)
+                }}
+              >
+                <SparklesIcon className="ml-2 h-4 w-4" />
+                {t.assistant}
+              </CommandItem>
+              <CommandItem
+                onSelect={() => {
+                  router.push("/chat/settings/appearance")
+                  setCommandOpen(false)
+                }}
+              >
+                <SettingsIcon className="ml-2 h-4 w-4" />
+                {t.settings}
+              </CommandItem>
+              {isAdmin && (
+                <CommandItem
+                  onSelect={() => {
+                    router.push("/admin")
+                    setCommandOpen(false)
+                  }}
+                >
+                  <XIcon className="ml-2 h-4 w-4" />
+                  {t.admin}
+                </CommandItem>
+              )}
+            </CommandGroup>
+            <CommandGroup heading={t.cells}>
+              {groups.map((group) => (
+                <CommandItem
+                  key={group.id}
+                  onSelect={() => {
+                    router.push(`/chat/${group.id}`)
+                    setCommandOpen(false)
+                  }}
+                >
+                  <XIcon className="ml-2 h-4 w-4" />
+                  {group.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+            <CommandGroup heading={t.actions}>
+              <CommandItem
+                onSelect={() => {
+                  router.push("/chat?new=true")
+                  setCommandOpen(false)
+                }}
+              >
+                <PlusIcon className="ml-2 h-4 w-4" />
+                {t.newCell}
+              </CommandItem>
+              <CommandItem onSelect={() => setTheme(theme === "dark" ? "light" : "dark")}>
+                {theme === "dark" ? <SunIcon className="ml-2 h-4 w-4" /> : <MoonIcon className="ml-2 h-4 w-4" />}
+                {theme === "dark" ? t.lightMode : t.darkMode}
+              </CommandItem>
+            </CommandGroup>
+          </CommandList>
+        </CommandDialog>
+
+        {/* Join by Invite Dialog */}
+        <Dialog
+          open={isInviteDialogOpen}
+          onOpenChange={(open) => {
+            setIsInviteDialogOpen(open)
+            if (!open) {
+              setInviteError(null)
+              setInviteLink("")
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>{t.joinByInvite}</DialogTitle>
+              <DialogDescription>
+                {language === "ar" ? "الصق رابط الدعوة للانضمام إلى خلية" : "Paste invite link to join a cell"}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              {inviteError && (
+                <div className="p-3 rounded-xl bg-destructive/10 text-destructive text-sm">{inviteError}</div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="inviteLinkSidebar">{language === "ar" ? "رابط الدعوة" : "Invite Link"}</Label>
+                <Input
+                  id="inviteLinkSidebar"
+                  value={inviteLink}
+                  onChange={(e) => setInviteLink(e.target.value)}
+                  placeholder={t.inviteLinkPlaceholder}
+                  className="bg-background rounded-xl"
+                  dir="ltr"
+                />
+              </div>
+              <Button
+                onClick={handleJoinByInvite}
+                disabled={!inviteLink.trim() || isJoining}
+                className="w-full rounded-xl h-11"
+              >
+                {isJoining ? (
+                  <>
+                    <XIcon className="w-4 h-4 animate-spin ml-2" />
+                    {t.joining}
+                  </>
+                ) : (
+                  t.join
+                )}
               </Button>
             </div>
-          </div>
-        </aside>
-
-        {/* Mobile Bottom Navigation */}
-        <BottomNavigationBar pathname={pathname} unreadCounts={unreadCounts} userId={userId} profile={profile} t={t} />
-
-        {/* Main Content */}
-        <main className="flex-1 overflow-hidden">{children}</main>
+          </DialogContent>
+        </Dialog>
       </div>
-    </BottomNavProvider>
+    </TooltipProvider>
   )
 }
