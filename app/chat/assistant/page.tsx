@@ -112,7 +112,11 @@ export default function AssistantPage() {
       </div>
 
       {/* Messages - using native scroll with onScroll handler */}
-      <div ref={messagesContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto overflow-x-hidden">
+      <div
+        ref={messagesContainerRef}
+        onScroll={handleScroll}
+        className="chat-scroll-container flex-1 overflow-y-auto overflow-x-hidden"
+      >
         <div className="max-w-3xl mx-auto space-y-4 px-4 py-4">
           {messages.length === 0 ? (
             <div className="text-center py-12">
@@ -211,7 +215,7 @@ export default function AssistantPage() {
       <div
         className="shrink-0 border-t border-border bg-background/95 backdrop-blur-lg p-4 transition-all duration-300"
         style={{
-          paddingBottom: `max(env(safe-area-inset-bottom), ${bottomNavHeight + 16}px)`,
+          paddingBottom: `max(env(safe-area-inset-bottom), ${bottomNavHeight}px)`,
         }}
       >
         <div className="max-w-3xl mx-auto flex gap-2">
