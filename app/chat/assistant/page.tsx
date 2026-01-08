@@ -24,6 +24,7 @@ export default function AssistantPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
   const { bottomNavHeight, isBottomNavVisible } = useBottomNav()
 
@@ -38,6 +39,33 @@ export default function AssistantPage() {
       scrollRef.current.scrollIntoView({ behavior: "smooth" })
     }
   }, [messages])
+
+  useEffect(() => {
+    const scrollContainer = scrollAreaRef.current?.querySelector("[data-radix-scroll-area-viewport]")
+    if (!scrollContainer) return
+
+    let lastScrollTop = 0
+
+    const handleScroll = (e: Event) => {
+      const element = scrollContainer as HTMLElement
+      const isScrollable = element.scrollHeight > element.clientHeight
+
+      if (isScrollable) {
+        const scrollTop = element.scrollTop
+        const scrollDirection = scrollTop > lastScrollTop ? "down" : "up"
+        lastScrollTop = scrollTop
+
+        window.dispatchEvent(
+          new CustomEvent("chat-scroll", {
+            detail: { direction: scrollDirection, isScrollable, scrollTop },
+          }),
+        )
+      }
+    }
+
+    scrollContainer.addEventListener("scroll", handleScroll, { passive: true })
+    return () => scrollContainer.removeEventListener("scroll", handleScroll)
+  }, [])
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
@@ -92,7 +120,7 @@ export default function AssistantPage() {
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 overflow-x-hidden chat-scroll-container">
+      <ScrollArea ref={scrollAreaRef} className="flex-1 overflow-x-hidden chat-scroll-container">
         <div className="max-w-3xl mx-auto space-y-4 px-4 py-4">
           {messages.length === 0 ? (
             <div className="text-center py-12">
