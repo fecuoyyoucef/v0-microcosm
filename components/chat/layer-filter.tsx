@@ -13,7 +13,9 @@ import {
   ArchiveBoxIcon,
   DocumentTextIcon,
   ArrowTrendingUpIcon,
-} from "@heroicons/react/24/solid"
+  ChevronDownIcon,
+  ChevronUpIcon,
+} from "@heroicons/react/24/outline"
 import type { MessageLayer, ConversationNode } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
@@ -80,9 +82,9 @@ export function LayerFilter({
           className="h-6 w-6 p-0 hover:bg-secondary transition-all duration-200"
         >
           {isCollapsed ? (
-            <ArrowTrendingUpIcon className="w-4 h-4 transition-transform duration-200" />
+            <ChevronDownIcon className="w-4 h-4 transition-transform duration-200" />
           ) : (
-            <ArrowTrendingUpIcon className="w-4 h-4 transition-transform duration-200" />
+            <ChevronUpIcon className="w-4 h-4 transition-transform duration-200" />
           )}
         </Button>
       </div>
