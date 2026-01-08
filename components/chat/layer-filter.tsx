@@ -90,13 +90,13 @@ export function LayerFilter({
       <div
         className={cn("overflow-hidden transition-all duration-300 ease-in-out", isCollapsed ? "max-h-0" : "max-h-12")}
       >
-        <div className="overflow-x-auto scrollbar-hide">
-          <div className="flex items-center gap-2 px-3 py-2 min-w-max">
+        <div className="overflow-x-auto scrollbar-hide w-full">
+          <div className="flex items-center gap-2 px-3 py-2">
             <Button
               variant={activeLayer === "all" ? "secondary" : "ghost"}
               size="sm"
               onClick={() => onLayerChange("all")}
-              className={cn("h-8 text-xs gap-1.5 rounded-full", activeLayer === "all" && "shadow-sm")}
+              className={cn("h-8 text-xs gap-1.5 rounded-full whitespace-nowrap", activeLayer === "all" && "shadow-sm")}
             >
               <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M6 4h12v2H6V4zm0 7h12v2H6v-2zm0 7h12v2H6v-2z" />
@@ -109,7 +109,7 @@ export function LayerFilter({
               size="sm"
               onClick={() => onLayerChange("upper")}
               className={cn(
-                "h-8 text-xs gap-1.5 rounded-full",
+                "h-8 text-xs gap-1.5 rounded-full whitespace-nowrap",
                 activeLayer === "upper" && "bg-orange-100 dark:bg-orange-900/40 shadow-sm",
               )}
             >
@@ -121,7 +121,10 @@ export function LayerFilter({
               variant={activeLayer === "standard" ? "secondary" : "ghost"}
               size="sm"
               onClick={() => onLayerChange("standard")}
-              className={cn("h-8 text-xs gap-1.5 rounded-full", activeLayer === "standard" && "shadow-sm")}
+              className={cn(
+                "h-8 text-xs gap-1.5 rounded-full whitespace-nowrap",
+                activeLayer === "standard" && "shadow-sm",
+              )}
             >
               <span className="w-2 h-2 rounded-full bg-gray-400" />
               عادي
@@ -132,7 +135,7 @@ export function LayerFilter({
               size="sm"
               onClick={() => onLayerChange("shadow")}
               className={cn(
-                "h-8 text-xs gap-1.5 rounded-full",
+                "h-8 text-xs gap-1.5 rounded-full whitespace-nowrap",
                 activeLayer === "shadow" && "bg-gray-200 dark:bg-gray-800 shadow-sm",
               )}
             >
@@ -143,7 +146,11 @@ export function LayerFilter({
             <div className="w-px h-6 bg-border/50 mx-1" />
 
             <Link href={`/chat/${groupId}/decisions`}>
-              <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-amber-500/10">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs gap-1.5 rounded-full hover:bg-amber-500/10 whitespace-nowrap"
+              >
                 <CheckCircleIcon className="w-3.5 h-3.5 text-amber-600" />
                 القرارات
               </Button>
@@ -154,7 +161,7 @@ export function LayerFilter({
                 <Button
                   variant={selectedNodeId ? "secondary" : "ghost"}
                   size="sm"
-                  className="h-8 text-xs gap-1.5 rounded-full hover:bg-violet-500/10"
+                  className="h-8 text-xs gap-1.5 rounded-full hover:bg-violet-500/10 whitespace-nowrap"
                 >
                   <CodeBracketIcon className="w-3.5 h-3.5 text-violet-600" />
                   العقد
@@ -179,63 +186,99 @@ export function LayerFilter({
             </Sheet>
 
             <Link href={`/chat/${groupId}/map`}>
-              <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-cyan-500/10">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs gap-1.5 rounded-full hover:bg-cyan-500/10 whitespace-nowrap"
+              >
                 <MapPinIcon className="w-3.5 h-3.5 text-cyan-600" />
                 الخريطة
               </Button>
             </Link>
 
             <Link href={`/chat/${groupId}/notebook`}>
-              <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-emerald-500/10">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs gap-1.5 rounded-full hover:bg-emerald-500/10 whitespace-nowrap"
+              >
                 <BookOpenIcon className="w-3.5 h-3.5 text-emerald-600" />
                 المفكرة
               </Button>
             </Link>
 
             <Link href={`/chat/${groupId}/memory`}>
-              <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-purple-500/10">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs gap-1.5 rounded-full hover:bg-purple-500/10 whitespace-nowrap"
+              >
                 <LightBulbIcon className="w-3.5 h-3.5 text-purple-600" />
                 الذاكرة
               </Button>
             </Link>
 
             <Link href={`/chat/${groupId}/archive`}>
-              <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-stone-500/10">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs gap-1.5 rounded-full hover:bg-stone-500/10 whitespace-nowrap"
+              >
                 <ArchiveBoxIcon className="w-3.5 h-3.5 text-stone-600" />
                 الأرشيف
               </Button>
             </Link>
 
             <Link href={`/chat/${groupId}/summary`}>
-              <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-blue-500/10">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs gap-1.5 rounded-full hover:bg-blue-500/10 whitespace-nowrap"
+              >
                 <DocumentTextIcon className="w-3.5 h-3.5 text-blue-600" />
                 الملخص
               </Button>
             </Link>
 
             <Link href={`/chat/${groupId}/quality`}>
-              <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-green-500/10">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs gap-1.5 rounded-full hover:bg-green-500/10 whitespace-nowrap"
+              >
                 <ArrowTrendingUpIcon className="w-3.5 h-3.5 text-green-600" />
                 جودة النقاش
               </Button>
             </Link>
 
             <Link href={`/chat/${groupId}/search`}>
-              <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-blue-500/10">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs gap-1.5 rounded-full hover:bg-blue-500/10 whitespace-nowrap"
+              >
                 <MagnifyingGlassIcon className="w-3.5 h-3.5 text-blue-600" />
                 البحث
               </Button>
             </Link>
 
             <Link href={`/chat/${groupId}/analytics`}>
-              <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-pink-500/10">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs gap-1.5 rounded-full hover:bg-pink-500/10 whitespace-nowrap"
+              >
                 <ChartBarIcon className="w-3.5 h-3.5 text-pink-600" />
                 التحليلات
               </Button>
             </Link>
 
             <Link href={`/chat/${groupId}/assistant`}>
-              <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-yellow-500/10">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs gap-1.5 rounded-full hover:bg-yellow-500/10 whitespace-nowrap"
+              >
                 <SparklesIcon className="w-3.5 h-3.5 text-yellow-600" />
                 المساعد
               </Button>
