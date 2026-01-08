@@ -77,7 +77,7 @@ export default function AssistantPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="flex flex-col h-[calc(100vh-64px)] bg-background">
       {/* Header */}
       <div className="shrink-0 border-b border-border bg-card/50 backdrop-blur-xl">
         <div className="h-14 px-4 flex items-center gap-3">
@@ -92,8 +92,8 @@ export default function AssistantPage() {
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4 chat-scroll-container">
-        <div className="max-w-3xl mx-auto space-y-4">
+      <ScrollArea className="flex-1 overflow-x-hidden chat-scroll-container">
+        <div className="max-w-3xl mx-auto space-y-4 px-4 py-4">
           {messages.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center mx-auto mb-4">
