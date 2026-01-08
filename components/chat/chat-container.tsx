@@ -645,7 +645,7 @@ export function ChatContainer({
         <div
           className={cn(
             "relative z-20 transition-transform duration-300",
-            scrollDirection === "down" ? "translate-y-full" : "translate-y-0",
+            scrollDirection === "down" ? "translate-y-16" : "translate-y-0",
           )}
         >
           <MessageInput
