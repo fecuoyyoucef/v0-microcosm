@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils"
 import Image from "next/image"
 import { toast } from "react-toastify"
 import { parseMentions } from "@/lib/utils"
+import { useBottomNav } from "@/lib/contexts/bottom-nav-context"
 
 interface MessageInputProps {
   onSend: (
@@ -98,6 +99,7 @@ export function MessageInput({
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const supabase = createClient()
   const router = useRouter()
+  const { bottomNavHeight } = useBottomNav()
 
   const otherMembers = members.filter((m) => m.user_id !== currentUserId)
   const currentLayerOption = layerOptions.find((l) => l.value === selectedLayer)!
@@ -393,7 +395,14 @@ export function MessageInput({
   }
 
   return (
-    <div className="shrink-0 border-t border-border/50 bg-background w-full max-w-full overflow-hidden relative">
+    <div
+      className={cn(
+        "sticky bg-background/95 backdrop-blur-lg border-t border-border p-4 pb-safe transition-all duration-300 lg:static",
+      )}
+      style={{
+        bottom: `${bottomNavHeight}px`,
+      }}
+    >
       {editingMessage && (
         <div className="px-3 py-1.5 bg-muted/50 border-b border-border/50 flex items-center justify-between animate-in slide-in-from-bottom-2 duration-200">
           <div className="flex items-center gap-2 min-w-0 flex-1">

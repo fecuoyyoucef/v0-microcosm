@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Card, CardContent } from "@/components/ui/card"
 import { ArrowRight, Sparkles, Loader2, User, Bot } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useBottomNav } from "@/lib/contexts/bottom-nav-context"
 
 interface Message {
   role: "user" | "assistant"
@@ -24,6 +25,7 @@ export default function AssistantPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
+  const { bottomNavHeight, isBottomNavVisible } = useBottomNav()
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -186,7 +188,12 @@ export default function AssistantPage() {
       </ScrollArea>
 
       {/* Input */}
-      <div className="shrink-0 border-t border-border bg-background/95 backdrop-blur-lg p-4 pb-safe">
+      <div
+        className="shrink-0 border-t border-border bg-background/95 backdrop-blur-lg p-4 pb-safe fixed bottom-0 left-0 right-0 lg:relative transition-all duration-300"
+        style={{
+          bottom: `${bottomNavHeight}px`,
+        }}
+      >
         <div className="max-w-3xl mx-auto flex gap-2">
           <Textarea
             value={input}
