@@ -544,21 +544,6 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
   }, [isScrollable])
 
   useEffect(() => {
-    const handleChatScroll = (e: CustomEvent) => {
-      const { scrollY, lastScrollY: prevScrollY, direction } = e.detail
-
-      if (scrollY > 50 && direction === "down") {
-        setIsBottomNavVisible(false)
-      } else if (direction === "up") {
-        setIsBottomNavVisible(true)
-      }
-    }
-
-    window.addEventListener("chatScrollEvent" as any, handleChatScroll)
-    return () => window.removeEventListener("chatScrollEvent" as any, handleChatScroll)
-  }, [])
-
-  useEffect(() => {
     const event = new CustomEvent("bottomNavStateChange", {
       detail: {
         height: isBottomNavVisible ? 96 : 0, // 96px = h-24

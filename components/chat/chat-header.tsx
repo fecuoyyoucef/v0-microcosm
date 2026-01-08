@@ -395,7 +395,7 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
                 <UsersIcon className="h-4 w-4" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-screen max-w-sm p-0">
+            <SheetContent side="left" className="w-[85vw] max-w-sm p-0">
               <SheetHeader className="p-4 border-b">
                 <SheetTitle>أعضاء المجموعة</SheetTitle>
                 <SheetDescription>

@@ -559,7 +559,7 @@ export function ChatContainer({
   }
 
   return (
-    <div className="relative flex flex-col h-screen w-full max-w-full box-border overflow-hidden">
+    <div className="relative flex flex-col h-full w-full overflow-hidden">
       {importantMessageToasts.map((message) => (
         <ImportantMessageToast key={message.id} message={message} onClose={() => removeImportantToast(message.id)} />
       ))}
@@ -570,7 +570,7 @@ export function ChatContainer({
         </div>
       )}
 
-      <div className="relative z-10 flex flex-col h-full w-full max-w-full bg-transparent overflow-hidden">
+      <div className="relative z-10 flex flex-col h-full overflow-hidden bg-transparent">
         <ChatHeader
           group={group}
           members={members}
@@ -581,60 +581,56 @@ export function ChatContainer({
 
         <OnlineIndicator onlineUsers={onlineUsers} />
 
-        <div className="flex-1 flex flex-col min-h-0 w-full max-w-full overflow-hidden relative">
-          <LayerFilter
-            activeLayer={activeLayer}
-            onLayerChange={setActiveLayer}
-            nodes={nodes}
-            selectedNodeId={selectedNodeId}
-            onNodeChange={setSelectedNodeId}
-            onNodesUpdate={fetchNodes}
+        <LayerFilter
+          activeLayer={activeLayer}
+          onLayerChange={setActiveLayer}
+          nodes={nodes}
+          selectedNodeId={selectedNodeId}
+          onNodeChange={setSelectedNodeId}
+          onNodesUpdate={fetchNodes}
+          currentUserId={currentUserId}
+          isAdmin={currentUserRole === "admin"}
+          groupId={groupId}
+          messages={messages.map((m) => ({
+            id: m.id,
+            content: m.content,
+            sender_id: m.sender_id,
+            created_at: m.created_at,
+          }))}
+        />
+
+        <div className="flex-1 overflow-y-auto bg-transparent chat-scroll-container">
+          <MessageList
+            messages={filteredMessages}
             currentUserId={currentUserId}
-            isAdmin={currentUserRole === "admin"}
-            groupId={groupId}
-            messages={messages.map((m) => ({
-              id: m.id,
-              content: m.content,
-              sender_id: m.sender_id,
-              created_at: m.created_at,
-            }))}
-          />
-
-          <div className="flex-1 overflow-y-auto overflow-x-hidden bg-transparent px-2 chat-scroll-container">
-            <MessageList
-              messages={filteredMessages}
-              currentUserId={currentUserId}
-              members={members}
-              isLoading={isLoading}
-              messagesEndRef={messagesEndRef}
-              nodes={nodes}
-              onReplySelect={handleReply}
-              onEditSelect={handleEditMessage}
-              onMessageDeleted={(messageId) => {
-                setMessages((prev) => prev.filter((m) => m.id !== messageId))
-              }}
-            />
-            <TypingIndicator userNames={typingUserNames} />
-          </div>
-        </div>
-
-        <div className="w-full max-w-full mt-auto">
-          <MessageInput
-            onSend={sendMessage}
             members={members}
-            currentUserId={currentUserId}
+            isLoading={isLoading}
+            messagesEndRef={messagesEndRef}
             nodes={nodes}
-            selectedNodeId={selectedNodeId}
-            groupId={groupId}
-            isAdmin={currentUserRole === "admin"}
-            groupSettings={groupSettings}
-            replyingTo={replyingTo}
-            onCancelReply={() => setReplyingTo(null)}
-            onTyping={broadcastTyping}
-            editingMessage={editingMessage}
-            onCancelEdit={() => setEditingMessage(null)}
+            onReplySelect={handleReply}
+            onEditSelect={handleEditMessage}
+            onMessageDeleted={(messageId) => {
+              setMessages((prev) => prev.filter((m) => m.id !== messageId))
+            }}
           />
+          <TypingIndicator userNames={typingUserNames} />
         </div>
+
+        <MessageInput
+          onSend={sendMessage}
+          members={members}
+          currentUserId={currentUserId}
+          nodes={nodes}
+          selectedNodeId={selectedNodeId}
+          groupId={groupId}
+          isAdmin={currentUserRole === "admin"}
+          groupSettings={groupSettings}
+          replyingTo={replyingTo}
+          onCancelReply={() => setReplyingTo(null)}
+          onTyping={broadcastTyping}
+          editingMessage={editingMessage}
+          onCancelEdit={() => setEditingMessage(null)}
+        />
       </div>
     </div>
   )

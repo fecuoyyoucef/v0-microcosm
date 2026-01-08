@@ -397,8 +397,11 @@ export function MessageInput({
   return (
     <div
       className={cn(
-        "relative bg-background/95 backdrop-blur-lg border-t border-border p-4 pb-safe transition-all duration-300 lg:static",
+        "sticky bg-background/95 backdrop-blur-lg border-t border-border p-4 pb-safe transition-all duration-300 lg:static",
       )}
+      style={{
+        bottom: `${bottomNavHeight}px`,
+      }}
     >
       {editingMessage && (
         <div className="px-3 py-1.5 bg-muted/50 border-b border-border/50 flex items-center justify-between animate-in slide-in-from-bottom-2 duration-200">
@@ -461,7 +464,7 @@ export function MessageInput({
         </div>
       )}
 
-      <div className="p-2 w-full max-w-full box-border">
+      <div className="p-2 w-full max-w-full">
         {/* File previews */}
         {filePreviews.length > 0 && (
           <div className="flex flex-wrap gap-2 p-2 border-t border-border">
@@ -551,7 +554,7 @@ export function MessageInput({
               onChange={handleContentChange}
               onKeyDown={handleKeyDown}
               placeholder="اكتب رسالة... (@للإشارة)"
-              className="flex-1 min-w-0 min-h-[32px] max-h-20 resize-none border-0 bg-transparent px-2 text-sm py-1.5 focus-visible:ring-0"
+              className="min-h-[32px] max-h-20 resize-none border-0 bg-transparent px-2 text-sm py-1.5 focus-visible:ring-0 flex-1 min-w-0"
               rows={1}
             />
 
