@@ -397,7 +397,7 @@ export function MessageInput({
   return (
     <div
       className={cn(
-        "sticky bg-background/95 backdrop-blur-lg border-t border-border p-4 pb-safe transition-all duration-300 lg:static overflow-x-hidden",
+        "sticky bg-background/95 backdrop-blur-lg border-t border-border p-4 pb-safe transition-all duration-300 lg:static",
       )}
       style={{
         bottom: `${bottomNavHeight}px`,
@@ -498,7 +498,7 @@ export function MessageInput({
         )}
 
         {/* Input row - redesigned to prevent overflow */}
-        <div className="flex items-center gap-2 w-full max-w-full">
+        <div className="flex items-center gap-2 w-full">
           {/* Camera button */}
           <Button
             variant="outline"
@@ -520,7 +520,7 @@ export function MessageInput({
           />
 
           {/* Text input container */}
-          <div className="flex-1 min-w-0 flex items-center gap-1 border border-border/80 bg-muted/30 rounded-full px-3 py-1 relative">
+          <div className="w-full max-w-[calc(100%-56px)] flex items-center gap-1 border border-border/80 bg-muted/30 rounded-full px-3 py-1 relative">
             {/* Layer picker */}
             <Popover open={isLayerOpen} onOpenChange={setIsLayerOpen}>
               <PopoverTrigger asChild>
@@ -554,7 +554,7 @@ export function MessageInput({
               onChange={handleContentChange}
               onKeyDown={handleKeyDown}
               placeholder="اكتب رسالة... (@للإشارة)"
-              className="min-h-[32px] max-h-20 resize-none border-0 bg-transparent px-2 text-sm py-1.5 focus-visible:ring-0 flex-1 min-w-0"
+              className="min-h-[32px] max-h-20 resize-none border-0 bg-transparent px-2 text-sm py-1.5 focus-visible:ring-0 w-full"
               rows={1}
             />
 
