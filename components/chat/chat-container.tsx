@@ -12,6 +12,7 @@ import { TypingIndicator } from "./typing-indicator"
 import { OnlineIndicator } from "./online-indicator"
 import { ImportantMessageToast } from "./important-message-toast"
 import type { Group, GroupMember, Message, MessageLayer, ConversationNode, GroupSettings } from "@/lib/types"
+import { cn } from "@/lib/utils"
 
 interface ChatContainerProps {
   groupId: string
@@ -37,7 +38,10 @@ export function ChatContainer({
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
   const [editingMessage, setEditingMessage] = useState<Message | null>(null)
   const [importantMessageToasts, setImportantMessageToasts] = useState<Message[]>([])
+  const [scrollDirection, setScrollDirection] = useState<"up" | "down">("up")
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const lastScrollYRef = useRef(0)
   const supabase = createClient()
   const isMounted = useRef(true)
   const pendingMessageIds = useRef<Set<string>>(new Set())
@@ -400,6 +404,25 @@ export function ChatContainer({
     }
   }, [groupId, fetchMessages, fetchMembers, fetchNodes, supabase, currentUserId, resetUnreadCount])
 
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current
+    if (!scrollContainer) return
+
+    const handleScroll = () => {
+      const currentScrollY = scrollContainer.scrollTop
+      const direction = currentScrollY > lastScrollYRef.current ? "down" : "up"
+
+      if (direction !== scrollDirection) {
+        setScrollDirection(direction)
+      }
+
+      lastScrollYRef.current = currentScrollY
+    }
+
+    scrollContainer.addEventListener("scroll", handleScroll)
+    return () => scrollContainer.removeEventListener("scroll", handleScroll)
+  }, [scrollDirection])
+
   const filteredMessages =
     activeLayer === "all"
       ? selectedNodeId
@@ -599,7 +622,10 @@ export function ChatContainer({
           }))}
         />
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden bg-transparent chat-scroll-container">
+        <div
+          ref={scrollContainerRef}
+          className="flex-1 overflow-y-auto overflow-x-hidden bg-transparent chat-scroll-container"
+        >
           <MessageList
             messages={filteredMessages}
             currentUserId={currentUserId}
@@ -616,21 +642,28 @@ export function ChatContainer({
           <TypingIndicator userNames={typingUserNames} />
         </div>
 
-        <MessageInput
-          onSend={sendMessage}
-          members={members}
-          currentUserId={currentUserId}
-          nodes={nodes}
-          selectedNodeId={selectedNodeId}
-          groupId={groupId}
-          isAdmin={currentUserRole === "admin"}
-          groupSettings={groupSettings}
-          replyingTo={replyingTo}
-          onCancelReply={() => setReplyingTo(null)}
-          onTyping={broadcastTyping}
-          editingMessage={editingMessage}
-          onCancelEdit={() => setEditingMessage(null)}
-        />
+        <div
+          className={cn(
+            "transition-transform duration-300",
+            scrollDirection === "down" ? "translate-y-full" : "translate-y-0",
+          )}
+        >
+          <MessageInput
+            onSend={sendMessage}
+            members={members}
+            currentUserId={currentUserId}
+            nodes={nodes}
+            selectedNodeId={selectedNodeId}
+            groupId={groupId}
+            isAdmin={currentUserRole === "admin"}
+            groupSettings={groupSettings}
+            replyingTo={replyingTo}
+            onCancelReply={() => setReplyingTo(null)}
+            onTyping={broadcastTyping}
+            editingMessage={editingMessage}
+            onCancelEdit={() => setEditingMessage(null)}
+          />
+        </div>
       </div>
     </div>
   )
