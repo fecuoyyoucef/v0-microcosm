@@ -644,7 +644,7 @@ export function ChatContainer({
 
         <div
           className={cn(
-            "transition-transform duration-300",
+            "relative z-20 transition-transform duration-300",
             scrollDirection === "down" ? "translate-y-full" : "translate-y-0",
           )}
         >
