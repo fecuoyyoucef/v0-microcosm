@@ -211,11 +211,12 @@ export default function AssistantPage() {
         </div>
       </div>
 
-      {/* Input - dynamic bottom position based on nav height */}
+      {/* Input - fixed at bottom with small margin */}
       <div
-        className="shrink-0 border-t border-border bg-background/95 backdrop-blur-lg p-4 transition-all duration-300"
+        className="shrink-0 border-t border-border bg-background/95 backdrop-blur-lg p-4"
         style={{
-          paddingBottom: `max(env(safe-area-inset-bottom), ${bottomNavHeight}px)`,
+          paddingBottom: `max(env(safe-area-inset-bottom), 8px)`,
+          marginBottom: `${bottomNavHeight}px`,
         }}
       >
         <div className="max-w-3xl mx-auto flex gap-2">
