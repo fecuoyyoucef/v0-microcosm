@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useRef, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -11,6 +10,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Card, CardContent } from "@/components/ui/card"
 import { ArrowRight, Sparkles, Loader2, User, Bot } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useBottomNav } from "@/lib/contexts/bottom-nav-context"
 
 interface Message {
   role: "user" | "assistant"
@@ -24,12 +24,13 @@ export default function AssistantPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
+  const { navHeight } = useBottomNav()
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setCurrentUserId(data.user?.id || null)
     })
-  }, [])
+  }, [supabase])
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -75,7 +76,7 @@ export default function AssistantPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-background pb-20">
+    <div className="flex flex-col h-screen bg-background w-full max-w-full box-border">
       {/* Header */}
       <div className="shrink-0 border-b border-border bg-card/50 backdrop-blur-xl">
         <div className="h-14 px-4 flex items-center gap-3">
@@ -89,8 +90,7 @@ export default function AssistantPage() {
         </div>
       </div>
 
-      {/* Messages */}
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea className="flex-1 p-4 chat-scroll-container">
         <div className="max-w-3xl mx-auto space-y-4">
           {messages.length === 0 ? (
             <div className="text-center py-12">
@@ -185,8 +185,12 @@ export default function AssistantPage() {
         </div>
       </ScrollArea>
 
-      {/* Input */}
-      <div className="shrink-0 border-t border-border bg-background p-4 pb-safe">
+      <div
+        className="shrink-0 border-t border-border bg-background p-4 pb-safe w-full max-w-full box-border"
+        style={{
+          marginBottom: window.innerWidth < 768 ? `${navHeight}px` : "0px",
+        }}
+      >
         <div className="max-w-3xl mx-auto flex gap-2">
           <Textarea
             value={input}
