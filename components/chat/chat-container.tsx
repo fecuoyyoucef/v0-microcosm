@@ -599,20 +599,22 @@ export function ChatContainer({
           }))}
         />
 
-        <div className="flex-1 overflow-y-auto overflow-x-visible bg-transparent chat-scroll-container w-full">
+        <div className="flex-1 overflow-y-auto bg-transparent chat-scroll-container">
           <MessageList
             messages={filteredMessages}
             currentUserId={currentUserId}
             members={members}
-            onReply={handleReply}
-            onEdit={handleEditMessage}
-            onDelete={handleDeleteMessage}
             isLoading={isLoading}
+            messagesEndRef={messagesEndRef}
+            nodes={nodes}
+            onReplySelect={handleReply}
+            onEditSelect={handleEditMessage}
+            onMessageDeleted={(messageId) => {
+              setMessages((prev) => prev.filter((m) => m.id !== messageId))
+            }}
           />
-          <div ref={messagesEndRef} />
+          <TypingIndicator userNames={typingUserNames} />
         </div>
-
-        <TypingIndicator typingUsers={typingUserNames} />
 
         <MessageInput
           onSend={sendMessage}
@@ -622,12 +624,12 @@ export function ChatContainer({
           selectedNodeId={selectedNodeId}
           groupId={groupId}
           isAdmin={currentUserRole === "admin"}
+          groupSettings={groupSettings}
           replyingTo={replyingTo}
           onCancelReply={() => setReplyingTo(null)}
+          onTyping={broadcastTyping}
           editingMessage={editingMessage}
           onCancelEdit={() => setEditingMessage(null)}
-          groupSettings={groupSettings}
-          onTyping={broadcastTyping}
         />
       </div>
     </div>

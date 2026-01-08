@@ -154,7 +154,6 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
   const [isScrollable, setIsScrollable] = useState(false)
   const [isBottomNavVisible, setIsBottomNavVisible] = useState(true)
   const lastScrollY = useRef(0)
-  const lastScrollTop = useRef(0)
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -522,35 +521,27 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
 
   useEffect(() => {
     const handleScroll = (e: Event) => {
-      if (e instanceof CustomEvent) {
-        const { direction, isScrollable } = e.detail
-        if (!isScrollable) {
-          setIsBottomNavVisible(true)
-          return
-        }
-        setIsBottomNavVisible(direction === "up")
-      } else {
-        // Handle regular window scroll for non-chat pages
-        const scrollTop = window.scrollY
-        const scrollDirection = scrollTop > lastScrollTop.current ? "down" : "up"
-        lastScrollTop.current = scrollTop
+      if (!isScrollable) return // Don't hide if not scrollable
 
-        if (scrollDirection === "down") {
-          setIsBottomNavVisible(false)
-        } else {
-          setIsBottomNavVisible(true)
-        }
+      const target = e.target as HTMLElement
+      if (!target.classList.contains("chat-scroll-container")) return
+
+      const currentScrollY = target.scrollTop
+
+      if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
+        // Scrolling down - hide nav
+        setIsBottomNavVisible(false)
+      } else if (currentScrollY < lastScrollY.current) {
+        // Scrolling up - show nav
+        setIsBottomNavVisible(true)
       }
+
+      lastScrollY.current = currentScrollY
     }
 
-    window.addEventListener("scroll", handleScroll, true)
-    window.addEventListener("chat-scroll", handleScroll as EventListener)
-
-    return () => {
-      window.removeEventListener("scroll", handleScroll, true)
-      window.removeEventListener("chat-scroll", handleScroll as EventListener)
-    }
-  }, [])
+    document.addEventListener("scroll", handleScroll, true)
+    return () => document.removeEventListener("scroll", handleScroll, true)
+  }, [isScrollable])
 
   useEffect(() => {
     const event = new CustomEvent("bottomNavStateChange", {
