@@ -559,7 +559,7 @@ export function ChatContainer({
   }
 
   return (
-    <div className="relative flex flex-col h-full w-full overflow-hidden">
+    <div className="relative flex flex-col h-full w-full max-w-full overflow-hidden">
       {importantMessageToasts.map((message) => (
         <ImportantMessageToast key={message.id} message={message} onClose={() => removeImportantToast(message.id)} />
       ))}
@@ -570,7 +570,7 @@ export function ChatContainer({
         </div>
       )}
 
-      <div className="relative z-10 flex flex-col h-full overflow-hidden bg-transparent">
+      <div className="relative z-10 flex flex-col h-full max-w-full overflow-hidden bg-transparent">
         <ChatHeader
           group={group}
           members={members}
@@ -599,7 +599,7 @@ export function ChatContainer({
           }))}
         />
 
-        <div className="flex-1 overflow-y-auto bg-transparent chat-scroll-container">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden bg-transparent chat-scroll-container">
           <MessageList
             messages={filteredMessages}
             currentUserId={currentUserId}

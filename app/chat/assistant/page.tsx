@@ -2,11 +2,10 @@
 
 import type React from "react"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Card, CardContent } from "@/components/ui/card"
 import { ArrowRight, Sparkles, Loader2, User, Bot } from "lucide-react"
@@ -24,8 +23,10 @@ export default function AssistantPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
-  const { bottomNavHeight, isBottomNavVisible } = useBottomNav()
+  const { bottomNavHeight } = useBottomNav()
+  const lastScrollY = useRef(0)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -38,6 +39,25 @@ export default function AssistantPage() {
       scrollRef.current.scrollIntoView({ behavior: "smooth" })
     }
   }, [messages])
+
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget
+    const currentScrollY = target.scrollTop
+    const isScrollable = target.scrollHeight > target.clientHeight
+
+    if (!isScrollable) return
+
+    const event = new CustomEvent("chatScrollEvent", {
+      detail: {
+        scrollY: currentScrollY,
+        lastScrollY: lastScrollY.current,
+        direction: currentScrollY > lastScrollY.current ? "down" : "up",
+      },
+    })
+    window.dispatchEvent(event)
+
+    lastScrollY.current = currentScrollY
+  }, [])
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
@@ -77,7 +97,7 @@ export default function AssistantPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] bg-background">
+    <div className="flex flex-col h-[calc(100dvh-64px)] bg-background overflow-hidden">
       {/* Header */}
       <div className="shrink-0 border-b border-border bg-card/50 backdrop-blur-xl">
         <div className="h-14 px-4 flex items-center gap-3">
@@ -91,8 +111,8 @@ export default function AssistantPage() {
         </div>
       </div>
 
-      {/* Messages */}
-      <ScrollArea className="flex-1 overflow-x-hidden chat-scroll-container">
+      {/* Messages - using native scroll with onScroll handler */}
+      <div ref={messagesContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto overflow-x-hidden">
         <div className="max-w-3xl mx-auto space-y-4 px-4 py-4">
           {messages.length === 0 ? (
             <div className="text-center py-12">
@@ -185,13 +205,13 @@ export default function AssistantPage() {
 
           <div ref={scrollRef} />
         </div>
-      </ScrollArea>
+      </div>
 
-      {/* Input */}
+      {/* Input - dynamic bottom position based on nav height */}
       <div
-        className="shrink-0 border-t border-border bg-background/95 backdrop-blur-lg p-4 pb-safe fixed bottom-0 left-0 right-0 lg:relative transition-all duration-300"
+        className="shrink-0 border-t border-border bg-background/95 backdrop-blur-lg p-4 transition-all duration-300"
         style={{
-          bottom: `${bottomNavHeight}px`,
+          paddingBottom: `max(env(safe-area-inset-bottom), ${bottomNavHeight + 16}px)`,
         }}
       >
         <div className="max-w-3xl mx-auto flex gap-2">

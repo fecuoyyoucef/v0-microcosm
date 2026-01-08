@@ -397,7 +397,7 @@ export function MessageInput({
   return (
     <div
       className={cn(
-        "sticky bg-background/95 backdrop-blur-lg border-t border-border p-4 pb-safe transition-all duration-300 lg:static",
+        "sticky bg-background/95 backdrop-blur-lg border-t border-border p-4 pb-safe transition-all duration-300 lg:static overflow-x-hidden",
       )}
       style={{
         bottom: `${bottomNavHeight}px`,
