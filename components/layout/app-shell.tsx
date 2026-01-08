@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { TooltipProvider } from "@/components/ui/tooltip"
 import { Badge } from "@/components/ui/badge"
 import {
   HomeIcon,
@@ -30,8 +29,6 @@ import {
 import type { Group, Profile } from "@/lib/types"
 import { useTheme } from "next-themes"
 import { useSettings } from "@/components/settings-provider"
-import { PushNotificationManager } from "@/components/notifications/push-notification-manager"
-import { FirebasePushProvider } from "@/components/notifications/firebase-push-provider"
 import { BottomNavProvider, useBottomNav } from "@/lib/contexts/bottom-nav-context"
 
 interface AppShellProps {
@@ -316,19 +313,21 @@ function BottomNavigationBar({
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-1">
           {/* Quick Actions */}
-          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">t.goTo</div>
+          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            {t.goTo}
+          </div>
 
           <Link href="/chat" onClick={() => setMobileMenuOpen(false)}>
             <Button variant={pathname === "/chat" ? "secondary" : "ghost"} className="w-full justify-start gap-3 h-10">
               <HomeIcon className="w-4 h-4" />
-              t.home
+              {t.home}
             </Button>
           </Link>
 
           <Link href="/chat/notifications" onClick={() => setMobileMenuOpen(false)}>
             <Button variant="ghost" className="w-full justify-start gap-3 h-10 relative">
               <BellIcon className="w-4 h-4" />
-              t.notifications
+              {t.notifications}
               {unreadCounts["notifications"] > 0 && (
                 <Badge className="mr-auto h-5 px-1.5 bg-destructive text-destructive-foreground">
                   {unreadCounts["notifications"] > 99 ? "99+" : unreadCounts["notifications"]}
@@ -340,14 +339,14 @@ function BottomNavigationBar({
           <Link href="/chat/assistant" onClick={() => setMobileMenuOpen(false)}>
             <Button variant="ghost" className="w-full justify-start gap-3 h-10">
               <SparklesIcon className="w-4 h-4 text-amber-500" />
-              t.assistant
+              {t.assistant}
             </Button>
           </Link>
 
           <Link href="/chat/profile" onClick={() => setMobileMenuOpen(false)}>
             <Button variant="ghost" className="w-full justify-start gap-3 h-10">
               <TrophyIcon className="w-4 h-4 text-amber-500" />
-              t.achievements
+              {t.achievements}
             </Button>
           </Link>
 
@@ -358,7 +357,7 @@ function BottomNavigationBar({
           >
             <div className="flex items-center gap-1">
               {cellsExpanded ? <ChevronDownIcon className="w-3 h-3" /> : <ChevronUpIcon className="w-3 h-3" />}
-              t.cells
+              {t.cells}
             </div>
             <Button
               variant="ghost"
@@ -414,7 +413,7 @@ function BottomNavigationBar({
                     onClick={() => router.push("/chat?new=true")}
                   >
                     <PlusIcon className="w-3 h-3 ml-1" />
-                    t.newCell
+                    {t.newCell}
                   </Button>
                 </div>
               )}
@@ -439,7 +438,7 @@ function BottomNavigationBar({
           <Link href="/admin" onClick={() => setMobileMenuOpen(false)}>
             <Button variant="ghost" className="w-full justify-start gap-3 h-10 text-cyan-500">
               <XIcon className="w-4 h-4" />
-              t.admin
+              {t.admin}
             </Button>
           </Link>
         )}
@@ -447,14 +446,14 @@ function BottomNavigationBar({
         <Link href="/chat/settings" onClick={() => setMobileMenuOpen(false)}>
           <Button variant="ghost" className="w-full justify-start gap-3 h-10">
             <SettingsIcon className="w-4 h-4" />
-            t.settings
+            {t.settings}
           </Button>
         </Link>
 
         <Link href="/chat/about" onClick={() => setMobileMenuOpen(false)}>
           <Button variant="ghost" className="w-full justify-start gap-3 h-10">
             <HelpCircleIcon className="w-4 h-4" />
-            t.help
+            {t.help}
           </Button>
         </Link>
 
@@ -464,7 +463,7 @@ function BottomNavigationBar({
           onClick={handleSignOut}
         >
           <LogOutIcon className="w-4 h-4" />
-          t.signOut
+          {t.signOut}
         </Button>
       </div>
     </nav>
@@ -486,6 +485,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
   const { theme, setTheme } = useTheme()
   const { language } = useSettings()
   const t = translations[language]
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     const fetchUnreadData = async () => {
@@ -519,6 +519,14 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
       supabase.removeChannel(channel)
     }
   }, [userId, supabase])
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      const { data } = await createClient().from("profiles").select("role").eq("id", userId).single()
+      setIsAdmin(data?.role === "admin" || data?.role === "owner")
+    }
+    checkAdmin()
+  }, [userId])
 
   return (
     <BottomNavProvider>
@@ -556,7 +564,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
               <div className="p-2 space-y-1">
                 {/* Quick Actions */}
                 <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  t.goTo
+                  {t.goTo}
                 </div>
 
                 <Link href="/chat">
@@ -565,16 +573,16 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
                     className="w-full justify-start gap-3 h-10"
                   >
                     <HomeIcon className="w-4 h-4" />
-                    t.home
+                    {t.home}
                   </Button>
                 </Link>
 
                 <Link href="/chat/notifications">
                   <Button variant="ghost" className="w-full justify-start gap-3 h-10 relative">
                     <BellIcon className="w-4 h-4" />
-                    t.notifications
+                    {t.notifications}
                     {unreadCounts["notifications"] > 0 && (
-                      <Badge className="mr-auto h-5 px-1.5 bg-destructive text-destructive-foreground">
+                      <Badge className="ml-auto h-5 px-1.5 bg-destructive text-destructive-foreground">
                         {unreadCounts["notifications"] > 99 ? "99+" : unreadCounts["notifications"]}
                       </Badge>
                     )}
@@ -584,14 +592,14 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
                 <Link href="/chat/assistant">
                   <Button variant="ghost" className="w-full justify-start gap-3 h-10">
                     <SparklesIcon className="w-4 h-4 text-amber-500" />
-                    t.assistant
+                    {t.assistant}
                   </Button>
                 </Link>
 
                 <Link href="/chat/profile">
                   <Button variant="ghost" className="w-full justify-start gap-3 h-10">
                     <TrophyIcon className="w-4 h-4 text-amber-500" />
-                    t.achievements
+                    {t.achievements}
                   </Button>
                 </Link>
 
@@ -602,7 +610,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
                 >
                   <div className="flex items-center gap-1">
                     {cellsExpanded ? <ChevronDownIcon className="w-3 h-3" /> : <ChevronUpIcon className="w-3 h-3" />}
-                    t.cells
+                    {t.cells}
                   </div>
                   <Button
                     variant="ghost"
@@ -657,14 +665,14 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
                           onClick={() => router.push("/chat?new=true")}
                         >
                           <PlusIcon className="w-3 h-3 ml-1" />
-                          t.newCell
+                          {t.newCell}
                         </Button>
                       </div>
                     )}
                   </>
                 )}
 
-                {/* Join by Invite button below cells list */}
+                {/* Join by Invite */}
                 <Button
                   onClick={() => setIsInviteDialogOpen(true)}
                   variant="ghost"
@@ -678,64 +686,49 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
 
             {/* Bottom Actions */}
             <div className="p-2 border-t border-border space-y-1">
-              {/* Admin Panel */}
-              {/* {isAdmin && (
+              {isAdmin && (
                 <Link href="/admin">
                   <Button variant="ghost" className="w-full justify-start gap-3 h-10 text-cyan-500">
                     <XIcon className="w-4 h-4" />
-                    t.admin
+                    {t.admin}
                   </Button>
                 </Link>
-              )} */}
+              )}
 
-              {/* Settings */}
               <Link href="/chat/settings">
                 <Button variant="ghost" className="w-full justify-start gap-3 h-10">
                   <SettingsIcon className="w-4 h-4" />
-                  t.settings
+                  {t.settings}
                 </Button>
               </Link>
 
-              {/* Help */}
               <Link href="/chat/about">
                 <Button variant="ghost" className="w-full justify-start gap-3 h-10">
                   <HelpCircleIcon className="w-4 h-4" />
-                  t.help
+                  {t.help}
                 </Button>
               </Link>
 
-              {/* Sign Out */}
               <Button
                 variant="ghost"
                 className="w-full justify-start gap-3 h-10 text-destructive hover:text-destructive"
-                onClick={() => supabase.auth.signOut().then(() => router.push("/"))}
+                onClick={() => {
+                  createClient().auth.signOut()
+                  router.push("/")
+                }}
               >
                 <LogOutIcon className="w-4 h-4" />
-                t.signOut
+                {t.signOut}
               </Button>
             </div>
           </div>
         </aside>
 
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col h-full overflow-hidden">
-          <main className="flex-1 overflow-hidden">
-            <TooltipProvider delayDuration={0}>
-              <PushNotificationManager userId={userId} />
-              <FirebasePushProvider userId={userId} />
-              {children}
-            </TooltipProvider>
-          </main>
+        {/* Mobile Bottom Navigation */}
+        <BottomNavigationBar pathname={pathname} unreadCounts={unreadCounts} userId={userId} profile={profile} t={t} />
 
-          {/* Bottom Navigation Bar */}
-          <BottomNavigationBar
-            pathname={pathname}
-            unreadCounts={unreadCounts}
-            userId={userId}
-            profile={profile}
-            t={t}
-          />
-        </div>
+        {/* Main Content */}
+        <main className="flex-1 overflow-hidden">{children}</main>
       </div>
     </BottomNavProvider>
   )
