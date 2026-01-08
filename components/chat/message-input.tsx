@@ -397,11 +397,8 @@ export function MessageInput({
   return (
     <div
       className={cn(
-        "sticky bg-background/95 backdrop-blur-lg border-t border-border p-4 pb-safe transition-all duration-300 lg:static",
+        "relative bg-background/95 backdrop-blur-lg border-t border-border p-4 pb-safe transition-all duration-300 lg:static",
       )}
-      style={{
-        bottom: `${bottomNavHeight}px`,
-      }}
     >
       {editingMessage && (
         <div className="px-3 py-1.5 bg-muted/50 border-b border-border/50 flex items-center justify-between animate-in slide-in-from-bottom-2 duration-200">
