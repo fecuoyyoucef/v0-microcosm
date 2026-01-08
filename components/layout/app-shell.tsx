@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -155,7 +155,8 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
   const [isJoining, setIsJoining] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [showBottomNav, setShowBottomNav] = useState(true)
-  const [lastScrollY, setLastScrollY] = useState(0)
+  const [scrollDirection, setScrollDirection] = useState<"up" | "down">("up")
+  const lastScrollY = useRef(0)
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -488,17 +489,38 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
   }
 
   useEffect(() => {
+    const handleScroll = (e: Event) => {
+      const target = e.target as HTMLElement
+      if (!target.classList.contains("chat-scroll-container")) return
+
+      const currentScrollY = target.scrollTop
+
+      if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
+        setScrollDirection("down")
+      } else if (currentScrollY < lastScrollY.current) {
+        setScrollDirection("up")
+      }
+
+      lastScrollY.current = currentScrollY
+    }
+
+    // Listen to scroll events on elements with chat-scroll-container class
+    document.addEventListener("scroll", handleScroll, true)
+    return () => document.removeEventListener("scroll", handleScroll, true)
+  }, [])
+
+  useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY
 
       // Show nav when scrolling up, hide when scrolling down
-      if (currentScrollY < lastScrollY || currentScrollY < 50) {
+      if (currentScrollY < lastScrollY.current || currentScrollY < 50) {
         setShowBottomNav(true)
-      } else if (currentScrollY > lastScrollY && currentScrollY > 50) {
+      } else if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
         setShowBottomNav(false)
       }
 
-      setLastScrollY(currentScrollY)
+      lastScrollY.current = currentScrollY
     }
 
     window.addEventListener("scroll", handleScroll, { passive: true })
@@ -537,6 +559,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
               "md:hidden fixed inset-x-0 bottom-0 bg-background/95 backdrop-blur-xl border-t border-border shadow-2xl transition-transform duration-300 ease-in-out",
               showBottomNav ? "translate-y-0" : "translate-y-full",
               isBottomNavCollapsed && "translate-y-[calc(100%-2.5rem)]",
+              scrollDirection === "down" && !isBottomNavCollapsed && "translate-y-full",
             )}
           >
             <button
