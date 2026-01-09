@@ -97,7 +97,7 @@ export default function AssistantPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-background pb-20">
+    <div className="flex flex-col h-screen bg-background pb-safe">
       {/* Header */}
       <div className="shrink-0 border-b border-border bg-card/50 backdrop-blur-xl">
         <div className="h-14 px-4 flex items-center gap-3">
