@@ -19,7 +19,7 @@ import {
   CommandGroup,
   CommandItem,
 } from "@/components/ui/command"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -28,7 +28,6 @@ import {
   PlusIcon,
   Cog6ToothIcon as SettingsIcon,
   BellIcon,
-  MagnifyingGlassIcon as SearchIcon,
   SparklesIcon,
   TrophyIcon,
   MoonIcon,
@@ -45,7 +44,7 @@ import { useTheme } from "next-themes"
 import { useSettings } from "@/components/settings-provider"
 import { PushNotificationManager } from "@/components/notifications/push-notification-manager"
 import { FirebasePushProvider } from "@/components/notifications/firebase-push-provider"
-import { ScrollProvider, useScroll } from "@/lib/contexts/scroll-context"
+import { ScrollProvider } from "@/lib/contexts/scroll-context"
 
 interface AppShellProps {
   children: React.ReactNode
@@ -158,7 +157,6 @@ function AppShellContent({ children, userId, profile, groups }: AppShellProps) {
   const [isAdmin, setIsAdmin] = useState(false)
   const [touchStart, setTouchStart] = useState<number | null>(null)
   const [touchEnd, setTouchEnd] = useState<number | null>(null)
-  const { scrollDirection, setScrollDirection } = useScroll()
   const router = useRouter()
   const pathname = usePathname()
 
@@ -484,43 +482,6 @@ function AppShellContent({ children, userId, profile, groups }: AppShellProps) {
     setTouchEnd(null)
   }
 
-  useEffect(() => {
-    let lastScrollY = window.scrollY
-    let ticking = false
-
-    const handleScroll = () => {
-      const scrollableElement = document.querySelector("[data-radix-scroll-area-viewport], .chat-scroll-container")
-
-      if (scrollableElement) {
-        const currentScrollY = scrollableElement.scrollTop
-
-        if (!ticking) {
-          window.requestAnimationFrame(() => {
-            if (currentScrollY > lastScrollY && currentScrollY > 50) {
-              setScrollDirection("down")
-            } else if (currentScrollY < lastScrollY) {
-              setScrollDirection("up")
-            }
-
-            lastScrollY = currentScrollY
-            ticking = false
-          })
-
-          ticking = true
-        }
-      }
-    }
-
-    const scrollableElement = document.querySelector("[data-radix-scroll-area-viewport], .chat-scroll-container")
-    scrollableElement?.addEventListener("scroll", handleScroll)
-    window.addEventListener("scroll", handleScroll)
-
-    return () => {
-      scrollableElement?.removeEventListener("scroll", handleScroll)
-      window.removeEventListener("scroll", handleScroll)
-    }
-  }, [setScrollDirection])
-
   return (
     <TooltipProvider delayDuration={0}>
       <PushNotificationManager userId={userId} />
@@ -539,211 +500,144 @@ function AppShellContent({ children, userId, profile, groups }: AppShellProps) {
 
         {/* Main Content */}
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <div className={cn("flex-1 overflow-auto transition-all duration-300", "pb-0 md:pb-0")}>{children}</div>
+          <div className="flex-1 overflow-auto">{children}</div>
 
-          <nav
-            className={cn(
-              "md:hidden fixed inset-x-0 bottom-0 bg-background/95 backdrop-blur-xl border-t border-border shadow-2xl transition-transform duration-300 ease-in-out z-40",
-              scrollDirection === "down" && "translate-y-full pointer-events-none",
-            )}
-          >
-            <div className="flex items-center justify-around py-3 px-4">
-              <Link href="/chat">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    "h-12 w-12 rounded-xl transition-all hover:scale-105",
-                    pathname === "/chat" && "bg-primary/10 text-primary",
-                  )}
-                >
-                  <HomeIcon className="w-5 h-5" />
-                </Button>
-              </Link>
-
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-12 w-12 rounded-xl transition-all hover:scale-105"
-                onClick={() => setCommandOpen(true)}
-              >
-                <SearchIcon className="w-5 h-5" />
-              </Button>
-
-              <Link href="/chat/notifications">
-                <Button
-                  size="icon"
-                  className="h-14 w-14 rounded-xl bg-primary text-primary-foreground relative transition-all hover:scale-105 hover:shadow-lg"
-                >
-                  <BellIcon className="w-6 h-6" />
-                  {unreadNotifications > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground text-[10px] rounded-full flex items-center justify-center animate-pulse">
-                      {unreadNotifications > 9 ? "9+" : unreadNotifications}
-                    </span>
-                  )}
-                </Button>
-              </Link>
-
-              <Link href="/chat/assistant">
-                <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl transition-all hover:scale-105">
-                  <SparklesIcon className="w-5 h-5 text-amber-500" />
-                </Button>
-              </Link>
-
-              <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-                <SheetTrigger asChild>
-                  <Avatar className="w-10 h-10 cursor-pointer">
-                    <AvatarImage src={profile?.avatar_url || undefined} />
-                    <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                      {profile?.display_name?.charAt(0) || <XIcon className="w-4 h-4" />}
-                    </AvatarFallback>
-                  </Avatar>
-                </SheetTrigger>
-                <SheetContent side="right" className="w-72 p-0">
-                  <SidebarContent isMobile />
-                </SheetContent>
-              </Sheet>
-            </div>
-          </nav>
+          {/* Mobile Sidebar */}
+          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+            <SheetContent side="left" className="p-0 w-64">
+              <SidebarContent isMobile={true} />
+            </SheetContent>
+          </Sheet>
         </main>
-
-        {/* Command Palette */}
-        <CommandDialog open={commandOpen} onOpenChange={setCommandOpen}>
-          <CommandInput placeholder={t.searchPlaceholder} />
-          <CommandList>
-            <CommandEmpty>{t.noResults}</CommandEmpty>
-            <CommandGroup heading={t.goTo}>
-              <CommandItem
-                onSelect={() => {
-                  router.push("/chat")
-                  setCommandOpen(false)
-                }}
-              >
-                <HomeIcon className="ml-2 h-4 w-4" />
-                {t.home}
-              </CommandItem>
-              <CommandItem
-                onSelect={() => {
-                  router.push("/chat/notifications")
-                  setCommandOpen(false)
-                }}
-              >
-                <BellIcon className="ml-2 h-4 w-4" />
-                {t.notifications}
-              </CommandItem>
-              <CommandItem
-                onSelect={() => {
-                  router.push("/chat/assistant")
-                  setCommandOpen(false)
-                }}
-              >
-                <SparklesIcon className="ml-2 h-4 w-4" />
-                {t.assistant}
-              </CommandItem>
-              <CommandItem
-                onSelect={() => {
-                  router.push("/chat/settings/appearance")
-                  setCommandOpen(false)
-                }}
-              >
-                <SettingsIcon className="ml-2 h-4 w-4" />
-                {t.settings}
-              </CommandItem>
-              {isAdmin && (
-                <CommandItem
-                  onSelect={() => {
-                    router.push("/admin")
-                    setCommandOpen(false)
-                  }}
-                >
-                  <XIcon className="ml-2 h-4 w-4" />
-                  {t.admin}
-                </CommandItem>
-              )}
-            </CommandGroup>
-            <CommandGroup heading={t.cells}>
-              {groups.map((group) => (
-                <CommandItem
-                  key={group.id}
-                  onSelect={() => {
-                    router.push(`/chat/${group.id}`)
-                    setCommandOpen(false)
-                  }}
-                >
-                  <XIcon className="ml-2 h-4 w-4" />
-                  {group.name}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-            <CommandGroup heading={t.actions}>
-              <CommandItem
-                onSelect={() => {
-                  router.push("/chat?new=true")
-                  setCommandOpen(false)
-                }}
-              >
-                <PlusIcon className="ml-2 h-4 w-4" />
-                {t.newCell}
-              </CommandItem>
-              <CommandItem onSelect={() => setTheme(theme === "dark" ? "light" : "dark")}>
-                {theme === "dark" ? <SunIcon className="ml-2 h-4 w-4" /> : <MoonIcon className="ml-2 h-4 w-4" />}
-                {theme === "dark" ? t.lightMode : t.darkMode}
-              </CommandItem>
-            </CommandGroup>
-          </CommandList>
-        </CommandDialog>
-
-        {/* Join by Invite Dialog */}
-        <Dialog
-          open={isInviteDialogOpen}
-          onOpenChange={(open) => {
-            setIsInviteDialogOpen(open)
-            if (!open) {
-              setInviteError(null)
-              setInviteLink("")
-            }
-          }}
-        >
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>{t.joinByInvite}</DialogTitle>
-              <DialogDescription>
-                {language === "ar" ? "الصق رابط الدعوة للانضمام إلى خلية" : "Paste invite link to join a cell"}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 mt-4">
-              {inviteError && (
-                <div className="p-3 rounded-xl bg-destructive/10 text-destructive text-sm">{inviteError}</div>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="inviteLinkSidebar">{language === "ar" ? "رابط الدعوة" : "Invite Link"}</Label>
-                <Input
-                  id="inviteLinkSidebar"
-                  value={inviteLink}
-                  onChange={(e) => setInviteLink(e.target.value)}
-                  placeholder={t.inviteLinkPlaceholder}
-                  className="bg-background rounded-xl"
-                  dir="ltr"
-                />
-              </div>
-              <Button
-                onClick={handleJoinByInvite}
-                disabled={!inviteLink.trim() || isJoining}
-                className="w-full rounded-xl h-11"
-              >
-                {isJoining ? (
-                  <>
-                    <XIcon className="w-4 h-4 animate-spin ml-2" />
-                    {t.joining}
-                  </>
-                ) : (
-                  t.join
-                )}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
+
+      {/* Command Palette */}
+      <CommandDialog open={commandOpen} onOpenChange={setCommandOpen}>
+        <CommandInput placeholder={t.searchPlaceholder} />
+        <CommandList>
+          <CommandEmpty>{t.noResults}</CommandEmpty>
+          <CommandGroup heading={t.goTo}>
+            <CommandItem
+              onSelect={() => {
+                router.push("/chat")
+                setCommandOpen(false)
+              }}
+            >
+              <HomeIcon className="ml-2 h-4 w-4" />
+              {t.home}
+            </CommandItem>
+            <CommandItem
+              onSelect={() => {
+                router.push("/chat/notifications")
+                setCommandOpen(false)
+              }}
+            >
+              <BellIcon className="ml-2 h-4 w-4" />
+              {t.notifications}
+            </CommandItem>
+            <CommandItem
+              onSelect={() => {
+                router.push("/chat/assistant")
+                setCommandOpen(false)
+              }}
+            >
+              <SparklesIcon className="ml-2 h-4 w-4" />
+              {t.assistant}
+            </CommandItem>
+            <CommandItem
+              onSelect={() => {
+                router.push("/chat/settings/appearance")
+                setCommandOpen(false)
+              }}
+            >
+              <SettingsIcon className="ml-2 h-4 w-4" />
+              {t.settings}
+            </CommandItem>
+            {isAdmin && (
+              <CommandItem
+                onSelect={() => {
+                  router.push("/admin")
+                  setCommandOpen(false)
+                }}
+              >
+                <XIcon className="ml-2 h-4 w-4" />
+                {t.admin}
+              </CommandItem>
+            )}
+          </CommandGroup>
+          <CommandGroup heading={t.cells}>
+            {groups.map((group) => (
+              <CommandItem
+                key={group.id}
+                onSelect={() => {
+                  router.push(`/chat/${group.id}`)
+                  setCommandOpen(false)
+                }}
+              >
+                <XIcon className="ml-2 h-4 w-4" />
+                {group.name}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+          <CommandGroup heading={t.actions}>
+            <CommandItem
+              onSelect={() => {
+                router.push("/chat?new=true")
+                setCommandOpen(false)
+              }}
+            >
+              <PlusIcon className="ml-2 h-4 w-4" />
+              {t.newCell}
+            </CommandItem>
+            <CommandItem onSelect={() => setTheme(theme === "dark" ? "light" : "dark")}>
+              {theme === "dark" ? <SunIcon className="ml-2 h-4 w-4" /> : <MoonIcon className="ml-2 h-4 w-4" />}
+              {theme === "dark" ? t.lightMode : t.darkMode}
+            </CommandItem>
+          </CommandGroup>
+        </CommandList>
+      </CommandDialog>
+
+      {/* Invite Dialog */}
+      <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t.joinByInvite}</DialogTitle>
+            <DialogDescription>
+              {language === "ar" ? "الصق رابط الدعوة للانضمام إلى خلية" : "Paste invite link to join a cell"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            {inviteError && (
+              <div className="p-3 rounded-xl bg-destructive/10 text-destructive text-sm">{inviteError}</div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="inviteLinkSidebar">{language === "ar" ? "رابط الدعوة" : "Invite Link"}</Label>
+              <Input
+                id="inviteLinkSidebar"
+                value={inviteLink}
+                onChange={(e) => setInviteLink(e.target.value)}
+                placeholder={t.inviteLinkPlaceholder}
+                className="bg-background rounded-xl"
+                dir="ltr"
+              />
+            </div>
+            <Button
+              onClick={handleJoinByInvite}
+              disabled={!inviteLink.trim() || isJoining}
+              className="w-full rounded-xl h-11"
+            >
+              {isJoining ? (
+                <>
+                  <XIcon className="w-4 h-4 animate-spin ml-2" />
+                  {t.joining}
+                </>
+              ) : (
+                t.join
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   )
 }
