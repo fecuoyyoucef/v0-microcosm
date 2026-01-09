@@ -150,7 +150,6 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
   const [inviteLink, setInviteLink] = useState("")
   const [isJoining, setIsJoining] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
-  const [showBottomNav, setShowBottomNav] = useState(true)
   const [scrollDirection, setScrollDirection] = useState<"up" | "down">("up")
   const lastScrollY = useRef(0)
   const pathname = usePathname()
@@ -490,7 +489,10 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
   useEffect(() => {
     const handleScroll = (e: Event) => {
       const target = e.target as HTMLElement
-      if (!target.classList.contains("chat-scroll-container")) return
+
+      // Check if the target is scrollable (has overflow-auto or similar)
+      const isScrollable = target.scrollHeight > target.clientHeight
+      if (!isScrollable) return
 
       const currentScrollY = target.scrollTop
 
@@ -503,7 +505,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
       lastScrollY.current = currentScrollY
     }
 
-    // Listen to scroll events on elements with chat-scroll-container class
+    // Listen to scroll events on all scrollable elements
     document.addEventListener("scroll", handleScroll, true)
     return () => document.removeEventListener("scroll", handleScroll, true)
   }, [])
@@ -512,11 +514,10 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
     const handleScroll = () => {
       const currentScrollY = window.scrollY
 
-      // Show nav when scrolling up, hide when scrolling down
       if (currentScrollY < lastScrollY.current || currentScrollY < 50) {
-        setShowBottomNav(true)
+        setScrollDirection("up")
       } else if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
-        setShowBottomNav(false)
+        setScrollDirection("down")
       }
 
       lastScrollY.current = currentScrollY
@@ -524,7 +525,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
 
     window.addEventListener("scroll", handleScroll, { passive: true })
     return () => window.removeEventListener("scroll", handleScroll)
-  }, [lastScrollY])
+  }, [])
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -549,7 +550,6 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
           <nav
             className={cn(
               "md:hidden fixed inset-x-0 bottom-0 bg-background/95 backdrop-blur-xl border-t border-border shadow-2xl transition-transform duration-300 ease-in-out z-40",
-              showBottomNav ? "translate-y-0" : "translate-y-full",
               scrollDirection === "down" && "translate-y-full pointer-events-none",
             )}
           >
