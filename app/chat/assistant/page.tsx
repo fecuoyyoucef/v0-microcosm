@@ -222,12 +222,7 @@ export default function AssistantPage() {
       </ScrollArea>
 
       {/* Input */}
-      <div
-        className={cn(
-          "fixed inset-x-0 z-50 shrink-0 border-t border-border bg-background transition-all duration-300",
-          scrollDirection === "up" ? "bottom-[4.5rem]" : "bottom-0",
-        )}
-      >
+      <div className={cn("fixed inset-x-0 z-50 shrink-0 border-t border-border bg-background", "bottom-0")}>
         <div className="p-4 pb-safe">
           <div className="max-w-3xl mx-auto flex gap-2">
             <Textarea
