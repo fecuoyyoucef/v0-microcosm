@@ -238,32 +238,30 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
     setError(null)
 
     try {
-      const { data: group, error: groupError } = await supabase
-        .from("groups")
-        .insert({
+      // Call API instead of direct database insertion
+      const response = await fetch("/api/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           name: newGroupName.trim(),
           description: newGroupDescription.trim() || null,
-          created_by: userId,
-        })
-        .select()
-        .single()
+          cell_category: "general", // Default category
+          goal: newGroupDescription.trim() || "التواصل والتعاون", // Default goal
+        }),
+      })
 
-      if (groupError) {
-        setError(groupError.message)
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || "Failed to create cell")
         return
       }
-
-      await supabase.from("group_members").insert({
-        group_id: group.id,
-        user_id: userId,
-        role: "admin",
-      })
 
       setNewGroupName("")
       setNewGroupDescription("")
       setIsCreateDialogOpen(false)
-      setGroups((prev) => [...prev, group])
-      setNewGroupId(group.id)
+      setGroups((prev) => [...prev, data])
+      setNewGroupId(data.id)
       setShowCellSurvey(true)
     } catch (err: any) {
       setError(err.message)
