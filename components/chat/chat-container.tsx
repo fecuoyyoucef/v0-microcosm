@@ -423,6 +423,10 @@ export function ChatContainer({
     return () => scrollContainer.removeEventListener("scroll", handleScroll)
   }, [scrollDirection])
 
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("scroll-direction-change", { detail: scrollDirection }))
+  }, [scrollDirection])
+
   const filteredMessages =
     activeLayer === "all"
       ? selectedNodeId

@@ -153,6 +153,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
   const [inviteLink, setInviteLink] = useState("")
   const [isJoining, setIsJoining] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
+  const [scrollDirection, setScrollDirection] = useState<"up" | "down">("up")
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -484,6 +485,50 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
     setTouchEnd(null)
   }
 
+  useEffect(() => {
+    let lastScrollY = 0
+    let ticking = false
+
+    const handleScroll = (e: Event) => {
+      const target = e.target as HTMLElement
+      const currentScrollY = target.scrollTop
+
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          if (currentScrollY > lastScrollY && currentScrollY > 50) {
+            setScrollDirection("down")
+          } else if (currentScrollY < lastScrollY) {
+            setScrollDirection("up")
+          }
+          lastScrollY = currentScrollY
+          ticking = false
+        })
+        ticking = true
+      }
+    }
+
+    // Listen to chat container
+    const chatContainer = document.querySelector(".chat-scroll-container")
+    if (chatContainer) {
+      chatContainer.addEventListener("scroll", handleScroll)
+    }
+
+    // Listen to assistant container
+    const assistantContainer = document.querySelector("[data-radix-scroll-area-viewport]")
+    if (assistantContainer) {
+      assistantContainer.addEventListener("scroll", handleScroll)
+    }
+
+    return () => {
+      if (chatContainer) {
+        chatContainer.removeEventListener("scroll", handleScroll)
+      }
+      if (assistantContainer) {
+        assistantContainer.removeEventListener("scroll", handleScroll)
+      }
+    }
+  }, [])
+
   return (
     <TooltipProvider delayDuration={0}>
       <PushNotificationManager userId={userId} />
@@ -504,9 +549,12 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <div className={cn("flex-1 overflow-auto transition-all duration-300", "md:pb-0")}>{children}</div>
 
+          {/* Bottom Navigation */}
           <nav
             className={cn(
               "md:hidden fixed inset-x-0 bottom-0 z-50 bg-background/95 backdrop-blur-xl border-t border-border shadow-2xl transition-transform duration-300 ease-in-out",
+              scrollDirection === "down" ? "translate-y-full" : "translate-y-0",
+              scrollDirection === "down" && "pointer-events-none",
             )}
           >
             <div className="h-16 px-4 flex items-center justify-around">
