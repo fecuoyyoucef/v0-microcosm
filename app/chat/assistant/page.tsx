@@ -10,6 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Card, CardContent } from "@/components/ui/card"
 import { ArrowRight, Sparkles, Loader2, User, Bot } from "lucide-react"
+import { useScrollDirection } from "@/lib/contexts/scroll-context"
 import { cn } from "@/lib/utils"
 
 interface Message {
@@ -22,7 +23,7 @@ export default function AssistantPage() {
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
-  const [scrollDirection, setScrollDirection] = useState<"up" | "down">("up")
+  const { scrollDirection, setScrollDirection } = useScrollDirection()
   const scrollRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const lastScrollYRef = useRef(0)
@@ -57,7 +58,7 @@ export default function AssistantPage() {
 
     scrollContainer.addEventListener("scroll", handleScroll)
     return () => scrollContainer.removeEventListener("scroll", handleScroll)
-  }, [scrollDirection])
+  }, [scrollDirection, setScrollDirection])
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
@@ -213,8 +214,8 @@ export default function AssistantPage() {
       {/* Input */}
       <div
         className={cn(
-          "fixed inset-x-0 shrink-0 border-t border-border bg-background transition-all duration-300",
-          scrollDirection === "up" ? "bottom-20" : "bottom-0",
+          "fixed inset-x-0 shrink-0 border-t border-border bg-background transition-all duration-300 z-40",
+          scrollDirection === "up" ? "bottom-16" : "bottom-0",
         )}
       >
         <div className="p-4 pb-safe">

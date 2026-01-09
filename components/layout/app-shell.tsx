@@ -40,111 +40,26 @@ import {
   LinkIcon as Link2Icon,
   MagnifyingGlassIcon as SearchIcon, // replaced non-existent SearchIcon with MagnifyingGlassIcon
 } from "@heroicons/react/24/outline"
-import type { Group, Profile } from "@/lib/types"
-import { useTheme } from "next-themes"
-import { useSettings } from "@/components/settings-provider"
 import { PushNotificationManager } from "@/components/notifications/push-notification-manager"
 import { FirebasePushProvider } from "@/components/notifications/firebase-push-provider"
+import { useScrollDirection } from "@/lib/contexts/scroll-context"
+import { useTranslations } from "@/lib/i18n"
 
 interface AppShellProps {
   children: React.ReactNode
-  userId: string
-  profile: Profile | null
-  groups: Group[]
 }
 
-const translations = {
-  ar: {
-    home: "الرئيسية",
-    search: "بحث...",
-    searchPlaceholder: "اضغط ⌘K للبحث السريع",
-    notifications: "الإشعارات",
-    assistant: "المساعد الذكي",
-    settings: "الإعدادات",
-    profile: "الملف الشخصي",
-    signOut: "تسجيل الخروج",
-    newCell: "خلية جديدة",
-    cells: "الخلايا",
-    noResults: "لا توجد نتائج",
-    goTo: "انتقل إلى",
-    actions: "إجراءات",
-    darkMode: "الوضع الداكن",
-    lightMode: "الوضع الفاتح",
-    explore: "استكشاف",
-    achievements: "الإنجازات",
-    help: "المساعدة",
-    admin: "لوحة التحكم",
-    directMessages: "الرسائل المباشرة",
-    comingSoon: "قريباً",
-    joinByInvite: "انضم بدعوة",
-    inviteLinkPlaceholder: "الصق رابط الدعوة هنا...",
-    join: "انضم",
-    joining: "جاري الانضمام...",
-    invalidInviteLink: "رابط الدعوة غير صالح",
-  },
-  en: {
-    home: "Home",
-    search: "Search...",
-    searchPlaceholder: "Press ⌘K to quick search",
-    notifications: "Notifications",
-    assistant: "AI Assistant",
-    settings: "Settings",
-    profile: "Profile",
-    signOut: "Sign Out",
-    newCell: "New Cell",
-    cells: "Cells",
-    noResults: "No results",
-    goTo: "Go to",
-    actions: "Actions",
-    darkMode: "Dark mode",
-    lightMode: "Light mode",
-    explore: "Explore",
-    achievements: "Achievements",
-    help: "Help",
-    admin: "Admin Panel",
-    directMessages: "Direct Messages",
-    comingSoon: "Coming Soon",
-    joinByInvite: "Join by Invite",
-    inviteLinkPlaceholder: "Paste invite link here...",
-    join: "Join",
-    joining: "Joining...",
-    invalidInviteLink: "Invalid invite link",
-  },
-  fr: {
-    home: "Accueil",
-    search: "Rechercher...",
-    searchPlaceholder: "Appuyez ⌘K pour recherche rapide",
-    notifications: "Notifications",
-    assistant: "Assistant IA",
-    settings: "Paramètres",
-    profile: "Profil",
-    signOut: "Déconnexion",
-    newCell: "Nouvelle Cellule",
-    cells: "Cellules",
-    noResults: "Aucun résultat",
-    goTo: "Aller à",
-    actions: "Actions",
-    darkMode: "Mode sombre",
-    lightMode: "Mode clair",
-    explore: "Explorer",
-    achievements: "Succès",
-    help: "Aide",
-    admin: "Panneau Admin",
-    directMessages: "Messages Directs",
-    comingSoon: "Bientôt",
-    joinByInvite: "Rejoindre par invitation",
-    inviteLinkPlaceholder: "Collez le lien d'invitation ici...",
-    join: "Rejoindre",
-    joining: "En cours...",
-    invalidInviteLink: "Lien d'invitation invalide",
-  },
-}
-
-export function AppShell({ children, userId, profile, groups }: AppShellProps) {
+export function AppShell({ children }: AppShellProps) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [commandOpen, setCommandOpen] = useState(false)
   const [unreadNotifications, setUnreadNotifications] = useState(0)
+  const { scrollDirection } = useScrollDirection()
+  const { t } = useTranslations()
+  const supabase = createClient()
+  const pathname = usePathname()
+  const router = useRouter()
+
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [touchStart, setTouchStart] = useState<number | null>(null)
   const [touchEnd, setTouchEnd] = useState<number | null>(null)
@@ -153,22 +68,15 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
   const [inviteLink, setInviteLink] = useState("")
   const [isJoining, setIsJoining] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
-  const [scrollDirection, setScrollDirection] = useState<"up" | "down">("up")
   const lastScrollY = useRef(0)
-  const pathname = usePathname()
-  const router = useRouter()
-  const supabase = createClient()
-  const { theme, setTheme } = useTheme()
-  const { language } = useSettings()
-  const t = translations[language]
 
   useEffect(() => {
     const checkAdmin = async () => {
-      const { data } = await supabase.from("profiles").select("role").eq("id", userId).single()
+      const { data } = await supabase.from("profiles").select("role").eq("id", pathname).single()
       setIsAdmin(data?.role === "admin" || data?.role === "owner")
     }
     checkAdmin()
-  }, [userId, supabase])
+  }, [pathname, supabase])
 
   // Keyboard shortcut for command palette
   useEffect(() => {
@@ -188,9 +96,9 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
       supabase
         .from("notifications")
         .select("*", { count: "exact", head: true })
-        .eq("user_id", userId)
+        .eq("user_id", pathname)
         .eq("is_read", false),
-      supabase.from("group_unread_counts").select("group_id, unread_count").eq("user_id", userId),
+      supabase.from("group_unread_counts").select("group_id, unread_count").eq("user_id", pathname),
     ])
 
     setUnreadNotifications(notifResult.count || 0)
@@ -202,7 +110,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
       })
       setUnreadCounts(counts)
     }
-  }, [userId, supabase])
+  }, [pathname, supabase])
 
   useEffect(() => {
     fetchUnreadData()
@@ -212,12 +120,12 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
       .channel("app-shell-realtime")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },
+        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${pathname}` },
         fetchUnreadData,
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "group_unread_counts", filter: `user_id=eq.${userId}` },
+        { event: "*", schema: "public", table: "group_unread_counts", filter: `user_id=eq.${pathname}` },
         fetchUnreadData,
       )
       .subscribe()
@@ -225,7 +133,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [userId, supabase, fetchUnreadData])
+  }, [pathname, supabase, fetchUnreadData])
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -243,7 +151,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
       const match = inviteLink.match(urlPattern)
 
       if (!match || !match[1]) {
-        setInviteError(t.invalidInviteLink)
+        setInviteError(t("invalidInviteLink"))
         setIsJoining(false)
         return
       }
@@ -255,7 +163,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
       setMobileMenuOpen(false)
     } catch (err) {
       console.error("Error joining by invite:", err)
-      setInviteError(t.invalidInviteLink)
+      setInviteError(t("invalidInviteLink"))
     } finally {
       setIsJoining(false)
     }
@@ -281,22 +189,15 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
       <div className="p-4 border-b border-border">
         <div className="flex items-center gap-3">
           <Avatar className="w-10 h-10">
-            <AvatarImage src={profile?.avatar_url || undefined} />
-            <AvatarFallback className="bg-primary/10 text-primary">
-              {profile?.display_name?.charAt(0) || <XIcon className="w-4 h-4" />}
-            </AvatarFallback>
+            <AvatarImage src="/placeholder.svg" />
+            <AvatarFallback className="bg-primary/10 text-primary">U</AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="font-semibold truncate">{profile?.display_name || "User"}</p>
-            {profile?.username && <p className="text-xs text-muted-foreground truncate">@{profile.username}</p>}
+            <p className="font-semibold truncate">User</p>
+            <p className="text-xs text-muted-foreground truncate">@username</p>
           </div>
-          <Button
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-          >
-            {theme === "dark" ? <SunIcon className="h-4 w-4" /> : <MoonIcon className="h-4 w-4" />}
+          <Button onClick={() => {}} variant="ghost" size="icon" className="h-8 w-8">
+            {pathname === "dark" ? <SunIcon className="h-4 w-4" /> : <MoonIcon className="h-4 w-4" />}
           </Button>
         </div>
       </div>
@@ -306,20 +207,20 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
         <div className="p-2 space-y-1">
           {/* Quick Actions */}
           <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            {t.goTo}
+            {t("goTo")}
           </div>
 
           <Link href="/chat" onClick={() => isMobile && setMobileMenuOpen(false)}>
             <Button variant={pathname === "/chat" ? "secondary" : "ghost"} className="w-full justify-start gap-3 h-10">
               <HomeIcon className="w-4 h-4" />
-              {t.home}
+              {t("home")}
             </Button>
           </Link>
 
           <Link href="/chat/notifications" onClick={() => isMobile && setMobileMenuOpen(false)}>
             <Button variant="ghost" className="w-full justify-start gap-3 h-10 relative">
               <BellIcon className="w-4 h-4" />
-              {t.notifications}
+              {t("notifications")}
               {unreadNotifications > 0 && (
                 <Badge className="mr-auto h-5 px-1.5 bg-destructive text-destructive-foreground">
                   {unreadNotifications > 99 ? "99+" : unreadNotifications}
@@ -331,14 +232,14 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
           <Link href="/chat/assistant" onClick={() => isMobile && setMobileMenuOpen(false)}>
             <Button variant="ghost" className="w-full justify-start gap-3 h-10">
               <SparklesIcon className="w-4 h-4 text-amber-500" />
-              {t.assistant}
+              {t("assistant")}
             </Button>
           </Link>
 
           <Link href="/chat/profile" onClick={() => isMobile && setMobileMenuOpen(false)}>
             <Button variant="ghost" className="w-full justify-start gap-3 h-10">
               <TrophyIcon className="w-4 h-4 text-amber-500" />
-              {t.achievements}
+              {t("achievements")}
             </Button>
           </Link>
 
@@ -349,7 +250,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
           >
             <div className="flex items-center gap-1">
               {cellsExpanded ? <ChevronDownIcon className="w-3 h-3" /> : <ChevronUpIcon className="w-3 h-3" />}
-              {t.cells}
+              {t("cells")}
             </div>
             <Button
               variant="ghost"
@@ -367,7 +268,10 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
 
           {cellsExpanded && (
             <>
-              {groups.map((group) => (
+              {[
+                { id: "1", name: "Group 1" },
+                { id: "2", name: "Group 2" },
+              ].map((group) => (
                 <Link key={group.id} href={`/chat/${group.id}`} onClick={() => isMobile && setMobileMenuOpen(false)}>
                   <Button
                     variant={isActiveGroup(group.id) ? "secondary" : "ghost"}
@@ -394,10 +298,10 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
                 </Link>
               ))}
 
-              {groups.length === 0 && (
+              {[].length === 0 && (
                 <div className="px-3 py-6 text-center">
                   <XIcon className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
-                  <p className="text-sm text-muted-foreground">لا توجد خلايا</p>
+                  <p className="text-sm text-muted-foreground">{t("noCells")}</p>
                   <Button
                     variant="outline"
                     size="sm"
@@ -405,7 +309,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
                     onClick={() => router.push("/chat?new=true")}
                   >
                     <PlusIcon className="w-3 h-3 ml-1" />
-                    {t.newCell}
+                    {t("newCell")}
                   </Button>
                 </div>
               )}
@@ -419,7 +323,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
             className="w-full justify-start gap-3 h-10 mt-1 text-muted-foreground hover:text-foreground"
           >
             <Link2Icon className="w-5 h-5" />
-            <span className="truncate flex-1 text-right text-sm">{t.joinByInvite}</span>
+            <span className="truncate flex-1 text-right text-sm">{t("joinByInvite")}</span>
           </Button>
         </div>
       </ScrollArea>
@@ -430,7 +334,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
           <Link href="/admin" onClick={() => isMobile && setMobileMenuOpen(false)}>
             <Button variant="ghost" className="w-full justify-start gap-3 h-10 text-cyan-500">
               <XIcon className="w-4 h-4" />
-              {t.admin}
+              {t("admin")}
             </Button>
           </Link>
         )}
@@ -438,14 +342,14 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
         <Link href="/chat/settings" onClick={() => isMobile && setMobileMenuOpen(false)}>
           <Button variant="ghost" className="w-full justify-start gap-3 h-10">
             <SettingsIcon className="w-4 h-4" />
-            {t.settings}
+            {t("settings")}
           </Button>
         </Link>
 
         <Link href="/chat/about" onClick={() => isMobile && setMobileMenuOpen(false)}>
           <Button variant="ghost" className="w-full justify-start gap-3 h-10">
             <HelpCircleIcon className="w-4 h-4" />
-            {t.help}
+            {t("help")}
           </Button>
         </Link>
 
@@ -455,7 +359,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
           onClick={handleSignOut}
         >
           <LogOutIcon className="w-4 h-4" />
-          {t.signOut}
+          {t("signOut")}
         </Button>
       </div>
     </div>
@@ -486,31 +390,10 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
     setTouchEnd(null)
   }
 
-  useEffect(() => {
-    const handleScroll = (e: Event) => {
-      const target = e.target as HTMLElement
-      if (!target.classList.contains("chat-scroll-container")) return
-
-      const currentScrollY = target.scrollTop
-
-      if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
-        setScrollDirection("down")
-      } else if (currentScrollY < lastScrollY.current) {
-        setScrollDirection("up")
-      }
-
-      lastScrollY.current = currentScrollY
-    }
-
-    // Listen to scroll events on elements with chat-scroll-container class
-    document.addEventListener("scroll", handleScroll, true)
-    return () => document.removeEventListener("scroll", handleScroll, true)
-  }, [])
-
   return (
     <TooltipProvider delayDuration={0}>
-      <PushNotificationManager userId={userId} />
-      <FirebasePushProvider userId={userId} />
+      <PushNotificationManager userId={pathname} />
+      <FirebasePushProvider userId={pathname} />
 
       <div
         className="relative h-dvh flex bg-background overflow-hidden"
@@ -575,14 +458,14 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
 
         {/* Command Palette */}
         <CommandDialog open={commandOpen} onOpenChange={setCommandOpen}>
-          <CommandInput placeholder={t.searchPlaceholder} />
+          <CommandInput placeholder={t("searchPlaceholder")} />
           <CommandList>
-            <CommandEmpty>{t.noResults}</CommandEmpty>
-            <CommandGroup heading={t.goTo}>
+            <CommandEmpty>{t("noResults")}</CommandEmpty>
+            <CommandGroup heading={t("goTo")}>
               {[
-                { href: "/chat", label: t.home },
-                { href: "/chat/notifications", label: t.notifications },
-                { href: "/chat/assistant", label: t.assistant },
+                { href: "/chat", label: t("home") },
+                { href: "/chat/notifications", label: t("notifications") },
+                { href: "/chat/assistant", label: t("assistant") },
               ].map((item) => (
                 <CommandItem
                   key={item.href}
@@ -595,8 +478,11 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
                 </CommandItem>
               ))}
             </CommandGroup>
-            <CommandGroup heading={t.cells}>
-              {groups.map((group) => (
+            <CommandGroup heading={t("cells")}>
+              {[
+                { id: "1", name: "Group 1" },
+                { id: "2", name: "Group 2" },
+              ].map((group) => (
                 <CommandItem
                   key={group.id}
                   onSelect={() => {
@@ -615,22 +501,22 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
         <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{t.joinByInvite}</DialogTitle>
-              <DialogDescription>أدخل رابط الدعوة للانضمام إلى خلية</DialogDescription>
+              <DialogTitle>{t("joinByInvite")}</DialogTitle>
+              <DialogDescription>{t("joinByInviteDescription")}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="invite-link">{t.joinByInvite}</Label>
+                <Label htmlFor="invite-link">{t("joinByInvite")}</Label>
                 <Input
                   id="invite-link"
-                  placeholder={t.inviteLinkPlaceholder}
+                  placeholder={t("inviteLinkPlaceholder")}
                   value={inviteLink}
                   onChange={(e) => setInviteLink(e.target.value)}
                 />
               </div>
               {inviteError && <p className="text-sm text-destructive">{inviteError}</p>}
               <Button onClick={handleJoinByInvite} disabled={isJoining} className="w-full">
-                {isJoining ? t.joining : t.join}
+                {isJoining ? t("joining") : t("join")}
               </Button>
             </div>
           </DialogContent>
