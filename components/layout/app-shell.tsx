@@ -38,7 +38,7 @@ import {
   ChevronUpIcon,
   ChevronDownIcon,
   LinkIcon as Link2Icon,
-  SearchIcon,
+  MagnifyingGlassIcon as SearchIcon, // replaced non-existent SearchIcon with MagnifyingGlassIcon
 } from "@heroicons/react/24/outline"
 import type { Group, Profile } from "@/lib/types"
 import { useTheme } from "next-themes"
