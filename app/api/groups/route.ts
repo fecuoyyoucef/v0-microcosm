@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
         description: description?.trim() || null,
         created_by: userData.user.id,
         group_type: "primary",
-        cell_category: cell_category || "general",
+        cell_category: cell_category || "discussion",
         goal: goal || "التواصل والتعاون",
         responsibility_score: 100,
         progress_score: cell_category === "project" ? 0 : null,
