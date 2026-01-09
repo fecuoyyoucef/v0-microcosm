@@ -22,7 +22,10 @@ export default function AssistantPage() {
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [scrollDirection, setScrollDirection] = useState<"up" | "down">("up")
   const scrollRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const lastScrollYRef = useRef(0)
   const supabase = createClient()
 
   useEffect(() => {
@@ -36,6 +39,25 @@ export default function AssistantPage() {
       scrollRef.current.scrollIntoView({ behavior: "smooth" })
     }
   }, [messages])
+
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current?.querySelector("[data-radix-scroll-area-viewport]")
+    if (!scrollContainer) return
+
+    const handleScroll = () => {
+      const currentScrollY = scrollContainer.scrollTop
+      const direction = currentScrollY > lastScrollYRef.current ? "down" : "up"
+
+      if (direction !== scrollDirection) {
+        setScrollDirection(direction)
+      }
+
+      lastScrollYRef.current = currentScrollY
+    }
+
+    scrollContainer.addEventListener("scroll", handleScroll)
+    return () => scrollContainer.removeEventListener("scroll", handleScroll)
+  }, [scrollDirection])
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
@@ -90,7 +112,10 @@ export default function AssistantPage() {
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea
+        ref={scrollContainerRef}
+        className="flex-1 p-4 [&>[data-radix-scroll-area-viewport]]:chat-scroll-container"
+      >
         <div className="max-w-3xl mx-auto space-y-4">
           {messages.length === 0 ? (
             <div className="text-center py-12">
@@ -186,26 +211,33 @@ export default function AssistantPage() {
       </ScrollArea>
 
       {/* Input */}
-      <div className="shrink-0 border-t border-border bg-background p-4 pb-safe">
-        <div className="max-w-3xl mx-auto flex gap-2">
-          <Textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="اكتب رسالتك... (Enter للإرسال)"
-            className="min-h-[44px] max-h-32 resize-none"
-            rows={1}
-          />
-          <Button
-            onClick={handleSend}
-            disabled={!input.trim() || isLoading}
-            size="icon"
-            className="h-11 w-11 rounded-xl shrink-0"
-          >
-            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <ArrowRight className="w-5 h-5" />}
-          </Button>
+      <div
+        className={cn(
+          "fixed inset-x-0 shrink-0 border-t border-border bg-background transition-all duration-300",
+          scrollDirection === "up" ? "bottom-20" : "bottom-0",
+        )}
+      >
+        <div className="p-4 pb-safe">
+          <div className="max-w-3xl mx-auto flex gap-2">
+            <Textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="اكتب رسالتك... (Enter للإرسال)"
+              className="min-h-[44px] max-h-32 resize-none"
+              rows={1}
+            />
+            <Button
+              onClick={handleSend}
+              disabled={!input.trim() || isLoading}
+              size="icon"
+              className="h-11 w-11 rounded-xl shrink-0"
+            >
+              {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <ArrowRight className="w-5 h-5" />}
+            </Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground text-center mt-2">المساعد الذكي مدعوم بنموذج Groq AI</p>
         </div>
-        <p className="text-[10px] text-muted-foreground text-center mt-2">المساعد الذكي مدعوم بنموذج Groq AI</p>
       </div>
     </div>
   )
