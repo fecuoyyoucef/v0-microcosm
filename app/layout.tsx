@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { SettingsProvider } from "@/components/settings-provider"
 import { FeaturesProvider } from "@/components/features/features-provider"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
+import { TutorialProvider } from "@/lib/contexts/tutorial-context"
 import "./globals.css"
 
 const inter = Inter({
@@ -107,8 +108,10 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <SettingsProvider>
             <FeaturesProvider>
-              {children}
-              <PWAInstallPrompt />
+              <TutorialProvider>
+                {children}
+                <PWAInstallPrompt />
+              </TutorialProvider>
             </FeaturesProvider>
           </SettingsProvider>
         </ThemeProvider>

@@ -11,18 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Badge } from "@/components/ui/badge"
-import {
-  CommandDialog,
-  CommandInput,
-  CommandList,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-} from "@/components/ui/command"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
   HomeIcon,
   PlusIcon,
@@ -45,6 +34,7 @@ import { useSettings } from "@/components/settings-provider"
 import { PushNotificationManager } from "@/components/notifications/push-notification-manager"
 import { FirebasePushProvider } from "@/components/notifications/firebase-push-provider"
 import { ScrollProvider } from "@/lib/contexts/scroll-context"
+import { TutorialShell } from "@/components/tutorial/tutorial-shell"
 
 interface AppShellProps {
   children: React.ReactNode
@@ -483,169 +473,42 @@ function AppShellContent({ children, userId, profile, groups }: AppShellProps) {
   }
 
   return (
-    <TooltipProvider delayDuration={0}>
-      <PushNotificationManager userId={userId} />
-      <FirebasePushProvider userId={userId} />
+    <ScrollProvider>
+      <TooltipProvider delayDuration={0}>
+        <PushNotificationManager userId={userId} />
+        <FirebasePushProvider userId={userId} />
 
-      <div
-        className="relative h-dvh flex bg-background overflow-hidden"
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-      >
-        {/* Desktop Sidebar */}
-        <aside className="hidden md:flex w-64 flex-col bg-card border-l border-border">
-          <SidebarContent />
-        </aside>
+        <div
+          className="relative h-screen flex bg-background overflow-hidden"
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
+          {/* Desktop Sidebar */}
+          <aside className="hidden md:flex w-64 flex-col bg-card border-l border-border">
+            <SidebarContent />
+          </aside>
 
-        {/* Main Content */}
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <div className="flex-1 overflow-auto">{children}</div>
+          {/* Main Content */}
+          <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            <div className="flex-1 overflow-auto">{children}</div>
 
-          {/* Mobile Sidebar */}
-          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-            <SheetContent side="left" className="p-0 w-64">
-              <SidebarContent isMobile={true} />
-            </SheetContent>
-          </Sheet>
-        </main>
-      </div>
+            {/* Mobile Sidebar */}
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetContent side="left" className="p-0 w-64">
+                <SidebarContent isMobile={true} />
+              </SheetContent>
+            </Sheet>
+          </main>
 
-      {/* Command Palette */}
-      <CommandDialog open={commandOpen} onOpenChange={setCommandOpen}>
-        <CommandInput placeholder={t.searchPlaceholder} />
-        <CommandList>
-          <CommandEmpty>{t.noResults}</CommandEmpty>
-          <CommandGroup heading={t.goTo}>
-            <CommandItem
-              onSelect={() => {
-                router.push("/chat")
-                setCommandOpen(false)
-              }}
-            >
-              <HomeIcon className="ml-2 h-4 w-4" />
-              {t.home}
-            </CommandItem>
-            <CommandItem
-              onSelect={() => {
-                router.push("/chat/notifications")
-                setCommandOpen(false)
-              }}
-            >
-              <BellIcon className="ml-2 h-4 w-4" />
-              {t.notifications}
-            </CommandItem>
-            <CommandItem
-              onSelect={() => {
-                router.push("/chat/assistant")
-                setCommandOpen(false)
-              }}
-            >
-              <SparklesIcon className="ml-2 h-4 w-4" />
-              {t.assistant}
-            </CommandItem>
-            <CommandItem
-              onSelect={() => {
-                router.push("/chat/settings/appearance")
-                setCommandOpen(false)
-              }}
-            >
-              <SettingsIcon className="ml-2 h-4 w-4" />
-              {t.settings}
-            </CommandItem>
-            {isAdmin && (
-              <CommandItem
-                onSelect={() => {
-                  router.push("/admin")
-                  setCommandOpen(false)
-                }}
-              >
-                <XIcon className="ml-2 h-4 w-4" />
-                {t.admin}
-              </CommandItem>
-            )}
-          </CommandGroup>
-          <CommandGroup heading={t.cells}>
-            {groups.map((group) => (
-              <CommandItem
-                key={group.id}
-                onSelect={() => {
-                  router.push(`/chat/${group.id}`)
-                  setCommandOpen(false)
-                }}
-              >
-                <XIcon className="ml-2 h-4 w-4" />
-                {group.name}
-              </CommandItem>
-            ))}
-          </CommandGroup>
-          <CommandGroup heading={t.actions}>
-            <CommandItem
-              onSelect={() => {
-                router.push("/chat?new=true")
-                setCommandOpen(false)
-              }}
-            >
-              <PlusIcon className="ml-2 h-4 w-4" />
-              {t.newCell}
-            </CommandItem>
-            <CommandItem onSelect={() => setTheme(theme === "dark" ? "light" : "dark")}>
-              {theme === "dark" ? <SunIcon className="ml-2 h-4 w-4" /> : <MoonIcon className="ml-2 h-4 w-4" />}
-              {theme === "dark" ? t.lightMode : t.darkMode}
-            </CommandItem>
-          </CommandGroup>
-        </CommandList>
-      </CommandDialog>
-
-      {/* Invite Dialog */}
-      <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{t.joinByInvite}</DialogTitle>
-            <DialogDescription>
-              {language === "ar" ? "الصق رابط الدعوة للانضمام إلى خلية" : "Paste invite link to join a cell"}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 mt-4">
-            {inviteError && (
-              <div className="p-3 rounded-xl bg-destructive/10 text-destructive text-sm">{inviteError}</div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="inviteLinkSidebar">{language === "ar" ? "رابط الدعوة" : "Invite Link"}</Label>
-              <Input
-                id="inviteLinkSidebar"
-                value={inviteLink}
-                onChange={(e) => setInviteLink(e.target.value)}
-                placeholder={t.inviteLinkPlaceholder}
-                className="bg-background rounded-xl"
-                dir="ltr"
-              />
-            </div>
-            <Button
-              onClick={handleJoinByInvite}
-              disabled={!inviteLink.trim() || isJoining}
-              className="w-full rounded-xl h-11"
-            >
-              {isJoining ? (
-                <>
-                  <XIcon className="w-4 h-4 animate-spin ml-2" />
-                  {t.joining}
-                </>
-              ) : (
-                t.join
-              )}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </TooltipProvider>
+          {/* Tutorial Shell */}
+          <TutorialShell />
+        </div>
+      </TooltipProvider>
+    </ScrollProvider>
   )
 }
 
 export function AppShell(props: AppShellProps) {
-  return (
-    <ScrollProvider>
-      <AppShellContent {...props} />
-    </ScrollProvider>
-  )
+  return <AppShellContent {...props} />
 }
