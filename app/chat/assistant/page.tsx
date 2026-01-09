@@ -59,10 +59,6 @@ export default function AssistantPage() {
     return () => scrollContainer.removeEventListener("scroll", handleScroll)
   }, [scrollDirection])
 
-  useEffect(() => {
-    window.dispatchEvent(new CustomEvent("scroll-direction-change", { detail: scrollDirection }))
-  }, [scrollDirection])
-
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
 
@@ -116,7 +112,10 @@ export default function AssistantPage() {
       </div>
 
       {/* Messages */}
-      <ScrollArea ref={scrollContainerRef} className="flex-1 p-4">
+      <ScrollArea
+        ref={scrollContainerRef}
+        className="flex-1 p-4 [&>[data-radix-scroll-area-viewport]]:chat-scroll-container"
+      >
         <div className="max-w-3xl mx-auto space-y-4">
           {messages.length === 0 ? (
             <div className="text-center py-12">
@@ -211,7 +210,7 @@ export default function AssistantPage() {
         </div>
       </ScrollArea>
 
-      {/* Input - follows bottom nav */}
+      {/* Input */}
       <div
         className={cn(
           "fixed inset-x-0 shrink-0 border-t border-border bg-background transition-all duration-300",

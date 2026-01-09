@@ -11,6 +11,7 @@ import { useRealtimePresence } from "@/hooks/use-realtime-presence"
 import { TypingIndicator } from "./typing-indicator"
 import { OnlineIndicator } from "./online-indicator"
 import { ImportantMessageToast } from "./important-message-toast"
+import { useScrollDirection } from "@/lib/contexts/scroll-direction-context"
 import type { Group, GroupMember, Message, MessageLayer, ConversationNode, GroupSettings } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -38,7 +39,7 @@ export function ChatContainer({
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
   const [editingMessage, setEditingMessage] = useState<Message | null>(null)
   const [importantMessageToasts, setImportantMessageToasts] = useState<Message[]>([])
-  const [scrollDirection, setScrollDirection] = useState<"up" | "down">("up")
+  const { scrollDirection, setScrollDirection } = useScrollDirection()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const lastScrollYRef = useRef(0)
@@ -403,29 +404,6 @@ export function ChatContainer({
       document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
   }, [groupId, fetchMessages, fetchMembers, fetchNodes, supabase, currentUserId, resetUnreadCount])
-
-  useEffect(() => {
-    const scrollContainer = scrollContainerRef.current
-    if (!scrollContainer) return
-
-    const handleScroll = () => {
-      const currentScrollY = scrollContainer.scrollTop
-      const direction = currentScrollY > lastScrollYRef.current ? "down" : "up"
-
-      if (direction !== scrollDirection) {
-        setScrollDirection(direction)
-      }
-
-      lastScrollYRef.current = currentScrollY
-    }
-
-    scrollContainer.addEventListener("scroll", handleScroll)
-    return () => scrollContainer.removeEventListener("scroll", handleScroll)
-  }, [scrollDirection])
-
-  useEffect(() => {
-    window.dispatchEvent(new CustomEvent("scroll-direction-change", { detail: scrollDirection }))
-  }, [scrollDirection])
 
   const filteredMessages =
     activeLayer === "all"
