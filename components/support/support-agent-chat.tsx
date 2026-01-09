@@ -98,12 +98,12 @@ export function SupportAgentChat() {
 
   return (
     <div className="flex flex-col h-full bg-background">
-      <ScrollArea ref={scrollRef} className="flex-1 p-4">
-        <div className="space-y-4">
+      <ScrollArea className="flex-1 p-4 overflow-hidden">
+        <div className="space-y-4 pr-4">
           {messages.map((msg, idx) => (
             <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
-                className={`max-w-[80%] p-3 rounded-lg ${
+                className={`max-w-sm p-3 rounded-lg break-words whitespace-normal ${
                   msg.role === "user" ? "bg-cyan-600 text-white" : "bg-secondary"
                 }`}
               >
