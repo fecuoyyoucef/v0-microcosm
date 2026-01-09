@@ -11,7 +11,6 @@ import { useRealtimePresence } from "@/hooks/use-realtime-presence"
 import { TypingIndicator } from "./typing-indicator"
 import { OnlineIndicator } from "./online-indicator"
 import { ImportantMessageToast } from "./important-message-toast"
-import { useScrollDirection } from "@/lib/contexts/scroll-direction-context"
 import type { Group, GroupMember, Message, MessageLayer, ConversationNode, GroupSettings } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -39,7 +38,7 @@ export function ChatContainer({
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
   const [editingMessage, setEditingMessage] = useState<Message | null>(null)
   const [importantMessageToasts, setImportantMessageToasts] = useState<Message[]>([])
-  const { scrollDirection, setScrollDirection } = useScrollDirection()
+  const [scrollDirection, setScrollDirection] = useState<"up" | "down">("up")
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const lastScrollYRef = useRef(0)
@@ -405,6 +404,25 @@ export function ChatContainer({
     }
   }, [groupId, fetchMessages, fetchMembers, fetchNodes, supabase, currentUserId, resetUnreadCount])
 
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current
+    if (!scrollContainer) return
+
+    const handleScroll = () => {
+      const currentScrollY = scrollContainer.scrollTop
+      const direction = currentScrollY > lastScrollYRef.current ? "down" : "up"
+
+      if (direction !== scrollDirection) {
+        setScrollDirection(direction)
+      }
+
+      lastScrollYRef.current = currentScrollY
+    }
+
+    scrollContainer.addEventListener("scroll", handleScroll)
+    return () => scrollContainer.removeEventListener("scroll", handleScroll)
+  }, [scrollDirection])
+
   const filteredMessages =
     activeLayer === "all"
       ? selectedNodeId
@@ -627,7 +645,7 @@ export function ChatContainer({
         <div
           className={cn(
             "fixed inset-x-0 z-50 w-full transition-all duration-300 pb-safe",
-            scrollDirection === "down" ? "bottom-0" : "bottom-16",
+            scrollDirection === "down" ? "bottom-0" : "bottom-20",
           )}
         >
           <MessageInput

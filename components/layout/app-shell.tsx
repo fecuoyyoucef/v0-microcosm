@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -19,7 +19,7 @@ import {
   CommandGroup,
   CommandItem,
 } from "@/components/ui/command"
-import { Sheet, SheetContent } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -28,6 +28,7 @@ import {
   PlusIcon,
   Cog6ToothIcon as SettingsIcon,
   BellIcon,
+  MagnifyingGlassIcon as SearchIcon,
   SparklesIcon,
   TrophyIcon,
   MoonIcon,
@@ -38,14 +39,12 @@ import {
   ChevronUpIcon,
   ChevronDownIcon,
   LinkIcon as Link2Icon,
-  MagnifyingGlassIcon as SearchIcon, // replaced non-existent SearchIcon with MagnifyingGlassIcon
 } from "@heroicons/react/24/outline"
 import type { Group, Profile } from "@/lib/types"
 import { useTheme } from "next-themes"
 import { useSettings } from "@/components/settings-provider"
 import { PushNotificationManager } from "@/components/notifications/push-notification-manager"
 import { FirebasePushProvider } from "@/components/notifications/firebase-push-provider"
-import { useScrollDirection } from "@/lib/contexts/scroll-direction-context"
 
 interface AppShellProps {
   children: React.ReactNode
@@ -146,21 +145,23 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
   const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [isAdmin, setIsAdmin] = useState(false)
-  const [touchStart, setTouchStart] = useState<number | null>(null)
-  const [touchEnd, setTouchEnd] = useState<number | null>(null)
   const [cellsExpanded, setCellsExpanded] = useState(true)
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
   const [inviteLink, setInviteLink] = useState("")
   const [isJoining, setIsJoining] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
+  const [showBottomNav, setShowBottomNav] = useState(true)
+  const [scrollDirection, setScrollDirection] = useState<"up" | "down">("up")
+  const lastScrollY = useRef(0)
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
   const { theme, setTheme } = useTheme()
   const { language } = useSettings()
   const t = translations[language]
-  const { scrollDirection } = useScrollDirection()
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [touchStart, setTouchStart] = useState<number | null>(null)
+  const [touchEnd, setTouchEnd] = useState<number | null>(null)
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -486,6 +487,45 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
     setTouchEnd(null)
   }
 
+  useEffect(() => {
+    const handleScroll = (e: Event) => {
+      const target = e.target as HTMLElement
+      if (!target.classList.contains("chat-scroll-container")) return
+
+      const currentScrollY = target.scrollTop
+
+      if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
+        setScrollDirection("down")
+      } else if (currentScrollY < lastScrollY.current) {
+        setScrollDirection("up")
+      }
+
+      lastScrollY.current = currentScrollY
+    }
+
+    // Listen to scroll events on elements with chat-scroll-container class
+    document.addEventListener("scroll", handleScroll, true)
+    return () => document.removeEventListener("scroll", handleScroll, true)
+  }, [])
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY
+
+      // Show nav when scrolling up, hide when scrolling down
+      if (currentScrollY < lastScrollY.current || currentScrollY < 50) {
+        setShowBottomNav(true)
+      } else if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
+        setShowBottomNav(false)
+      }
+
+      lastScrollY.current = currentScrollY
+    }
+
+    window.addEventListener("scroll", handleScroll, { passive: true })
+    return () => window.removeEventListener("scroll", handleScroll)
+  }, [lastScrollY])
+
   return (
     <TooltipProvider delayDuration={0}>
       <PushNotificationManager userId={userId} />
@@ -504,53 +544,74 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
 
         {/* Main Content */}
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <div className={cn("flex-1 overflow-auto transition-all duration-300", "md:pb-0")}>{children}</div>
+          <div className={cn("flex-1 overflow-auto transition-all duration-300", "pb-0 md:pb-0")}>{children}</div>
 
           <nav
             className={cn(
-              "md:hidden fixed inset-x-0 bottom-0 z-50 bg-background/95 backdrop-blur-xl border-t border-border shadow-2xl transition-transform duration-300 ease-in-out",
+              "md:hidden fixed inset-x-0 bottom-0 bg-background/95 backdrop-blur-xl border-t border-border shadow-2xl transition-transform duration-300 ease-in-out z-40",
+              showBottomNav ? "translate-y-0" : "translate-y-full",
               scrollDirection === "down" && "translate-y-full pointer-events-none",
             )}
           >
-            <div className="h-16 px-4 flex items-center justify-around">
-              <Link href="/chat" onClick={() => setMobileMenuOpen(false)}>
-                <Button variant="ghost" size="icon" className="h-10 w-10">
+            <div className="flex items-center justify-around py-3 px-4">
+              <Link href="/chat">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "h-12 w-12 rounded-xl transition-all hover:scale-105",
+                    pathname === "/chat" && "bg-primary/10 text-primary",
+                  )}
+                >
                   <HomeIcon className="w-5 h-5" />
                 </Button>
               </Link>
-              <Link href="/chat/notifications" onClick={() => setMobileMenuOpen(false)}>
-                <Button variant="ghost" size="icon" className="h-10 w-10 relative">
-                  <BellIcon className="w-5 h-5" />
+
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-12 w-12 rounded-xl transition-all hover:scale-105"
+                onClick={() => setCommandOpen(true)}
+              >
+                <SearchIcon className="w-5 h-5" />
+              </Button>
+
+              <Link href="/chat/notifications">
+                <Button
+                  size="icon"
+                  className="h-14 w-14 rounded-xl bg-primary text-primary-foreground relative transition-all hover:scale-105 hover:shadow-lg"
+                >
+                  <BellIcon className="w-6 h-6" />
                   {unreadNotifications > 0 && (
-                    <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center bg-destructive text-destructive-foreground text-[10px]">
-                      {unreadNotifications > 99 ? "99+" : unreadNotifications}
-                    </Badge>
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground text-[10px] rounded-full flex items-center justify-center animate-pulse">
+                      {unreadNotifications > 9 ? "9+" : unreadNotifications}
+                    </span>
                   )}
                 </Button>
               </Link>
-              <Link href="/chat/assistant" onClick={() => setMobileMenuOpen(false)}>
-                <Button variant="ghost" size="icon" className="h-10 w-10">
+
+              <Link href="/chat/assistant">
+                <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl transition-all hover:scale-105">
                   <SparklesIcon className="w-5 h-5 text-amber-500" />
                 </Button>
               </Link>
-              <Link href="/chat/profile" onClick={() => setMobileMenuOpen(false)}>
-                <Button variant="ghost" size="icon" className="h-10 w-10">
-                  <TrophyIcon className="w-5 h-5 text-amber-500" />
-                </Button>
-              </Link>
-              <Button variant="ghost" size="icon" className="h-10 w-10" onClick={() => setCommandOpen(true)}>
-                <SearchIcon className="w-5 h-5" />
-              </Button>
+
+              <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Avatar className="w-10 h-10 cursor-pointer">
+                    <AvatarImage src={profile?.avatar_url || undefined} />
+                    <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                      {profile?.display_name?.charAt(0) || <XIcon className="w-4 h-4" />}
+                    </AvatarFallback>
+                  </Avatar>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-72 p-0">
+                  <SidebarContent isMobile />
+                </SheetContent>
+              </Sheet>
             </div>
           </nav>
         </main>
-
-        {/* Mobile Sidebar Sheet */}
-        <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-          <SheetContent side="left" className="w-64 p-0">
-            <SidebarContent isMobile />
-          </SheetContent>
-        </Sheet>
 
         {/* Command Palette */}
         <CommandDialog open={commandOpen} onOpenChange={setCommandOpen}>
@@ -558,21 +619,53 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
           <CommandList>
             <CommandEmpty>{t.noResults}</CommandEmpty>
             <CommandGroup heading={t.goTo}>
-              {[
-                { href: "/chat", label: t.home },
-                { href: "/chat/notifications", label: t.notifications },
-                { href: "/chat/assistant", label: t.assistant },
-              ].map((item) => (
+              <CommandItem
+                onSelect={() => {
+                  router.push("/chat")
+                  setCommandOpen(false)
+                }}
+              >
+                <HomeIcon className="ml-2 h-4 w-4" />
+                {t.home}
+              </CommandItem>
+              <CommandItem
+                onSelect={() => {
+                  router.push("/chat/notifications")
+                  setCommandOpen(false)
+                }}
+              >
+                <BellIcon className="ml-2 h-4 w-4" />
+                {t.notifications}
+              </CommandItem>
+              <CommandItem
+                onSelect={() => {
+                  router.push("/chat/assistant")
+                  setCommandOpen(false)
+                }}
+              >
+                <SparklesIcon className="ml-2 h-4 w-4" />
+                {t.assistant}
+              </CommandItem>
+              <CommandItem
+                onSelect={() => {
+                  router.push("/chat/settings/appearance")
+                  setCommandOpen(false)
+                }}
+              >
+                <SettingsIcon className="ml-2 h-4 w-4" />
+                {t.settings}
+              </CommandItem>
+              {isAdmin && (
                 <CommandItem
-                  key={item.href}
                   onSelect={() => {
-                    router.push(item.href)
+                    router.push("/admin")
                     setCommandOpen(false)
                   }}
                 >
-                  {item.label}
+                  <XIcon className="ml-2 h-4 w-4" />
+                  {t.admin}
                 </CommandItem>
-              ))}
+              )}
             </CommandGroup>
             <CommandGroup heading={t.cells}>
               {groups.map((group) => (
@@ -583,33 +676,75 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
                     setCommandOpen(false)
                   }}
                 >
+                  <XIcon className="ml-2 h-4 w-4" />
                   {group.name}
                 </CommandItem>
               ))}
             </CommandGroup>
+            <CommandGroup heading={t.actions}>
+              <CommandItem
+                onSelect={() => {
+                  router.push("/chat?new=true")
+                  setCommandOpen(false)
+                }}
+              >
+                <PlusIcon className="ml-2 h-4 w-4" />
+                {t.newCell}
+              </CommandItem>
+              <CommandItem onSelect={() => setTheme(theme === "dark" ? "light" : "dark")}>
+                {theme === "dark" ? <SunIcon className="ml-2 h-4 w-4" /> : <MoonIcon className="ml-2 h-4 w-4" />}
+                {theme === "dark" ? t.lightMode : t.darkMode}
+              </CommandItem>
+            </CommandGroup>
           </CommandList>
         </CommandDialog>
 
-        {/* Invite Dialog */}
-        <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
-          <DialogContent>
+        {/* Join by Invite Dialog */}
+        <Dialog
+          open={isInviteDialogOpen}
+          onOpenChange={(open) => {
+            setIsInviteDialogOpen(open)
+            if (!open) {
+              setInviteError(null)
+              setInviteLink("")
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>{t.joinByInvite}</DialogTitle>
-              <DialogDescription>أدخل رابط الدعوة للانضمام إلى خلية</DialogDescription>
+              <DialogDescription>
+                {language === "ar" ? "الصق رابط الدعوة للانضمام إلى خلية" : "Paste invite link to join a cell"}
+              </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="invite-link">{t.joinByInvite}</Label>
+            <div className="space-y-4 mt-4">
+              {inviteError && (
+                <div className="p-3 rounded-xl bg-destructive/10 text-destructive text-sm">{inviteError}</div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="inviteLinkSidebar">{language === "ar" ? "رابط الدعوة" : "Invite Link"}</Label>
                 <Input
-                  id="invite-link"
-                  placeholder={t.inviteLinkPlaceholder}
+                  id="inviteLinkSidebar"
                   value={inviteLink}
                   onChange={(e) => setInviteLink(e.target.value)}
+                  placeholder={t.inviteLinkPlaceholder}
+                  className="bg-background rounded-xl"
+                  dir="ltr"
                 />
               </div>
-              {inviteError && <p className="text-sm text-destructive">{inviteError}</p>}
-              <Button onClick={handleJoinByInvite} disabled={isJoining} className="w-full">
-                {isJoining ? t.joining : t.join}
+              <Button
+                onClick={handleJoinByInvite}
+                disabled={!inviteLink.trim() || isJoining}
+                className="w-full rounded-xl h-11"
+              >
+                {isJoining ? (
+                  <>
+                    <XIcon className="w-4 h-4 animate-spin ml-2" />
+                    {t.joining}
+                  </>
+                ) : (
+                  t.join
+                )}
               </Button>
             </div>
           </DialogContent>

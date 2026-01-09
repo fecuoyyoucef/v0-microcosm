@@ -44,9 +44,19 @@ export default function AssistantPage() {
     const scrollContainer = scrollContainerRef.current?.querySelector("[data-radix-scroll-area-viewport]")
     if (!scrollContainer) return
 
+    scrollContainer.classList.add("chat-scroll-container")
+
     const handleScroll = () => {
       const currentScrollY = scrollContainer.scrollTop
-      const direction = currentScrollY > lastScrollYRef.current && currentScrollY > 50 ? "down" : "up"
+      const scrollHeight = scrollContainer.scrollHeight
+      const clientHeight = scrollContainer.clientHeight
+
+      if (scrollHeight <= clientHeight) {
+        setScrollDirection("up")
+        return
+      }
+
+      const direction = currentScrollY > lastScrollYRef.current ? "down" : "up"
 
       if (direction !== scrollDirection) {
         setScrollDirection(direction)
@@ -55,8 +65,11 @@ export default function AssistantPage() {
       lastScrollYRef.current = currentScrollY
     }
 
-    scrollContainer.addEventListener("scroll", handleScroll)
-    return () => scrollContainer.removeEventListener("scroll", handleScroll)
+    scrollContainer.addEventListener("scroll", handleScroll, { passive: true })
+    return () => {
+      scrollContainer.removeEventListener("scroll", handleScroll)
+      scrollContainer.classList.remove("chat-scroll-container")
+    }
   }, [scrollDirection])
 
   const handleSend = async () => {
@@ -97,7 +110,7 @@ export default function AssistantPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-background pb-safe">
+    <div className="flex flex-col h-screen bg-background pb-20">
       {/* Header */}
       <div className="shrink-0 border-b border-border bg-card/50 backdrop-blur-xl">
         <div className="h-14 px-4 flex items-center gap-3">
@@ -213,8 +226,8 @@ export default function AssistantPage() {
       {/* Input */}
       <div
         className={cn(
-          "fixed inset-x-0 shrink-0 border-t border-border bg-background transition-all duration-300",
-          scrollDirection === "up" ? "bottom-16" : "bottom-0",
+          "fixed inset-x-0 z-50 shrink-0 border-t border-border bg-background transition-all duration-300",
+          scrollDirection === "up" ? "bottom-[4.5rem]" : "bottom-0",
         )}
       >
         <div className="p-4 pb-safe">

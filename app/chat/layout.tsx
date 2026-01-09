@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { AppShell } from "@/components/layout/app-shell"
 import { InstallPromptNotification } from "@/components/pwa/install-button"
-import { ScrollDirectionProvider } from "@/lib/contexts/scroll-direction-context"
 
 export default async function ChatLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -27,11 +26,9 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
   return (
     <>
       <InstallPromptNotification />
-      <ScrollDirectionProvider>
-        <AppShell userId={user.id} profile={profile} groups={groups as any}>
-          {children}
-        </AppShell>
-      </ScrollDirectionProvider>
+      <AppShell userId={user.id} profile={profile} groups={groups as any}>
+        {children}
+      </AppShell>
     </>
   )
 }
