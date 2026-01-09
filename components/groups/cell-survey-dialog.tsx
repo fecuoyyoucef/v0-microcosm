@@ -315,8 +315,8 @@ export function CellSurveyDialog({ open, onOpenChange, groupId, onComplete }: Ce
         <div className="flex items-center justify-between gap-3 pt-4 border-t">
           {step > 1 && (
             <Button variant="outline" onClick={() => setStep(step - 1)} disabled={loading}>
-              <ChevronRight className="w-4 h-4 ml-2" />
               السابق
+              <ChevronRight className="w-4 h-4 ml-2" />
             </Button>
           )}
 
