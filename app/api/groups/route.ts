@@ -14,19 +14,19 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { name, description, cell_category, goal } = body
 
-    if (!name || !cell_category || !goal) {
-      return NextResponse.json({ error: "Name, cell category, and goal are required" }, { status: 400 })
+    if (!name || !name.trim()) {
+      return NextResponse.json({ error: "Name is required" }, { status: 400 })
     }
 
     const { data: group, error: groupError } = await supabase
       .from("groups")
       .insert({
-        name,
-        description,
+        name: name.trim(),
+        description: description?.trim() || null,
         created_by: userData.user.id,
         group_type: "primary",
-        cell_category,
-        goal,
+        cell_category: cell_category || "general",
+        goal: goal || "التواصل والتعاون",
         responsibility_score: 100,
         progress_score: cell_category === "project" ? 0 : null,
         last_activity_date: new Date().toISOString(),
