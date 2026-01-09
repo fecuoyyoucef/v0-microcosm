@@ -2,7 +2,14 @@ import { createServerClient as createSupabaseServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 
+let serverClientInstance: ReturnType<typeof createSupabaseServerClient> | null = null
+let serviceClientInstance: ReturnType<typeof createSupabaseClient> | null = null
+
 export async function createClient() {
+  if (serverClientInstance) {
+    return serverClientInstance
+  }
+
   const cookieStore = await cookies()
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -12,7 +19,7 @@ export async function createClient() {
     throw new Error("Missing Supabase environment variables")
   }
 
-  return createSupabaseServerClient(url, key, {
+  serverClientInstance = createSupabaseServerClient(url, key, {
     cookies: {
       getAll() {
         return cookieStore.getAll()
@@ -26,9 +33,15 @@ export async function createClient() {
       },
     },
   })
+
+  return serverClientInstance
 }
 
 export function createServiceClient() {
+  if (serviceClientInstance) {
+    return serviceClientInstance
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
@@ -36,12 +49,14 @@ export function createServiceClient() {
     throw new Error("Missing Supabase service role environment variables")
   }
 
-  return createSupabaseClient(url, serviceKey, {
+  serviceClientInstance = createSupabaseClient(url, serviceKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
     },
   })
+
+  return serviceClientInstance
 }
 
 export const createServerClient = createClient

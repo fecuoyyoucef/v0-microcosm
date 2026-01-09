@@ -110,7 +110,7 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url)
     }
   } catch (error) {
-    console.error("[v0] Auth error:", error)
+    console.error("[v0] Auth error in middleware:", error)
     // Continue anyway - user might be accessing public routes
   }
 
