@@ -108,8 +108,17 @@ export function CellSurveyDialog({ open, onOpenChange, groupId, onComplete }: Ce
   const handleSubmit = async () => {
     setLoading(true)
     try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        throw new Error("User not authenticated")
+      }
+
       const { error } = await supabase.from("cell_surveys").insert({
         group_id: groupId,
+        created_by: user.id, // Added missing created_by field
         discussion_style: discussionStyle,
         expertise_level: expertiseLevel,
         primary_goal: primaryGoal,
