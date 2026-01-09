@@ -441,7 +441,7 @@ function AppShellContent({ children, userId, profile, groups }: AppShellProps) {
         <Link href="/chat/about" onClick={() => isMobile && setMobileMenuOpen(false)}>
           <Button variant="ghost" className="w-full justify-start gap-3 h-10">
             <HelpCircleIcon className="w-4 h-4" />
-            {t.help}
+            حول التطبيق
           </Button>
         </Link>
 
