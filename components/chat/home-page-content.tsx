@@ -238,19 +238,23 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
     setError(null)
 
     try {
-      // Call API instead of direct database insertion
+      const requestBody = {
+        name: newGroupName.trim(),
+        description: newGroupDescription.trim() || null,
+        cell_category: "general",
+        goal: newGroupDescription.trim() || "التواصل والتعاون",
+      }
+
+      console.log("[v0] Creating group with body:", requestBody)
+
       const response = await fetch("/api/groups", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: newGroupName.trim(),
-          description: newGroupDescription.trim() || null,
-          cell_category: "general", // Default category
-          goal: newGroupDescription.trim() || "التواصل والتعاون", // Default goal
-        }),
+        body: JSON.stringify(requestBody),
       })
 
       const data = await response.json()
+      console.log("[v0] Response:", { ok: response.ok, status: response.status, data })
 
       if (!response.ok) {
         setError(data.error || "Failed to create cell")
