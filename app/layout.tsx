@@ -5,7 +5,6 @@ import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/theme-provider"
 import { SettingsProvider } from "@/components/settings-provider"
 import { FeaturesProvider } from "@/components/features/features-provider"
-import { ScrollProvider } from "@/lib/contexts/scroll-context"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import "./globals.css"
 
@@ -108,10 +107,8 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <SettingsProvider>
             <FeaturesProvider>
-              <ScrollProvider>
-                {children}
-                <PWAInstallPrompt />
-              </ScrollProvider>
+              {children}
+              <PWAInstallPrompt />
             </FeaturesProvider>
           </SettingsProvider>
         </ThemeProvider>

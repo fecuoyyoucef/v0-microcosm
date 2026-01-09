@@ -10,7 +10,6 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Card, CardContent } from "@/components/ui/card"
 import { ArrowRight, Sparkles, Loader2, User, Bot } from "lucide-react"
-import { useScrollDirection } from "@/lib/contexts/scroll-context"
 import { cn } from "@/lib/utils"
 
 interface Message {
@@ -23,7 +22,7 @@ export default function AssistantPage() {
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
-  const { scrollDirection, setScrollDirection } = useScrollDirection()
+  const [scrollDirection, setScrollDirection] = useState<"up" | "down">("up")
   const scrollRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const lastScrollYRef = useRef(0)
@@ -47,7 +46,7 @@ export default function AssistantPage() {
 
     const handleScroll = () => {
       const currentScrollY = scrollContainer.scrollTop
-      const direction = currentScrollY > lastScrollYRef.current ? "down" : "up"
+      const direction = currentScrollY > lastScrollYRef.current && currentScrollY > 50 ? "down" : "up"
 
       if (direction !== scrollDirection) {
         setScrollDirection(direction)
@@ -58,7 +57,7 @@ export default function AssistantPage() {
 
     scrollContainer.addEventListener("scroll", handleScroll)
     return () => scrollContainer.removeEventListener("scroll", handleScroll)
-  }, [scrollDirection, setScrollDirection])
+  }, [scrollDirection])
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
@@ -214,7 +213,7 @@ export default function AssistantPage() {
       {/* Input */}
       <div
         className={cn(
-          "fixed inset-x-0 shrink-0 border-t border-border bg-background transition-all duration-300 z-40",
+          "fixed inset-x-0 shrink-0 border-t border-border bg-background transition-all duration-300",
           scrollDirection === "up" ? "bottom-16" : "bottom-0",
         )}
       >
