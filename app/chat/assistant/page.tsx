@@ -70,7 +70,7 @@ export default function AssistantPage() {
       scrollContainer.removeEventListener("scroll", handleScroll)
       scrollContainer.classList.remove("chat-scroll-container")
     }
-  }, [scrollDirection])
+  }, []) // removed scrollDirection from dependency array to ensure listener stays active
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
