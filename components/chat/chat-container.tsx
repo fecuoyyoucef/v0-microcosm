@@ -642,12 +642,7 @@ export function ChatContainer({
           <TypingIndicator userNames={typingUserNames} />
         </div>
 
-        <div
-          className={cn(
-            "relative z-50 w-full transition-all duration-300",
-            scrollDirection === "up" ? "mb-16" : "mb-0",
-          )}
-        >
+        <div className={cn("relative z-50 w-full transition-all duration-300", "pb-safe")}>
           <MessageInput
             onSend={sendMessage}
             members={members}
