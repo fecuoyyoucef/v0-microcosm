@@ -529,7 +529,7 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
 
           <nav
             className={cn(
-              "md:hidden fixed inset-x-0 bottom-0 bg-background/95 backdrop-blur-xl border-t border-border shadow-2xl transition-transform duration-300 ease-in-out",
+              "md:hidden fixed inset-x-0 bottom-0 z-50 bg-background/95 backdrop-blur-xl border-t border-border shadow-2xl transition-transform duration-300 ease-in-out",
               scrollDirection === "down" ? "translate-y-full pointer-events-none" : "translate-y-0",
             )}
           >
@@ -559,11 +559,9 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
                   <TrophyIcon className="w-5 h-5 text-amber-500" />
                 </Button>
               </Link>
-              <Link href="/chat" onClick={() => setMobileMenuOpen(false)}>
-                <Button variant="ghost" size="icon" className="h-10 w-10">
-                  <SearchIcon className="w-5 h-5" />
-                </Button>
-              </Link>
+              <Button variant="ghost" size="icon" className="h-10 w-10" onClick={() => setCommandOpen(true)}>
+                <SearchIcon className="w-5 h-5" />
+              </Button>
             </div>
           </nav>
         </main>
