@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -45,6 +45,7 @@ import { useTheme } from "next-themes"
 import { useSettings } from "@/components/settings-provider"
 import { PushNotificationManager } from "@/components/notifications/push-notification-manager"
 import { FirebasePushProvider } from "@/components/notifications/firebase-push-provider"
+import { ScrollProvider, useScroll } from "@/lib/contexts/scroll-context"
 
 interface AppShellProps {
   children: React.ReactNode
@@ -140,7 +141,7 @@ const translations = {
   },
 }
 
-export function AppShell({ children, userId, profile, groups }: AppShellProps) {
+function AppShellContent({ children, userId, profile, groups }: AppShellProps) {
   const [commandOpen, setCommandOpen] = useState(false)
   const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
@@ -150,10 +151,6 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
   const [inviteLink, setInviteLink] = useState("")
   const [isJoining, setIsJoining] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
-  const [scrollDirection, setScrollDirection] = useState<"up" | "down">("up")
-  const lastScrollY = useRef(0)
-  const pathname = usePathname()
-  const router = useRouter()
   const supabase = createClient()
   const { theme, setTheme } = useTheme()
   const { language } = useSettings()
@@ -161,6 +158,9 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
   const [isAdmin, setIsAdmin] = useState(false)
   const [touchStart, setTouchStart] = useState<number | null>(null)
   const [touchEnd, setTouchEnd] = useState<number | null>(null)
+  const { scrollDirection, setScrollDirection } = useScroll()
+  const router = useRouter()
+  const pathname = usePathname()
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -233,8 +233,6 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
   }
 
   const handleJoinByInvite = async () => {
-    if (!inviteLink.trim()) return
-
     setIsJoining(true)
     setInviteError(null)
 
@@ -487,45 +485,41 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
   }
 
   useEffect(() => {
-    const handleScroll = (e: Event) => {
-      const target = e.target as HTMLElement
+    let lastScrollY = window.scrollY
+    let ticking = false
 
-      // Check if the target is scrollable (has overflow-auto or similar)
-      const isScrollable = target.scrollHeight > target.clientHeight
-      if (!isScrollable) return
-
-      const currentScrollY = target.scrollTop
-
-      if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
-        setScrollDirection("down")
-      } else if (currentScrollY < lastScrollY.current) {
-        setScrollDirection("up")
-      }
-
-      lastScrollY.current = currentScrollY
-    }
-
-    // Listen to scroll events on all scrollable elements
-    document.addEventListener("scroll", handleScroll, true)
-    return () => document.removeEventListener("scroll", handleScroll, true)
-  }, [])
-
-  useEffect(() => {
     const handleScroll = () => {
-      const currentScrollY = window.scrollY
+      const scrollableElement = document.querySelector("[data-radix-scroll-area-viewport], .chat-scroll-container")
 
-      if (currentScrollY < lastScrollY.current || currentScrollY < 50) {
-        setScrollDirection("up")
-      } else if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
-        setScrollDirection("down")
+      if (scrollableElement) {
+        const currentScrollY = scrollableElement.scrollTop
+
+        if (!ticking) {
+          window.requestAnimationFrame(() => {
+            if (currentScrollY > lastScrollY && currentScrollY > 50) {
+              setScrollDirection("down")
+            } else if (currentScrollY < lastScrollY) {
+              setScrollDirection("up")
+            }
+
+            lastScrollY = currentScrollY
+            ticking = false
+          })
+
+          ticking = true
+        }
       }
-
-      lastScrollY.current = currentScrollY
     }
 
-    window.addEventListener("scroll", handleScroll, { passive: true })
-    return () => window.removeEventListener("scroll", handleScroll)
-  }, [])
+    const scrollableElement = document.querySelector("[data-radix-scroll-area-viewport], .chat-scroll-container")
+    scrollableElement?.addEventListener("scroll", handleScroll)
+    window.addEventListener("scroll", handleScroll)
+
+    return () => {
+      scrollableElement?.removeEventListener("scroll", handleScroll)
+      window.removeEventListener("scroll", handleScroll)
+    }
+  }, [setScrollDirection])
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -751,5 +745,13 @@ export function AppShell({ children, userId, profile, groups }: AppShellProps) {
         </Dialog>
       </div>
     </TooltipProvider>
+  )
+}
+
+export function AppShell(props: AppShellProps) {
+  return (
+    <ScrollProvider>
+      <AppShellContent {...props} />
+    </ScrollProvider>
   )
 }

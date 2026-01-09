@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Card, CardContent } from "@/components/ui/card"
 import { ArrowRight, Sparkles, Loader2, User, Bot } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useScroll } from "@/lib/contexts/scroll-context"
 
 interface Message {
   role: "user" | "assistant"
@@ -22,7 +23,7 @@ export default function AssistantPage() {
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
-  const [scrollDirection, setScrollDirection] = useState<"up" | "down">("up")
+  const { scrollDirection, setScrollDirection } = useScroll()
   const scrollRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const lastScrollYRef = useRef(0)
@@ -32,7 +33,7 @@ export default function AssistantPage() {
     supabase.auth.getUser().then(({ data }) => {
       setCurrentUserId(data.user?.id || null)
     })
-  }, [])
+  }, [supabase])
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -43,8 +44,6 @@ export default function AssistantPage() {
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current?.querySelector("[data-radix-scroll-area-viewport]")
     if (!scrollContainer) return
-
-    scrollContainer.classList.add("chat-scroll-container")
 
     const handleScroll = () => {
       const currentScrollY = scrollContainer.scrollTop
@@ -68,9 +67,8 @@ export default function AssistantPage() {
     scrollContainer.addEventListener("scroll", handleScroll, { passive: true })
     return () => {
       scrollContainer.removeEventListener("scroll", handleScroll)
-      scrollContainer.classList.remove("chat-scroll-container")
     }
-  }, []) // removed scrollDirection from dependency array to ensure listener stays active
+  }, [scrollDirection, setScrollDirection])
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
