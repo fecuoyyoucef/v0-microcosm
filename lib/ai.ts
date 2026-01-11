@@ -9,6 +9,16 @@ export function getAIModel() {
   return groq("qwen/qwen3-32b")
 }
 
+function cleanThinkingTags(text: string): string {
+  // Remove <Thinking> tags and their content
+  let cleaned = text.replace(/<Thinking>[\s\S]*?<\/think>/gi, "")
+  // Remove any remaining XML-like tags that might contain thinking
+  cleaned = cleaned.replace(/<[^>]*think[^>]*>[\s\S]*?<\/[^>]*>/gi, "")
+  // Remove leading/trailing whitespace
+  cleaned = cleaned.trim()
+  return cleaned
+}
+
 export async function generateAIText(
   prompt: string,
   options?: {
@@ -23,7 +33,7 @@ export async function generateAIText(
       maxTokens: options?.maxTokens || 2000,
       temperature: options?.temperature || 0.7,
     })
-    return text
+    return cleanThinkingTags(text)
   } catch (error) {
     console.error("[v0] AI Error:", error)
     throw new Error("حدث خطأ في خدمة الذكاء الاصطناعي")

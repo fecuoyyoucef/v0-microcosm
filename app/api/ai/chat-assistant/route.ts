@@ -200,7 +200,7 @@ export async function POST(req: Request) {
 - لا تخلط اللغات في أي جزء من الرد
 - لا تكتب كلمات أجنبية حتى لو كانت أسماء تقنية
 - استثناء وحيد: اسم التطبيق "Synaptic Space" فقط
-- إذا احتجت لشرح مصطلح تقني ترجمه للعربية الفصحى
+- إذا احتجت لشرح مصطلح تقني ترجم للعربية الفصحى
 
 # معلومات المستخدم الأساسية
 الاسم: ${profile?.display_name || profile?.username || "مستخدم"}
@@ -318,7 +318,9 @@ ${unreadNotifications.map((n: any) => `• ${n.title}: ${n.body?.substring(0, 60
     const response = await generateAIText(fullPrompt)
     console.log("[v0] AI response generated successfully")
 
-    return Response.json({ success: true, response })
+    const cleanedResponse = response.replace(/<Thinking>[\s\S]*?<\/think>/gi, "").trim()
+
+    return Response.json({ success: true, response: cleanedResponse })
   } catch (error) {
     console.error("[v0] Chat assistant error:", error)
     return Response.json(
