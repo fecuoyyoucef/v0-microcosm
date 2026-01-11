@@ -144,8 +144,11 @@ const translations = {
   },
 }
 
-function removeThinkingTags(text: string): string {
-  return text.replace(/<Thinking>[\s\S]*?<\/think>/gi, "").trim()
+const removeThinkingTags = (text: string) => {
+  return text
+    .replace(/<Thinking>[\s\S]*?<\/think>/gi, "")
+    .replace(/<Thinking>[\s\S]*?<\/thinking>/gi, "")
+    .trim()
 }
 
 export function HomePageContent({ groups: initialGroups, userId, profile, hasCompletedSurvey }: HomePageContentProps) {
