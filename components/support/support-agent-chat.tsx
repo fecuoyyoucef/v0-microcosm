@@ -23,10 +23,12 @@ export function SupportAgentChat() {
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
+    }
   }, [messages])
 
   const handleSend = async () => {
@@ -94,32 +96,35 @@ export function SupportAgentChat() {
   }
 
   return (
-    <div className="flex flex-col h-[80vh] max-h-[80vh] w-full max-w-full overflow-hidden bg-background rounded-lg shadow-sm border border-border">
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-6 scroll-smooth">
-        <div className="flex flex-col gap-4 max-w-full">
+    // The iframe has a fixed height, so h-full will respect that constraint
+    <div className="flex flex-col h-full w-full overflow-hidden bg-background">
+      {/* Header */}
+      <div className="shrink-0 px-4 py-3 border-b border-border bg-card">
+        <h2 className="text-lg font-semibold text-center">دعم العملاء</h2>
+        <p className="text-xs text-muted-foreground text-center">تحدث مع وكيل الدعم الذكي</p>
+      </div>
+
+      {/* flex-1 + min-h-0 is the key combo for proper flex scrolling */}
+      <div ref={messagesContainerRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4">
+        <div className="flex flex-col gap-3">
           {messages.map((msg, idx) => (
-            <div
-              key={idx}
-              className={`flex w-full ${msg.role === "user" ? "justify-end" : "justify-start"} animate-fade-in`}
-            >
+            <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
                 className={`
-                  max-w-[80%] sm:max-w-md px-4 py-3 rounded-2xl shadow-sm
-                  break-words whitespace-pre-wrap
+                  max-w-[85%] px-4 py-2.5 rounded-2xl
                   ${
                     msg.role === "user"
-                      ? "bg-primary text-primary-foreground rounded-br-sm"
-                      : "bg-muted text-foreground rounded-bl-sm"
+                      ? "bg-primary text-primary-foreground rounded-br-md"
+                      : "bg-muted text-foreground rounded-bl-md"
                   }
                 `}
                 style={{
-                  wordWrap: "break-word",
-                  overflowWrap: "anywhere",
                   wordBreak: "break-word",
+                  overflowWrap: "anywhere",
                 }}
               >
-                <p className="text-[15px] leading-relaxed">{msg.content}</p>
-                <span className={`text-[11px] opacity-60 mt-1.5 block`}>
+                <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                <span className="text-[10px] opacity-60 mt-1 block">
                   {msg.timestamp.toLocaleTimeString("ar-SA", {
                     hour: "2-digit",
                     minute: "2-digit",
@@ -130,23 +135,21 @@ export function SupportAgentChat() {
           ))}
 
           {loading && (
-            <div className="flex justify-start animate-fade-in">
-              <div className="bg-muted px-5 py-3 rounded-2xl rounded-bl-sm shadow-sm">
-                <div className="flex gap-1.5">
-                  <div className="w-2 h-2 bg-muted-foreground/40 rounded-full animate-bounce" />
-                  <div className="w-2 h-2 bg-muted-foreground/40 rounded-full animate-bounce [animation-delay:0.15s]" />
-                  <div className="w-2 h-2 bg-muted-foreground/40 rounded-full animate-bounce [animation-delay:0.3s]" />
+            <div className="flex justify-start">
+              <div className="bg-muted px-4 py-3 rounded-2xl rounded-bl-md">
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" />
+                  <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce [animation-delay:150ms]" />
+                  <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce [animation-delay:300ms]" />
                 </div>
               </div>
             </div>
           )}
-
-          <div ref={messagesEndRef} className="h-0" />
         </div>
       </div>
 
-      <div className="shrink-0 px-4 py-4 border-t border-border bg-card/50 backdrop-blur-sm">
-        <div className="flex gap-2 mb-2">
+      <div className="shrink-0 p-3 border-t border-border bg-card">
+        <div className="flex gap-2">
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -156,27 +159,22 @@ export function SupportAgentChat() {
                 handleSend()
               }
             }}
-            placeholder="اكتب رسالتك هنا..."
+            placeholder="اكتب رسالتك..."
             disabled={loading}
-            className="flex-1 rounded-full px-4 py-2.5 text-[15px] border-border/60 focus:border-primary transition-colors"
+            className="flex-1 rounded-full px-4 text-sm"
           />
           <Button
             onClick={handleSend}
             disabled={loading || !input.trim()}
             size="icon"
-            className="rounded-full h-11 w-11 shrink-0"
+            className="rounded-full shrink-0"
           >
             <Send className="w-4 h-4" />
           </Button>
         </div>
-
-        <Button
-          variant="ghost"
-          onClick={handleReportIssue}
-          className="w-full text-xs text-muted-foreground hover:text-foreground gap-2 h-8"
-        >
-          <AlertCircle className="w-3.5 h-3.5" />
-          الإبلاغ عن مشكلة تقنية
+        <Button variant="ghost" onClick={handleReportIssue} className="w-full mt-2 text-xs text-muted-foreground h-7">
+          <AlertCircle className="w-3 h-3 ml-1" />
+          الإبلاغ عن مشكلة
         </Button>
       </div>
     </div>

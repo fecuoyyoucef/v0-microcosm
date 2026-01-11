@@ -2,7 +2,8 @@ import { SupportAgentChat } from "@/components/support/support-agent-chat"
 
 export default function SupportAgentPage() {
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 bg-background">
+    // This ensures the page fits within the iframe container
+    <div className="h-full w-full overflow-hidden bg-background">
       <SupportAgentChat />
     </div>
   )
