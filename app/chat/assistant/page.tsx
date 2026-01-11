@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { ArrowRight, Sparkles, Loader2, User, Bot } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useScroll } from "@/lib/contexts/scroll-context"
+import { MarkdownRenderer } from "@/components/ui/markdown-renderer"
 
 interface Message {
   role: "user" | "assistant"
@@ -190,7 +191,10 @@ export default function AssistantPage() {
                     msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted",
                   )}
                 >
-                  <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                  <MarkdownRenderer
+                    content={msg.content}
+                    className={msg.role === "user" ? "prose-sm text-primary-foreground" : "prose-sm"}
+                  />
                 </div>
 
                 {msg.role === "user" && (

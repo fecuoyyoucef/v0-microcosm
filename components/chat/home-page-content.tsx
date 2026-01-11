@@ -22,6 +22,7 @@ import {
 import { SmartRecommendations } from "@/components/groups/smart-recommendations"
 import { SuggestedCells } from "@/components/groups/suggested-cells"
 import { CellSurveyDialog } from "@/components/groups/cell-survey-dialog"
+import { MarkdownRenderer } from "@/components/ui/markdown-renderer"
 import {
   PlusIcon,
   UsersIcon,
@@ -602,7 +603,10 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
                       )}
                       style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}
                     >
-                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                      <MarkdownRenderer
+                        content={msg.content}
+                        className={msg.role === "user" ? "prose-sm text-primary-foreground" : "prose-sm"}
+                      />
                     </div>
                   </div>
                 ))
