@@ -107,11 +107,11 @@ export function SupportAgentChat() {
             {messages.map((msg, idx) => (
               <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div
-                  className={`max-w-[85%] p-3 rounded-lg break-words overflow-hidden ${
+                  className={`max-w-[280px] sm:max-w-sm p-3 rounded-lg break-words overflow-wrap-anywhere ${
                     msg.role === "user" ? "bg-cyan-600 text-white" : "bg-secondary"
                   }`}
                 >
-                  <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                  <p className="text-sm whitespace-pre-wrap break-words overflow-wrap-anywhere">{msg.content}</p>
                   <span className="text-xs text-muted-foreground mt-1 block">
                     {msg.timestamp.toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}
                   </span>
