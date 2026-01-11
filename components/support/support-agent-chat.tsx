@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Send, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
 
@@ -24,15 +23,10 @@ export function SupportAgentChat() {
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (scrollRef.current) {
-      const scrollContainer = scrollRef.current.querySelector("[data-radix-scroll-area-viewport]")
-      if (scrollContainer) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight
-      }
-    }
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
   const handleSend = async () => {
@@ -100,47 +94,48 @@ export function SupportAgentChat() {
   }
 
   return (
-    <div className="flex flex-col h-full w-full bg-background overflow-hidden">
-      <div className="flex-1 min-h-0 overflow-hidden" ref={scrollRef}>
-        <ScrollArea className="h-full">
-          <div className="p-4 space-y-4">
-            {messages.map((msg, idx) => (
-              <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`max-w-[280px] sm:max-w-sm p-3 rounded-lg break-words overflow-wrap-anywhere ${
-                    msg.role === "user" ? "bg-cyan-600 text-white" : "bg-secondary"
-                  }`}
-                >
-                  <p className="text-sm whitespace-pre-wrap break-words overflow-wrap-anywhere">{msg.content}</p>
-                  <span className="text-xs text-muted-foreground mt-1 block">
-                    {msg.timestamp.toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}
-                  </span>
+    <div className="flex flex-col h-full w-full max-w-full overflow-hidden bg-background">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-4">
+        <div className="space-y-4">
+          {messages.map((msg, idx) => (
+            <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+              <div
+                className={`max-w-[75%] p-3 rounded-lg break-words ${
+                  msg.role === "user" ? "bg-cyan-600 text-white" : "bg-secondary"
+                }`}
+                style={{ wordWrap: "break-word", overflowWrap: "break-word" }}
+              >
+                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                <span className="text-xs opacity-70 mt-1 block">
+                  {msg.timestamp.toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}
+                </span>
+              </div>
+            </div>
+          ))}
+          {loading && (
+            <div className="flex justify-start">
+              <div className="bg-secondary p-3 rounded-lg">
+                <div className="flex gap-1">
+                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" />
+                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce [animation-delay:0.1s]" />
+                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce [animation-delay:0.2s]" />
                 </div>
               </div>
-            ))}
-            {loading && (
-              <div className="flex justify-start">
-                <div className="bg-secondary p-3 rounded-lg">
-                  <div className="flex gap-1">
-                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" />
-                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce delay-100" />
-                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce delay-200" />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </ScrollArea>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
       </div>
 
-      <div className="shrink-0 p-4 border-t border-border space-y-2 bg-background">
+      <div className="shrink-0 p-4 border-t border-border bg-background space-y-2">
         <div className="flex gap-2">
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
             placeholder="اكتب رسالتك..."
             disabled={loading}
+            className="flex-1"
           />
           <Button onClick={handleSend} disabled={loading || !input.trim()} size="icon">
             <Send className="w-4 h-4" />
