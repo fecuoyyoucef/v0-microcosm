@@ -580,13 +580,13 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
 
       {/* Support Dialog */}
       <Dialog open={showSupportDialog} onOpenChange={setShowSupportDialog}>
-        <DialogContent className="sm:max-w-md h-[500px] flex flex-col">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-4 shrink-0">
             <DialogTitle>{t.supportTitle}</DialogTitle>
             <DialogDescription>{t.supportDesc}</DialogDescription>
           </DialogHeader>
-          <ScrollArea className="flex-1 -mx-6 px-6 my-4">
-            <div className="space-y-4 flex flex-col">
+          <div className="flex-1 min-h-0 overflow-y-auto px-6">
+            <div className="space-y-4 pb-4">
               {supportMessages.length === 0 ? (
                 <div className="text-center text-muted-foreground py-8">
                   <MessageCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
@@ -594,20 +594,22 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
                 </div>
               ) : (
                 supportMessages.map((msg, idx) => (
-                  <div
-                    key={idx}
-                    className={cn(
-                      "p-3 rounded-xl flex",
-                      msg.role === "user" ? "bg-primary text-primary-foreground justify-end" : "bg-muted justify-start",
-                    )}
-                  >
-                    <p className="text-sm break-words max-w-xs">{msg.content}</p>
+                  <div key={idx} className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}>
+                    <div
+                      className={cn(
+                        "p-3 rounded-xl max-w-[280px] break-words",
+                        msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted",
+                      )}
+                      style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}
+                    >
+                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    </div>
                   </div>
                 ))
               )}
             </div>
-          </ScrollArea>
-          <div className="flex gap-2">
+          </div>
+          <div className="flex gap-2 px-6 pb-6 pt-4 shrink-0 border-t">
             <Input
               value={supportInput}
               onChange={(e) => setSupportInput(e.target.value)}
