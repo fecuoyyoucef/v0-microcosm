@@ -144,6 +144,10 @@ const translations = {
   },
 }
 
+function removeThinkingTags(text: string): string {
+  return text.replace(/<Thinking>[\s\S]*?<\/think>/gi, "").trim()
+}
+
 export function HomePageContent({ groups: initialGroups, userId, profile, hasCompletedSurvey }: HomePageContentProps) {
   const [groups, setGroups] = useState<Group[]>(initialGroups)
   const [searchQuery, setSearchQuery] = useState("")
@@ -289,14 +293,6 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
     }
   }
 
-  const cleanThinkingTags = (text: string): string => {
-    return text
-      .replace(/<Thinking>[\s\S]*?<\/think>/gi, "")
-      .replace(/<Thinking>[\s\S]*?<\/thinking>/gi, "")
-      .replace(/<Thinking>[\s\S]*?<\/Thinking>/gi, "")
-      .trim()
-  }
-
   const sendSupportMessage = async () => {
     if (!supportInput.trim() || isSendingSupport) return
 
@@ -319,7 +315,7 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
       const data = await response.json()
 
       if (data.response) {
-        const cleanedResponse = cleanThinkingTags(data.response)
+        const cleanedResponse = removeThinkingTags(data.response)
         setSupportMessages((prev) => [...prev, { role: "assistant", content: cleanedResponse }])
         if (data.conversationId) {
           setConversationId(data.conversationId)
