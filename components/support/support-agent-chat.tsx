@@ -97,17 +97,17 @@ export function SupportAgentChat() {
   }
 
   return (
-    <div className="flex flex-col h-full max-h-[600px] bg-background">
+    <div className="flex flex-col h-screen bg-background overflow-hidden">
       <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
         <div className="p-4 space-y-4">
           {messages.map((msg, idx) => (
             <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
-                className={`max-w-[85%] p-3 rounded-lg break-words ${
+                className={`max-w-[80%] p-3 rounded-lg break-words whitespace-pre-wrap ${
                   msg.role === "user" ? "bg-cyan-600 text-white" : "bg-secondary"
                 }`}
               >
-                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                <p className="text-sm">{msg.content}</p>
                 <span className="text-xs text-muted-foreground mt-1 block">
                   {msg.timestamp.toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}
                 </span>
@@ -128,7 +128,7 @@ export function SupportAgentChat() {
         </div>
       </ScrollArea>
 
-      <div className="p-4 border-t border-border space-y-2">
+      <div className="shrink-0 p-4 border-t border-border space-y-2 bg-background">
         <div className="flex gap-2">
           <Input
             value={input}
