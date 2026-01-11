@@ -94,55 +94,88 @@ export function SupportAgentChat() {
   }
 
   return (
-    <div className="flex flex-col h-full w-full max-w-full overflow-hidden bg-background">
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-4">
-        <div className="space-y-4">
+    <div className="flex flex-col h-[80vh] max-h-[80vh] w-full max-w-full overflow-hidden bg-background rounded-lg shadow-sm border border-border">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-6 scroll-smooth">
+        <div className="flex flex-col gap-4 max-w-full">
           {messages.map((msg, idx) => (
-            <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div
+              key={idx}
+              className={`flex w-full ${msg.role === "user" ? "justify-end" : "justify-start"} animate-fade-in`}
+            >
               <div
-                className={`max-w-[75%] p-3 rounded-lg break-words ${
-                  msg.role === "user" ? "bg-cyan-600 text-white" : "bg-secondary"
-                }`}
-                style={{ wordWrap: "break-word", overflowWrap: "break-word" }}
+                className={`
+                  max-w-[80%] sm:max-w-md px-4 py-3 rounded-2xl shadow-sm
+                  break-words whitespace-pre-wrap
+                  ${
+                    msg.role === "user"
+                      ? "bg-primary text-primary-foreground rounded-br-sm"
+                      : "bg-muted text-foreground rounded-bl-sm"
+                  }
+                `}
+                style={{
+                  wordWrap: "break-word",
+                  overflowWrap: "anywhere",
+                  wordBreak: "break-word",
+                }}
               >
-                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                <span className="text-xs opacity-70 mt-1 block">
-                  {msg.timestamp.toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}
+                <p className="text-[15px] leading-relaxed">{msg.content}</p>
+                <span className={`text-[11px] opacity-60 mt-1.5 block`}>
+                  {msg.timestamp.toLocaleTimeString("ar-SA", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </span>
               </div>
             </div>
           ))}
+
           {loading && (
-            <div className="flex justify-start">
-              <div className="bg-secondary p-3 rounded-lg">
-                <div className="flex gap-1">
-                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" />
-                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce [animation-delay:0.1s]" />
-                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce [animation-delay:0.2s]" />
+            <div className="flex justify-start animate-fade-in">
+              <div className="bg-muted px-5 py-3 rounded-2xl rounded-bl-sm shadow-sm">
+                <div className="flex gap-1.5">
+                  <div className="w-2 h-2 bg-muted-foreground/40 rounded-full animate-bounce" />
+                  <div className="w-2 h-2 bg-muted-foreground/40 rounded-full animate-bounce [animation-delay:0.15s]" />
+                  <div className="w-2 h-2 bg-muted-foreground/40 rounded-full animate-bounce [animation-delay:0.3s]" />
                 </div>
               </div>
             </div>
           )}
-          <div ref={messagesEndRef} />
+
+          <div ref={messagesEndRef} className="h-0" />
         </div>
       </div>
 
-      <div className="shrink-0 p-4 border-t border-border bg-background space-y-2">
-        <div className="flex gap-2">
+      <div className="shrink-0 px-4 py-4 border-t border-border bg-card/50 backdrop-blur-sm">
+        <div className="flex gap-2 mb-2">
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-            placeholder="اكتب رسالتك..."
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault()
+                handleSend()
+              }
+            }}
+            placeholder="اكتب رسالتك هنا..."
             disabled={loading}
-            className="flex-1"
+            className="flex-1 rounded-full px-4 py-2.5 text-[15px] border-border/60 focus:border-primary transition-colors"
           />
-          <Button onClick={handleSend} disabled={loading || !input.trim()} size="icon">
+          <Button
+            onClick={handleSend}
+            disabled={loading || !input.trim()}
+            size="icon"
+            className="rounded-full h-11 w-11 shrink-0"
+          >
             <Send className="w-4 h-4" />
           </Button>
         </div>
-        <Button variant="ghost" onClick={handleReportIssue} className="w-full text-xs gap-2">
-          <AlertCircle className="w-3 h-3" />
+
+        <Button
+          variant="ghost"
+          onClick={handleReportIssue}
+          className="w-full text-xs text-muted-foreground hover:text-foreground gap-2 h-8"
+        >
+          <AlertCircle className="w-3.5 h-3.5" />
           الإبلاغ عن مشكلة تقنية
         </Button>
       </div>
