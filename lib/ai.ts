@@ -6,7 +6,7 @@ const groq = createGroq({
 })
 
 export function getAIModel() {
-  return groq("llama-3.3-70b-versatile")
+  return groq("qwen3-32b")
 }
 
 export async function generateAIText(
