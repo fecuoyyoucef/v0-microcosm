@@ -10,16 +10,16 @@ export function getAIModel() {
 }
 
 function cleanThinkingTags(text: string): string {
-  // Remove all variations of thinking tags: <Thinking>, <Think>, <Thinking>, <Thinking>, etc.
-  let cleaned = text.replace(/<Thinking>[\s\S]*?<\/think>/gi, "")
-  cleaned = cleaned.replace(/<Thinking>[\s\S]*?<\/thinking>/gi, "")
+  // Remove all variations: <Thinking>...</Thinking>, <Thinking>...</Thinking>, etc.
+  let cleaned = text.replace(/<Thinking>[\s\S]*?<\/thinking>/gi, "")
+  cleaned = cleaned.replace(/<Thinking>[\s\S]*?<\/Thinking>/gi, "")
+  cleaned = cleaned.replace(/<Thinking>[\s\S]*?<\/think>/gi, "")
+  cleaned = cleaned.replace(/<Think>[\s\S]*?<\/Think>/gi, "")
 
-  // Also remove any leftover XML-like tags
-  cleaned = cleaned.replace(/<[^>]*think[^>]*>[\s\S]*?<\/[^>]*>/gi, "")
+  // Remove any other XML-like thinking tags
+  cleaned = cleaned.replace(/<[^>]*?think[^>]*?>[\s\S]*?<\/[^>]*?>/gi, "")
 
-  // Remove leading/trailing whitespace
-  cleaned = cleaned.trim()
-  return cleaned
+  return cleaned.trim()
 }
 
 export async function generateAIText(
