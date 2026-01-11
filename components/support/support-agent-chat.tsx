@@ -28,7 +28,10 @@ export function SupportAgentChat() {
 
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+      const scrollContainer = scrollRef.current.querySelector("[data-radix-scroll-area-viewport]")
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight
+      }
     }
   }, [messages])
 
@@ -97,36 +100,38 @@ export function SupportAgentChat() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-background overflow-hidden">
-      <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
-        <div className="p-4 space-y-4">
-          {messages.map((msg, idx) => (
-            <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div
-                className={`max-w-[80%] p-3 rounded-lg break-words whitespace-pre-wrap ${
-                  msg.role === "user" ? "bg-cyan-600 text-white" : "bg-secondary"
-                }`}
-              >
-                <p className="text-sm">{msg.content}</p>
-                <span className="text-xs text-muted-foreground mt-1 block">
-                  {msg.timestamp.toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}
-                </span>
-              </div>
-            </div>
-          ))}
-          {loading && (
-            <div className="flex justify-start">
-              <div className="bg-secondary p-3 rounded-lg">
-                <div className="flex gap-1">
-                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" />
-                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce delay-100" />
-                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce delay-200" />
+    <div className="flex flex-col h-full w-full bg-background overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-hidden" ref={scrollRef}>
+        <ScrollArea className="h-full">
+          <div className="p-4 space-y-4">
+            {messages.map((msg, idx) => (
+              <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div
+                  className={`max-w-[85%] p-3 rounded-lg break-words overflow-hidden ${
+                    msg.role === "user" ? "bg-cyan-600 text-white" : "bg-secondary"
+                  }`}
+                >
+                  <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                  <span className="text-xs text-muted-foreground mt-1 block">
+                    {msg.timestamp.toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
-      </ScrollArea>
+            ))}
+            {loading && (
+              <div className="flex justify-start">
+                <div className="bg-secondary p-3 rounded-lg">
+                  <div className="flex gap-1">
+                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" />
+                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce delay-100" />
+                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce delay-200" />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      </div>
 
       <div className="shrink-0 p-4 border-t border-border space-y-2 bg-background">
         <div className="flex gap-2">
