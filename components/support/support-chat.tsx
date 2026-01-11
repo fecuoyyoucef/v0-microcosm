@@ -1,9 +1,8 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useRef, useEffect } from "react"
-import { Send, X, Bot, User } from "lucide-react"
+import { Send, Bot, User } from "lucide-react"
 
 interface Message {
   id: string
@@ -11,11 +10,7 @@ interface Message {
   content: string
 }
 
-interface SupportChatProps {
-  onClose?: () => void
-}
-
-export function SupportChat({ onClose }: SupportChatProps) {
+export function SupportChat() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
@@ -25,11 +20,13 @@ export function SupportChat({ onClose }: SupportChatProps) {
   ])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
 
-  // Auto scroll to bottom when new messages arrive
+  // Auto scroll to bottom
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
+    }
   }, [messages])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -74,7 +71,7 @@ export function SupportChat({ onClose }: SupportChatProps) {
           },
         ])
       } else {
-        throw new Error("Failed to get response")
+        throw new Error("Failed")
       }
     } catch {
       setMessages((prev) => [
@@ -93,57 +90,22 @@ export function SupportChat({ onClose }: SupportChatProps) {
   return (
     <div
       style={{
-        position: "fixed",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        top: 0,
-        maxHeight: "100%",
+        width: "100%",
+        height: "100%",
         display: "flex",
         flexDirection: "column",
         backgroundColor: "#0a0a0a",
         overflow: "hidden",
       }}
     >
-      {/* Header - Fixed */}
+      {/* Messages Area */}
       <div
+        ref={messagesContainerRef}
         style={{
-          flexShrink: 0,
-          padding: "16px",
-          borderBottom: "1px solid #262626",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          backgroundColor: "#0a0a0a",
-        }}
-      >
-        <div style={{ textAlign: "center", flex: 1 }}>
-          <h2 style={{ fontSize: "18px", fontWeight: 600, color: "#fff", margin: 0 }}>دعم العملاء</h2>
-          <p style={{ fontSize: "12px", color: "#737373", margin: "4px 0 0 0" }}>تحدث مع وكيل الدعم الذكي</p>
-        </div>
-        {onClose && (
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#737373",
-              cursor: "pointer",
-              padding: "8px",
-            }}
-          >
-            <X size={20} />
-          </button>
-        )}
-      </div>
-
-      {/* Messages Area - Scrollable */}
-      <div
-        style={{
-          flex: 1,
+          flex: "1 1 0%",
+          minHeight: 0,
           overflowY: "auto",
           padding: "16px",
-          minHeight: 0,
         }}
       >
         {messages.map((message) => (
@@ -157,13 +119,13 @@ export function SupportChat({ onClose }: SupportChatProps) {
           >
             <div
               style={{
-                maxWidth: "280px",
+                maxWidth: "75%",
                 padding: "12px 16px",
                 borderRadius: "16px",
                 backgroundColor: message.role === "user" ? "#3b82f6" : "#262626",
                 color: "#fff",
                 fontSize: "14px",
-                lineHeight: 1.5,
+                lineHeight: "1.5",
                 wordBreak: "break-word",
                 overflowWrap: "anywhere",
                 display: "flex",
@@ -192,11 +154,9 @@ export function SupportChat({ onClose }: SupportChatProps) {
             </div>
           </div>
         )}
-
-        <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area - Fixed at bottom */}
+      {/* Input Area */}
       <form
         onSubmit={handleSubmit}
         style={{
@@ -206,13 +166,7 @@ export function SupportChat({ onClose }: SupportChatProps) {
           backgroundColor: "#0a0a0a",
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            gap: "8px",
-            alignItems: "center",
-          }}
-        >
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           <input
             type="text"
             value={input}
