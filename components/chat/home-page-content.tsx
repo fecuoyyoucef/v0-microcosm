@@ -146,8 +146,8 @@ const translations = {
 
 const removeThinkingTags = (text: string) => {
   return text
-    .replace(/<Thinking>[\s\S]*?<\/think>/gi, "")
-    .replace(/<Thinking>[\s\S]*?<\/thinking>/gi, "")
+    .replace(/<Thinking>[\s\S]*?<\/Thinking>/gi, "")
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
     .trim()
 }
 
