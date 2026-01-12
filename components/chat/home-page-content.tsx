@@ -145,9 +145,10 @@ const translations = {
 }
 
 const removeThinkingTags = (text: string) => {
+  // Remove all thinking/think tags in any case variation
   return text
-    .replace(/<Thinking>[\s\S]*?<\/Thinking>/gi, "")
-    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
+    .replace(/<[Tt][Hh][Ii][Nn][Kk]([Ii][Nn][Gg])?>([\s\S]*?)<\/[Tt][Hh][Ii][Nn][Kk]\1>/gi, "") // Catches <Thinking>, <Think>, <Thinking>, <Thinking>, etc.
+    .replace(/<Thinking>([\s\S]*?)<\/thinking>/gi, "") // Extra fallback for lowercase
     .trim()
 }
 
