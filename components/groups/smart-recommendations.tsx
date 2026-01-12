@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Sparkles, TrendingUp, Users, MessageSquare, Loader2 } from "lucide-react"
+import { Sparkles, Users, Loader2 } from "lucide-react"
 import Link from "next/link"
 
 interface Recommendation {
@@ -66,24 +66,28 @@ export function SmartRecommendations({ userId }: SmartRecommendationsProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
-        {recommendations.map((rec) => (
-          <Link key={rec.id} href={rec.type === "cell" ? `/chat/${rec.id}` : `/chat/${rec.id}/nodes`} className="block">
-            <div className="p-3 rounded-lg bg-card hover:bg-card/80 transition-colors border border-border/50">
-              <div className="flex items-start gap-3">
-                <div className="p-2 rounded-lg bg-amber-500/20 shrink-0">
-                  {rec.type === "cell" && <Users className="w-4 h-4 text-amber-600" />}
-                  {rec.type === "node" && <MessageSquare className="w-4 h-4 text-amber-600" />}
-                  {rec.type === "user" && <TrendingUp className="w-4 h-4 text-amber-600" />}
+        {recommendations.map(
+          (rec) =>
+            rec.id &&
+            rec.type === "cell" && (
+              <Link key={rec.id} href={`/chat/${rec.id}`} className="block">
+                <div className="p-3 rounded-lg bg-card hover:bg-card/80 transition-colors border border-border/50">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-lg bg-amber-500/20 shrink-0">
+                      {rec.type === "cell" && <Users className="w-4 h-4 text-amber-600" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{rec.title}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{rec.reason}</p>
+                    </div>
+                    {rec.score && !isNaN(rec.score) && (
+                      <div className="text-xs font-medium text-amber-600 shrink-0">{Math.round(rec.score)}%</div>
+                    )}
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate">{rec.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{rec.reason}</p>
-                </div>
-                <div className="text-xs font-medium text-amber-600 shrink-0">{Math.round(rec.score)}%</div>
-              </div>
-            </div>
-          </Link>
-        ))}
+              </Link>
+            ),
+        )}
       </CardContent>
     </Card>
   )

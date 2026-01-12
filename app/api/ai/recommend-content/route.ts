@@ -1,7 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { getAIModel } from "@/lib/ai"
-import { generateText } from "ai"
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,58 +9,47 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    // Get user interests and behavior
-    const { data: userSurvey } = await supabase.from("user_surveys").select("*").eq("user_id", user.id).single()
+    // Get user's current groups
+    const { data: userGroups } = await supabase.from("group_members").select("group_id").eq("user_id", user.id)
 
-    const { data: userActivity } = await supabase
-      .from("messages")
-      .select("content, conversation_nodes(title)")
-      .eq("sender_id", user.id)
+    const userGroupIds = userGroups?.map((g) => g.group_id) || []
+
+    // Get recommended groups user is NOT in yet, sorted by member count
+    const { data: recommendedGroups } = await supabase
+      .from("groups")
+      .select("id, name, description, group_members(count)")
+      .not("id", "in", `(${userGroupIds.length > 0 ? userGroupIds.join(",") : "null"})`)
       .order("created_at", { ascending: false })
-      .limit(20)
+      .limit(5)
 
-    // Get available nodes user hasn't interacted with
-    const { data: allNodes } = await supabase
-      .from("conversation_nodes")
-      .select("id, title, messages(count)")
-      .order("created_at", { ascending: false })
-      .limit(50)
-
-    const nodeTopics = allNodes?.map((n) => n.title).join(", ") || ""
-    const userInterests = userSurvey?.interests?.join(", ") || "غير محدد"
-    const recentTopics =
-      userActivity
-        ?.map((m: any) => m.conversation_nodes?.title)
-        .filter(Boolean)
-        .join(", ") || "غير متاح"
-
-    const { text } = await generateText({
-      model: getAIModel(),
-      prompt: `أنت نظام توصيات ذكي. بناءً على المعلومات التالية، اقترح 3 مواضيع أو عقد نقاش قد تهم المستخدم:
-
-اهتمامات المستخدم: ${userInterests}
-المواضيع التي تفاعل معها مؤخراً: ${recentTopics}
-المواضيع المتاحة: ${nodeTopics}
-
-أرجع 3 اقتراحات، كل واحد في سطر مستقل بالصيغة:
-- [عنوان الموضوع]: [سبب الاقتراح بجملة قصيرة]`,
-    })
-
-    const recommendations = text
-      .split("\n")
-      .filter((line) => line.trim().startsWith("-"))
-      .map((line) => {
-        const match = line.match(/^-\s*\[(.*?)\]:\s*(.*)/)
-        if (match) {
-          return { title: match[1].trim(), reason: match[2].trim() }
-        }
-        return null
+    const validRecommendations = (recommendedGroups || [])
+      .filter((group) => {
+        const memberCount = Array.isArray(group.group_members)
+          ? group.group_members.length
+          : group.group_members?.count || 0
+        return group.name && group.id && memberCount > 0
       })
-      .filter(Boolean)
+      .slice(0, 3)
+      .map((group) => {
+        const memberCount = Array.isArray(group.group_members)
+          ? group.group_members.length
+          : group.group_members?.count || 0
 
-    return NextResponse.json({ recommendations })
+        return {
+          type: "cell",
+          id: group.id,
+          title: group.name,
+          description: group.description || "خلية متاحة للانضمام",
+          score: Math.min(100, memberCount * 10), // Calculate score from member count
+          reason: `${memberCount} أعضاء نشطين في هذه الخلية`,
+        }
+      })
+
+    return NextResponse.json({
+      recommendations: validRecommendations.length > 0 ? validRecommendations : [],
+    })
   } catch (error) {
     console.error("Content recommendation error:", error)
-    return NextResponse.json({ error: "Failed to generate recommendations" }, { status: 500 })
+    return NextResponse.json({ recommendations: [] })
   }
 }
