@@ -17,17 +17,29 @@ export async function POST(request: NextRequest) {
     // Get recommended groups user is NOT in yet, sorted by member count
     const { data: recommendedGroups } = await supabase
       .from("groups")
-      .select("id, name, description, group_members(count)")
+      .select("id, name, description, settings, group_members(count)")
       .not("id", "in", `(${userGroupIds.length > 0 ? userGroupIds.join(",") : "null"})`)
       .order("created_at", { ascending: false })
       .limit(5)
+
+    const { data: pendingRequests } = await supabase
+      .from("group_join_requests")
+      .select("group_id")
+      .eq("user_id", user.id)
+      .eq("status", "pending")
+
+    const pendingGroupIds = pendingRequests?.map((r) => r.group_id) || []
 
     const validRecommendations = (recommendedGroups || [])
       .filter((group) => {
         const memberCount = Array.isArray(group.group_members)
           ? group.group_members.length
           : group.group_members?.count || 0
-        return group.name && group.id && memberCount > 0
+        const isPublic = group.settings?.privacy === "public"
+        const hasPendingRequest = pendingGroupIds.includes(group.id)
+
+        // Show only public cells without pending requests
+        return group.name && group.id && memberCount > 0 && isPublic && !hasPendingRequest
       })
       .slice(0, 3)
       .map((group) => {
@@ -40,7 +52,7 @@ export async function POST(request: NextRequest) {
           id: group.id,
           title: group.name,
           description: group.description || "خلية متاحة للانضمام",
-          score: Math.min(100, memberCount * 10), // Calculate score from member count
+          score: Math.min(100, memberCount * 10),
           reason: `${memberCount} أعضاء نشطين في هذه الخلية`,
         }
       })
