@@ -42,15 +42,23 @@ import type {
 } from "@/lib/types"
 import { MetricCard } from "@/components/ui/metric-card"
 import { CellManagementPanel } from "@/components/chat/cell-management-panel"
+import { JoinRequestsManager } from "@/components/chat/join-requests-manager"
 
 interface GroupSettingsFormProps {
   group: Group
   members: GroupMember[]
   currentUserId: string
   isAdmin: boolean
+  joinRequests?: any[]
 }
 
-export function GroupSettingsForm({ group, members: initialMembers, currentUserId, isAdmin }: GroupSettingsFormProps) {
+export function GroupSettingsForm({
+  group,
+  members: initialMembers,
+  currentUserId,
+  isAdmin,
+  joinRequests = [],
+}: GroupSettingsFormProps) {
   const [name, setName] = useState(group.name)
   const [description, setDescription] = useState(group.description || "")
   const [avatarUrl, setAvatarUrl] = useState(group.avatar_url || "")
@@ -64,6 +72,7 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
       allow_notebook: true,
       allow_mindmap: true,
       allow_smart_summary: true,
+      privacy_type: "open",
     },
   )
   const [isSaving, setIsSaving] = useState(false)
@@ -366,7 +375,7 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
         )}
 
         <Tabs defaultValue="general" className="space-y-6">
-          <TabsList className={`grid w-full ${isPrimaryCell && isAdmin ? "grid-cols-6" : "grid-cols-5"} h-auto p-1`}>
+          <TabsList className={`grid w-full ${isPrimaryCell && isAdmin ? "grid-cols-7" : "grid-cols-6"} h-auto p-1`}>
             <TabsTrigger value="general" className="text-xs md:text-sm py-2">
               <Settings className="w-4 h-4 md:ml-2" />
               <span className="hidden md:inline">عام</span>
@@ -387,6 +396,12 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
               <TabsTrigger value="cells" className="text-xs md:text-sm py-2">
                 <GitBranch className="w-4 h-4 md:ml-2" />
                 <span className="hidden md:inline">الخلايا</span>
+              </TabsTrigger>
+            )}
+            {isAdmin && (
+              <TabsTrigger value="join-requests" className="text-xs md:text-sm py-2">
+                <Shield className="w-4 h-4 md:ml-2" />
+                <span className="hidden md:inline">طلبات الانضمام</span>
               </TabsTrigger>
             )}
             <TabsTrigger value="stats" className="text-xs md:text-sm py-2" onClick={loadStatistics}>
@@ -780,6 +795,72 @@ export function GroupSettingsForm({ group, members: initialMembers, currentUserI
                 currentUserId={currentUserId}
                 isAdmin={isAdmin}
               />
+            </TabsContent>
+          )}
+
+          {/* Join Requests Tab */}
+          {isAdmin && (
+            <TabsContent value="join-requests" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>طلبات الانضمام</CardTitle>
+                  <CardDescription>إدارة طلبات انضمام المستخدمين للخلية</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <JoinRequestsManager groupId={group.id} initialRequests={joinRequests} />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>إعدادات الخصوصية</CardTitle>
+                  <CardDescription>تحكم في من يمكنه الانضمام للخلية</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3">
+                    <div className="flex items-start space-x-3 space-x-reverse border rounded-lg p-3">
+                      <RadioGroup
+                        value={settings.privacy_type || "open"}
+                        onValueChange={(value) =>
+                          setSettings({ ...settings, privacy_type: value as "open" | "private" })
+                        }
+                      >
+                        <div className="flex items-center space-x-2 space-x-reverse">
+                          <RadioGroupItem value="open" id="privacy-open" />
+                          <Label htmlFor="privacy-open" className="font-semibold cursor-pointer">
+                            خلية عامة (مفتوحة)
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                      <p className="text-xs text-muted-foreground">يمكن للمستخدمين الانضمام مباشرة دون موافقة</p>
+                    </div>
+
+                    <div className="flex items-start space-x-3 space-x-reverse border rounded-lg p-3">
+                      <RadioGroup
+                        value={settings.privacy_type || "open"}
+                        onValueChange={(value) =>
+                          setSettings({ ...settings, privacy_type: value as "open" | "private" })
+                        }
+                      >
+                        <div className="flex items-center space-x-2 space-x-reverse">
+                          <RadioGroupItem value="private" id="privacy-private" />
+                          <Label htmlFor="privacy-private" className="font-semibold cursor-pointer">
+                            خلية خاصة (مقفلة)
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                      <p className="text-xs text-muted-foreground">يجب الموافقة على طلبات الانضمام من قبل المسؤول</p>
+                    </div>
+                  </div>
+
+                  {isAdmin && (
+                    <Button onClick={handleSave} disabled={isSaving} className="w-full mt-4">
+                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                      حفظ الإعدادات
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
             </TabsContent>
           )}
 

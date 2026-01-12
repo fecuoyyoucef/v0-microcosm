@@ -81,7 +81,22 @@ export default async function GroupSettingsPage({ params }: PageProps) {
       profile: profilesData?.find((p) => p.id === member.user_id) || null,
     })) || []
 
+  // Fetch join requests from database
+  const { data: joinRequestsData } = await supabase
+    .from("group_join_requests")
+    .select("*, profiles(id, display_name, avatar_url, bio)")
+    .eq("group_id", groupId)
+    .eq("status", "pending")
+
   const isAdmin = membership?.role === "admin" || isSupervisor
 
-  return <GroupSettingsForm group={groupData} members={members} currentUserId={user.id} isAdmin={isAdmin} />
+  return (
+    <GroupSettingsForm
+      group={groupData}
+      members={members}
+      currentUserId={user.id}
+      isAdmin={isAdmin}
+      joinRequests={joinRequestsData || []}
+    />
+  )
 }
