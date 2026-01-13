@@ -679,6 +679,82 @@ export function GroupSettingsForm({
 
             <Card>
               <CardHeader>
+                <CardTitle className="text-lg">الخصوصية والانضمام</CardTitle>
+                <CardDescription>إدارة نوع الخلية والرؤية في الاقتراحات</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Privacy Type Selection */}
+                <div className="space-y-3">
+                  <Label className="text-base font-medium">نوع الخلية</Label>
+                  <RadioGroup
+                    value={settings.privacy_type || "open"}
+                    onValueChange={(value) => setSettings({ ...settings, privacy_type: value as "open" | "private" })}
+                    disabled={!isAdmin}
+                  >
+                    <div className="flex items-center space-x-2 space-x-reverse p-3 rounded-lg border hover:bg-secondary cursor-pointer">
+                      <RadioGroupItem value="open" id="privacy_open" />
+                      <Label htmlFor="privacy_open" className="flex-1 cursor-pointer">
+                        <div className="font-medium">خلية عامة (مفتوحة)</div>
+                        <div className="text-xs text-muted-foreground">الانضمام المباشر بدون موافقة</div>
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2 space-x-reverse p-3 rounded-lg border hover:bg-secondary cursor-pointer">
+                      <RadioGroupItem value="private" id="privacy_private" />
+                      <Label htmlFor="privacy_private" className="flex-1 cursor-pointer">
+                        <div className="font-medium">خلية خاصة (مقفلة)</div>
+                        <div className="text-xs text-muted-foreground">تقديم طلب انضمام للموافقة من المسؤول</div>
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                {/* Visibility in Recommendations Toggle */}
+                <div className="flex items-center justify-between p-3 rounded-lg border">
+                  <div>
+                    <p className="font-medium">الظهور في الاقتراحات الذكية</p>
+                    <p className="text-sm text-muted-foreground">السماح بظهور الخلية في قائمة التوصيات</p>
+                  </div>
+                  <Switch
+                    checked={settings.visible_in_recommendations !== false}
+                    onCheckedChange={(checked) => setSettings({ ...settings, visible_in_recommendations: checked })}
+                    disabled={!isAdmin}
+                  />
+                </div>
+
+                {isAdmin && (
+                  <Button onClick={handleSave} disabled={isSaving} className="w-full">
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin ml-2" />
+                        جاري الحفظ...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 ml-2" />
+                        حفظ إعدادات الخصوصية
+                      </>
+                    )}
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Join Requests Manager */}
+            {joinRequests && joinRequests.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">طلبات الانضمام</CardTitle>
+                  <CardDescription>مراجعة وإدارة طلبات المستخدمين للانضمام</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <JoinRequestsManager groupId={group.id} initialRequests={joinRequests} />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Existing Features Card */}
+            <Card>
+              <CardHeader>
                 <CardTitle className="text-lg">ميزات الخلية</CardTitle>
                 <CardDescription>تفعيل أو تعطيل ميزات الخلية</CardDescription>
               </CardHeader>
