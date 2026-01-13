@@ -73,6 +73,7 @@ export function GroupSettingsForm({
       allow_mindmap: true,
       allow_smart_summary: true,
       privacy_type: "open",
+      visible_in_recommendations: true,
     },
   )
   const [isSaving, setIsSaving] = useState(false)
@@ -407,6 +408,10 @@ export function GroupSettingsForm({
             <TabsTrigger value="stats" className="text-xs md:text-sm py-2" onClick={loadStatistics}>
               <BarChart3 className="w-4 h-4 md:ml-2" />
               <span className="hidden md:inline">الإحصائيات</span>
+            </TabsTrigger>
+            <TabsTrigger value="privacy" className="text-xs md:text-sm py-2" disabled={!isAdmin}>
+              <Shield className="w-4 h-4 md:ml-2" />
+              <span className="hidden md:inline">الخصوصية والظهور</span>
             </TabsTrigger>
           </TabsList>
 
@@ -948,6 +953,79 @@ export function GroupSettingsForm({
               <div className="text-center p-12 text-muted-foreground">اضغط على تبويب الإحصائيات لتحميل البيانات</div>
             )}
           </TabsContent>
+
+          {/* Privacy Tab */}
+          {isAdmin && (
+            <TabsContent value="privacy" className="space-y-4 mt-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">الخصوصية والظهور</CardTitle>
+                  <CardDescription>التحكم في ظهور الخلية والانضمام إليها</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3">
+                    <div className="font-medium text-sm">نوع الخلية</div>
+                    <RadioGroup
+                      value={settings.privacy_type || "open"}
+                      onValueChange={(value) => setSettings({ ...settings, privacy_type: value as "open" | "private" })}
+                      disabled={!isAdmin}
+                    >
+                      <div className="flex items-start space-x-2 space-x-reverse p-3 rounded-lg border hover:bg-secondary">
+                        <RadioGroupItem value="open" id="privacy-open" className="mt-1" />
+                        <div className="flex-1 space-y-1">
+                          <Label htmlFor="privacy-open" className="font-semibold cursor-pointer">
+                            خلية مفتوحة
+                          </Label>
+                          <p className="text-xs text-muted-foreground">المستخدمون ينضمون مباشرة بدون طلب موافقة</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start space-x-2 space-x-reverse p-3 rounded-lg border hover:bg-secondary">
+                        <RadioGroupItem value="private" id="privacy-private" className="mt-1" />
+                        <div className="flex-1 space-y-1">
+                          <Label htmlFor="privacy-private" className="font-semibold cursor-pointer">
+                            خلية خاصة
+                          </Label>
+                          <p className="text-xs text-muted-foreground">المستخدمون يقدمون طلب انضمام ينتظر الموافقة</p>
+                        </div>
+                      </div>
+                    </RadioGroup>
+                  </div>
+
+                  <div className="border-t pt-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">ظهور الخلية في الاقتراحات</p>
+                        <p className="text-sm text-muted-foreground">
+                          اسمح بظهور هذه الخلية في التوصيات الذكية للمستخدمين الآخرين
+                        </p>
+                      </div>
+                      <Switch
+                        checked={settings.visible_in_recommendations !== false}
+                        onCheckedChange={(checked) => setSettings({ ...settings, visible_in_recommendations: checked })}
+                        disabled={!isAdmin}
+                      />
+                    </div>
+                  </div>
+
+                  {isAdmin && (
+                    <Button onClick={handleSave} disabled={isSaving} className="w-full mt-4">
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin ml-2" />
+                          جاري الحفظ...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4 ml-2" />
+                          حفظ إعدادات الخصوصية
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
       {isAdmin && (
