@@ -363,7 +363,7 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
   }
 
   return (
-    <div className="flex flex-col h-full bg-background pb-16 md:pb-0">
+    <div className="flex flex-col h-full bg-background pb-16 md:pb-0 px-4">
       {/* Header */}
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border/50 px-4 py-4">
         <div className="flex items-center justify-between mb-4">
@@ -444,8 +444,8 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
         </div>
       </header>
 
-      <ScrollArea className="flex-1">
-        <div className="p-4 space-y-6">
+      <ScrollArea className="flex-1 w-full">
+        <div className="px-4 py-6 space-y-6 max-w-full">
           {/* Quick Actions */}
           <div className="grid grid-cols-2 gap-3">
             <Card
