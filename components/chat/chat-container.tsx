@@ -624,7 +624,7 @@ export function ChatContainer({
 
         <div
           ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto overflow-x-hidden bg-transparent chat-scroll-container"
+          className="flex-1 overflow-y-auto overflow-x-hidden bg-transparent chat-scroll-container pb-32"
         >
           <MessageList
             messages={filteredMessages}
