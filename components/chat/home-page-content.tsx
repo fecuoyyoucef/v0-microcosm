@@ -363,9 +363,9 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
   }
 
   return (
-    <div className="flex flex-col h-full bg-background pb-16 md:pb-0 px-4">
+    <div className="flex flex-col h-full bg-background pb-16 md:pb-0">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border/50 px-4 py-4">
+      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border/50 py-4 px-4">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold">
@@ -433,7 +433,7 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
         </div>
 
         {/* Search */}
-        <div className="relative">
+        <div className="relative px-4">
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             value={searchQuery}
@@ -445,9 +445,9 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
       </header>
 
       <ScrollArea className="flex-1 w-full">
-        <div className="px-4 py-6 space-y-6 max-w-full">
+        <div className="py-6 space-y-6 max-w-full">
           {/* Quick Actions */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 px-4">
             <Card
               className="cursor-pointer hover:bg-muted/50 transition-colors"
               onClick={() => setIsCreateDialogOpen(true)}
@@ -474,66 +474,69 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
           </div>
 
           {/* Suggested Cells */}
-          <SuggestedCells userId={userId} />
+          <div className="px-4">
+            <SuggestedCells userId={userId} />
+          </div>
 
           {/* Cells List */}
-          {filteredGroups.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center mb-4">
-                <UsersIcon className="w-10 h-10 text-muted-foreground" />
+          <div className="px-4">
+            {filteredGroups.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center mb-4">
+                  <UsersIcon className="w-10 h-10 text-muted-foreground" />
+                </div>
+                <h2 className="text-lg font-semibold mb-2">{searchQuery ? t.noResults : t.noCells}</h2>
+                <p className="text-sm text-muted-foreground mb-6 max-w-xs">{!searchQuery && t.createFirst}</p>
+                {!searchQuery && (
+                  <Button onClick={() => setIsCreateDialogOpen(true)} className="gap-2 rounded-xl">
+                    <PlusIcon className="w-4 h-4" />
+                    {t.createCell}
+                  </Button>
+                )}
               </div>
-              <h2 className="text-lg font-semibold mb-2">{searchQuery ? t.noResults : t.noCells}</h2>
-              <p className="text-sm text-muted-foreground mb-6 max-w-xs">{!searchQuery && t.createFirst}</p>
-              {!searchQuery && (
-                <Button onClick={() => setIsCreateDialogOpen(true)} className="gap-2 rounded-xl">
-                  <PlusIcon className="w-4 h-4" />
-                  {t.createCell}
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <h3 className="text-sm font-medium text-muted-foreground px-1">{t.cells}</h3>
+            ) : (
               <div className="space-y-2">
-                {filteredGroups.map((group) => (
-                  <Link key={group.id} href={`/chat/${group.id}`}>
-                    <Card className="hover:bg-muted/50 transition-colors">
-                      <CardContent className="p-4 flex items-center gap-4">
-                        <Avatar className="h-12 w-12 rounded-xl">
-                          {group.avatar_url ? (
-                            <AvatarImage src={group.avatar_url || "/placeholder.svg"} />
-                          ) : (
-                            <AvatarFallback
-                              className={cn(
-                                "rounded-xl bg-gradient-to-br text-white font-bold",
-                                getGroupColor(group.name),
-                              )}
-                            >
-                              {group.name.substring(0, 2)}
-                            </AvatarFallback>
-                          )}
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <h3 className="font-semibold truncate">{group.name}</h3>
-                            {unreadCounts[group.id] > 0 && (
-                              <span className="h-5 min-w-5 px-1.5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold">
-                                {unreadCounts[group.id]}
-                              </span>
+                <h3 className="text-sm font-medium text-muted-foreground px-1">{t.cells}</h3>
+                <div className="space-y-2">
+                  {filteredGroups.map((group) => (
+                    <Link key={group.id} href={`/chat/${group.id}`}>
+                      <Card className="hover:bg-muted/50 transition-colors">
+                        <CardContent className="p-4 flex items-center gap-4">
+                          <Avatar className="h-12 w-12 rounded-xl">
+                            {group.avatar_url ? (
+                              <AvatarImage src={group.avatar_url || "/placeholder.svg"} />
+                            ) : (
+                              <AvatarFallback
+                                className={cn(
+                                  "rounded-xl bg-gradient-to-br text-white font-bold",
+                                  getGroupColor(group.name),
+                                )}
+                              >
+                                {group.name.substring(0, 2)}
+                              </AvatarFallback>
                             )}
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <h3 className="font-semibold truncate">{group.name}</h3>
+                              {unreadCounts[group.id] > 0 && (
+                                <span className="h-5 min-w-5 px-1.5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold">
+                                  {unreadCounts[group.id]}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground truncate">
+                              {group.description || `${memberCounts[group.id] || 1} ${t.members}`}
+                            </p>
                           </div>
-                          <p className="text-sm text-muted-foreground truncate">
-                            {group.description || `${memberCounts[group.id] || 1} ${t.members}`}
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                ))}
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-
+            )}
+          </div>
           {/* Smart Recommendations */}
           {hasCompletedSurvey && <SmartRecommendations userId={userId} />}
         </div>
