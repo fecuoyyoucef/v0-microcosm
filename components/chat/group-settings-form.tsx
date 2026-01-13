@@ -73,7 +73,7 @@ export function GroupSettingsForm({
       allow_mindmap: true,
       allow_smart_summary: true,
       privacy_type: "open",
-      visible_in_recommendations: true,
+      show_in_recommendations: true, // add show_in_recommendations
     },
   )
   const [isSaving, setIsSaving] = useState(false)
@@ -409,10 +409,6 @@ export function GroupSettingsForm({
               <BarChart3 className="w-4 h-4 md:ml-2" />
               <span className="hidden md:inline">الإحصائيات</span>
             </TabsTrigger>
-            <TabsTrigger value="privacy" className="text-xs md:text-sm py-2" disabled={!isAdmin}>
-              <Shield className="w-4 h-4 md:ml-2" />
-              <span className="hidden md:inline">الخصوصية والظهور</span>
-            </TabsTrigger>
           </TabsList>
 
           {/* General Tab */}
@@ -679,82 +675,6 @@ export function GroupSettingsForm({
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">الخصوصية والانضمام</CardTitle>
-                <CardDescription>إدارة نوع الخلية والرؤية في الاقتراحات</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Privacy Type Selection */}
-                <div className="space-y-3">
-                  <Label className="text-base font-medium">نوع الخلية</Label>
-                  <RadioGroup
-                    value={settings.privacy_type || "open"}
-                    onValueChange={(value) => setSettings({ ...settings, privacy_type: value as "open" | "private" })}
-                    disabled={!isAdmin}
-                  >
-                    <div className="flex items-center space-x-2 space-x-reverse p-3 rounded-lg border hover:bg-secondary cursor-pointer">
-                      <RadioGroupItem value="open" id="privacy_open" />
-                      <Label htmlFor="privacy_open" className="flex-1 cursor-pointer">
-                        <div className="font-medium">خلية عامة (مفتوحة)</div>
-                        <div className="text-xs text-muted-foreground">الانضمام المباشر بدون موافقة</div>
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2 space-x-reverse p-3 rounded-lg border hover:bg-secondary cursor-pointer">
-                      <RadioGroupItem value="private" id="privacy_private" />
-                      <Label htmlFor="privacy_private" className="flex-1 cursor-pointer">
-                        <div className="font-medium">خلية خاصة (مقفلة)</div>
-                        <div className="text-xs text-muted-foreground">تقديم طلب انضمام للموافقة من المسؤول</div>
-                      </Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-
-                {/* Visibility in Recommendations Toggle */}
-                <div className="flex items-center justify-between p-3 rounded-lg border">
-                  <div>
-                    <p className="font-medium">الظهور في الاقتراحات الذكية</p>
-                    <p className="text-sm text-muted-foreground">السماح بظهور الخلية في قائمة التوصيات</p>
-                  </div>
-                  <Switch
-                    checked={settings.visible_in_recommendations !== false}
-                    onCheckedChange={(checked) => setSettings({ ...settings, visible_in_recommendations: checked })}
-                    disabled={!isAdmin}
-                  />
-                </div>
-
-                {isAdmin && (
-                  <Button onClick={handleSave} disabled={isSaving} className="w-full">
-                    {isSaving ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin ml-2" />
-                        جاري الحفظ...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4 ml-2" />
-                        حفظ إعدادات الخصوصية
-                      </>
-                    )}
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Join Requests Manager */}
-            {joinRequests && joinRequests.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">طلبات الانضمام</CardTitle>
-                  <CardDescription>مراجعة وإدارة طلبات المستخدمين للانضمام</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <JoinRequestsManager groupId={group.id} initialRequests={joinRequests} />
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Existing Features Card */}
-            <Card>
-              <CardHeader>
                 <CardTitle className="text-lg">ميزات الخلية</CardTitle>
                 <CardDescription>تفعيل أو تعطيل ميزات الخلية</CardDescription>
               </CardHeader>
@@ -894,12 +814,14 @@ export function GroupSettingsForm({
 
               <Card>
                 <CardHeader>
-                  <CardTitle>إعدادات الخصوصية</CardTitle>
-                  <CardDescription>تحكم في من يمكنه الانضمام للخلية</CardDescription>
+                  <CardTitle>إعدادات الخصوصية والتوصيات</CardTitle>
+                  <CardDescription>تحكم في من يمكنه الانضمام للخلية وظهورها في الاقتراحات</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-3">
-                    <div className="flex items-start space-x-3 space-x-reverse border rounded-lg p-3">
+                    {/* Privacy Type */}
+                    <div className="space-y-2 border rounded-lg p-3">
+                      <p className="font-semibold">نوع الخصوصية</p>
                       <RadioGroup
                         value={settings.privacy_type || "open"}
                         onValueChange={(value) =>
@@ -908,29 +830,38 @@ export function GroupSettingsForm({
                       >
                         <div className="flex items-center space-x-2 space-x-reverse">
                           <RadioGroupItem value="open" id="privacy-open" />
-                          <Label htmlFor="privacy-open" className="font-semibold cursor-pointer">
-                            خلية عامة (مفتوحة)
+                          <Label htmlFor="privacy-open" className="cursor-pointer">
+                            <span className="font-medium">خلية عامة (مفتوحة)</span>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              يمكن للمستخدمين الانضمام مباشرة دون موافقة
+                            </p>
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2 space-x-reverse mt-3">
+                          <RadioGroupItem value="private" id="privacy-private" />
+                          <Label htmlFor="privacy-private" className="cursor-pointer">
+                            <span className="font-medium">خلية خاصة (مقفلة)</span>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              يجب الموافقة على طلبات الانضمام من قبل المسؤول
+                            </p>
                           </Label>
                         </div>
                       </RadioGroup>
-                      <p className="text-xs text-muted-foreground">يمكن للمستخدمين الانضمام مباشرة دون موافقة</p>
                     </div>
 
-                    <div className="flex items-start space-x-3 space-x-reverse border rounded-lg p-3">
-                      <RadioGroup
-                        value={settings.privacy_type || "open"}
-                        onValueChange={(value) =>
-                          setSettings({ ...settings, privacy_type: value as "open" | "private" })
-                        }
-                      >
-                        <div className="flex items-center space-x-2 space-x-reverse">
-                          <RadioGroupItem value="private" id="privacy-private" />
-                          <Label htmlFor="privacy-private" className="font-semibold cursor-pointer">
-                            خلية خاصة (مقفلة)
-                          </Label>
-                        </div>
-                      </RadioGroup>
-                      <p className="text-xs text-muted-foreground">يجب الموافقة على طلبات الانضمام من قبل المسؤول</p>
+                    {/* Show in Recommendations */}
+                    <div className="flex items-center justify-between border rounded-lg p-3">
+                      <div>
+                        <p className="font-medium">ظهور في الاقتراحات الذكية</p>
+                        <p className="text-sm text-muted-foreground">
+                          السماح للخلية بالظهور في قسم "التوصيات الذكية لك"
+                        </p>
+                      </div>
+                      <Switch
+                        checked={settings.show_in_recommendations !== false}
+                        onCheckedChange={(checked) => setSettings({ ...settings, show_in_recommendations: checked })}
+                        disabled={!isAdmin}
+                      />
                     </div>
                   </div>
 
@@ -1029,79 +960,6 @@ export function GroupSettingsForm({
               <div className="text-center p-12 text-muted-foreground">اضغط على تبويب الإحصائيات لتحميل البيانات</div>
             )}
           </TabsContent>
-
-          {/* Privacy Tab */}
-          {isAdmin && (
-            <TabsContent value="privacy" className="space-y-4 mt-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">الخصوصية والظهور</CardTitle>
-                  <CardDescription>التحكم في ظهور الخلية والانضمام إليها</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-3">
-                    <div className="font-medium text-sm">نوع الخلية</div>
-                    <RadioGroup
-                      value={settings.privacy_type || "open"}
-                      onValueChange={(value) => setSettings({ ...settings, privacy_type: value as "open" | "private" })}
-                      disabled={!isAdmin}
-                    >
-                      <div className="flex items-start space-x-2 space-x-reverse p-3 rounded-lg border hover:bg-secondary">
-                        <RadioGroupItem value="open" id="privacy-open" className="mt-1" />
-                        <div className="flex-1 space-y-1">
-                          <Label htmlFor="privacy-open" className="font-semibold cursor-pointer">
-                            خلية مفتوحة
-                          </Label>
-                          <p className="text-xs text-muted-foreground">المستخدمون ينضمون مباشرة بدون طلب موافقة</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start space-x-2 space-x-reverse p-3 rounded-lg border hover:bg-secondary">
-                        <RadioGroupItem value="private" id="privacy-private" className="mt-1" />
-                        <div className="flex-1 space-y-1">
-                          <Label htmlFor="privacy-private" className="font-semibold cursor-pointer">
-                            خلية خاصة
-                          </Label>
-                          <p className="text-xs text-muted-foreground">المستخدمون يقدمون طلب انضمام ينتظر الموافقة</p>
-                        </div>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  <div className="border-t pt-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">ظهور الخلية في الاقتراحات</p>
-                        <p className="text-sm text-muted-foreground">
-                          اسمح بظهور هذه الخلية في التوصيات الذكية للمستخدمين الآخرين
-                        </p>
-                      </div>
-                      <Switch
-                        checked={settings.visible_in_recommendations !== false}
-                        onCheckedChange={(checked) => setSettings({ ...settings, visible_in_recommendations: checked })}
-                        disabled={!isAdmin}
-                      />
-                    </div>
-                  </div>
-
-                  {isAdmin && (
-                    <Button onClick={handleSave} disabled={isSaving} className="w-full mt-4">
-                      {isSaving ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin ml-2" />
-                          جاري الحفظ...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="h-4 w-4 ml-2" />
-                          حفظ إعدادات الخصوصية
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
         </Tabs>
       </div>
       {isAdmin && (
