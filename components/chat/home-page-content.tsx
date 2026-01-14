@@ -444,7 +444,7 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
         </div>
       </header>
 
-      <ScrollArea className="flex-1 w-full">
+      <ScrollArea className="flex-1 w-full overflow-x-hidden">
         <div className="py-6 space-y-6 max-w-full">
           {/* Quick Actions */}
           <div className="grid grid-cols-2 gap-3 px-4">
