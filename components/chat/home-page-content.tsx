@@ -363,9 +363,9 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
   }
 
   return (
-    <div className="flex flex-col h-full max-w-full bg-background pb-16 md:pb-0">
+    <div className="flex flex-col h-full w-full overflow-x-hidden bg-background pb-16 md:pb-0">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border/50 py-4 px-3 md:px-4">
+      <header className="sticky top-0 z-10 w-full bg-background/80 backdrop-blur-xl border-b border-border/50 py-4 px-4">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold">
@@ -405,7 +405,7 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
                       value={inviteLink}
                       onChange={(e) => setInviteLink(e.target.value)}
                       placeholder={t.inviteLinkPlaceholder}
-                      className="bg-background rounded-xl"
+                      className="bg-background rounded-xl w-full"
                       dir="ltr"
                     />
                   </div>
@@ -439,15 +439,15 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t.search}
-            className="pr-10 bg-muted/50 border-0 rounded-xl h-11"
+            className="pr-10 bg-muted/50 border-0 rounded-xl h-11 w-full"
           />
         </div>
       </header>
 
-      <ScrollArea className="flex-1 w-full">
-        <div className="py-6 space-y-6 max-w-full">
+      <ScrollArea className="flex-1 w-full overflow-x-hidden">
+        <div className="py-6 space-y-6 w-full px-4">
           {/* Quick Actions */}
-          <div className="grid grid-cols-2 gap-2 px-3 md:gap-3 md:px-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-full">
             <Card
               className="cursor-pointer hover:bg-muted/50 transition-colors"
               onClick={() => setIsCreateDialogOpen(true)}
@@ -474,12 +474,10 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
           </div>
 
           {/* Suggested Cells */}
-          <div className="px-3 md:px-4">
-            <SuggestedCells userId={userId} />
-          </div>
+          <SuggestedCells userId={userId} />
 
           {/* Cells List */}
-          <div className="px-3 md:px-4">
+          <div className="w-full max-w-full">
             {filteredGroups.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center mb-4">
