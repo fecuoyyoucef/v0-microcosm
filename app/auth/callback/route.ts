@@ -9,18 +9,21 @@ export async function GET(request: Request) {
   const next = searchParams.get("next") ?? "/chat"
 
   if (error_param) {
+    console.error("[v0] OAuth provider error:", error_param, error_description)
     return NextResponse.redirect(
       `${origin}/auth/auth-code-error?error=${encodeURIComponent(error_description || error_param)}`,
     )
   }
 
   if (!code) {
+    console.error("[v0] No authorization code received")
     const supabase = await createClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
 
     if (user) {
+      console.log("[v0] User already authenticated, redirecting to:", next)
       const forwardedHost = request.headers.get("x-forwarded-host")
       const isLocalEnv = process.env.NODE_ENV === "development"
 
@@ -33,18 +36,28 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+    return NextResponse.redirect(`${origin}/auth/auth-code-error?error=missing_code`)
   }
 
   const supabase = await createClient()
 
   console.log("[v0] Attempting to exchange code for session")
-  console.log("[v0] Code present:", !!code)
 
   const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
   if (error) {
-    console.error("[v0] Exchange code failed:", error.message, error.status)
+    console.error("[v0] Exchange code failed:", {
+      message: error.message,
+      status: error.status,
+      name: error.name,
+    })
+
+    if (error.message.includes("OAuth")) {
+      return NextResponse.redirect(
+        `${origin}/auth/auth-code-error?error=oauth_not_enabled&details=${encodeURIComponent(error.message)}`,
+      )
+    }
+
     return NextResponse.redirect(`${origin}/auth/auth-code-error?error=${encodeURIComponent(error.message)}`)
   }
 
@@ -54,10 +67,8 @@ export async function GET(request: Request) {
     const forwardedHost = request.headers.get("x-forwarded-host")
     const isLocalEnv = process.env.NODE_ENV === "development"
 
-    // Check profile
     const { data: profile } = await supabase.from("profiles").select("id, username").eq("id", data.user.id).single()
 
-    // Check survey
     const { data: survey } = await supabase
       .from("user_surveys")
       .select("completed_at")
@@ -67,12 +78,14 @@ export async function GET(request: Request) {
     let redirectPath = next
 
     if (!profile?.username && data.user.app_metadata?.provider !== "email") {
-      // OAuth user without username - complete profile first
       redirectPath = "/auth/complete-profile"
+      console.log("[v0] Redirecting OAuth user to complete profile")
     } else if (!survey?.completed_at) {
-      // User without completed survey - show survey
       redirectPath = "/auth/survey"
+      console.log("[v0] Redirecting user to complete survey")
     }
+
+    console.log("[v0] Final redirect path:", redirectPath)
 
     if (isLocalEnv) {
       return NextResponse.redirect(`${origin}${redirectPath}`)
@@ -83,5 +96,6 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+  console.error("[v0] No user data after successful exchange")
+  return NextResponse.redirect(`${origin}/auth/auth-code-error?error=no_user_data`)
 }

@@ -70,11 +70,16 @@ export default function LoginPage() {
     setError(null)
 
     try {
+      const redirectTo = process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL
+        ? `${process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL}/auth/callback?next=/chat`
+        : `${window.location.origin}/auth/callback?next=/chat`
+
+      console.log("[v0] Google OAuth redirect URL:", redirectTo)
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo:
-            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/auth/callback?next=/chat`,
+          redirectTo,
           queryParams: {
             access_type: "offline",
             prompt: "consent",
@@ -83,6 +88,7 @@ export default function LoginPage() {
       })
       if (error) throw error
     } catch (error: unknown) {
+      console.error("[v0] Google OAuth error:", error)
       setError(error instanceof Error ? error.message : "حدث خطأ في تسجيل الدخول بجوجل")
       setIsGoogleLoading(false)
     }
