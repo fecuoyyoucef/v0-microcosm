@@ -116,11 +116,11 @@ export default function AdminDashboard() {
     fetchStats()
     fetchFeatureStatus()
 
-    // Auto-refresh every 30 seconds
+    // Auto-refresh every 60 seconds
     const interval = setInterval(() => {
       fetchStats()
       fetchFeatureStatus()
-    }, 30000)
+    }, 60000)
     return () => clearInterval(interval)
   }, [fetchStats, fetchFeatureStatus])
 
