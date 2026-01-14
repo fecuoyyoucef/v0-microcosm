@@ -107,11 +107,19 @@ export function ProfileManager({ user, profile }: ProfileManagerProps) {
   const handleDeleteAccount = async () => {
     setIsDeleting(true)
     try {
-      // حذف الحساب - هذا يتطلب دالة Edge أو RPC في الإنتاج
-      await supabase.auth.signOut()
-      router.push("/")
+      const response = await fetch("/api/user/delete-account", {
+        method: "DELETE",
+      })
+
+      if (response.ok) {
+        await supabase.auth.signOut()
+        router.push("/")
+      } else {
+        alert("حدث خطأ أثناء حذف الحساب")
+      }
     } catch (error) {
       console.error("Error deleting account:", error)
+      alert("حدث خطأ أثناء حذف الحساب")
     } finally {
       setIsDeleting(false)
     }

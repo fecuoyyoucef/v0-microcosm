@@ -24,6 +24,27 @@ export default function PrivacySettingsPage() {
   const [allowGroupInvites, setAllowGroupInvites] = useState(true)
   const [showOnlineStatus, setShowOnlineStatus] = useState(true)
   const [allowReadReceipts, setAllowReadReceipts] = useState(true)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true)
+    try {
+      const response = await fetch("/api/user/delete-account", {
+        method: "DELETE",
+      })
+
+      if (response.ok) {
+        window.location.href = "/"
+      } else {
+        alert("حدث خطأ أثناء حذف الحساب")
+      }
+    } catch (error) {
+      console.error("Error deleting account:", error)
+      alert("حدث خطأ أثناء حذف الحساب")
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   return (
     <div className="p-6 space-y-6 max-w-2xl">
@@ -121,8 +142,9 @@ export default function PrivacySettingsPage() {
               <Button
                 variant="outline"
                 className="w-full border-destructive/50 text-destructive hover:bg-destructive/10 bg-transparent"
+                disabled={isDeleting}
               >
-                حذف الحساب نهائياً
+                {isDeleting ? "جاري الحذف..." : "حذف الحساب نهائياً"}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -134,8 +156,12 @@ export default function PrivacySettingsPage() {
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                <AlertDialogAction className="bg-destructive text-destructive-foreground">
-                  حذف النهاية
+                <AlertDialogAction
+                  onClick={handleDeleteAccount}
+                  disabled={isDeleting}
+                  className="bg-destructive text-destructive-foreground"
+                >
+                  {isDeleting ? "جاري الحذف..." : "حذف نهائي"}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
