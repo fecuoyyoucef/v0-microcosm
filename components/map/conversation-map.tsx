@@ -1,7 +1,6 @@
 "use client"
-
-import type React from "react"
-import { useState, useRef, useEffect, useMemo } from "react"
+import { useState, useRef, useEffect } from "react"
+import * as d3 from "d3"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,7 +16,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Plus, ZoomIn, ZoomOut, Maximize, MessageSquare, ChevronLeft, Hash, Loader2, Search, X } from "lucide-react"
+import { Plus, Maximize, ChevronLeft, Hash, Loader2, Search, X } from "lucide-react"
 import Link from "next/link"
 import type { ConversationNode, Group, Message } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -31,121 +30,13 @@ interface ConversationMapProps {
 
 const NODE_COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#06B6D4"]
 
-const calculateMindMapPositions = (
-  nodes: ConversationNode[],
-  containerWidth: number,
-  containerHeight: number,
-): ConversationNode[] => {
-  if (nodes.length === 0) return []
-
-  const centerX = containerWidth / 2
-  const centerY = containerHeight / 2
-  const positioned: ConversationNode[] = []
-
-  // Find root nodes (no parent)
-  const rootNodes = nodes.filter((n) => !n.parent_id)
-  const childNodes = nodes.filter((n) => n.parent_id)
-
-  // If there's only one root, place it in center
-  if (rootNodes.length === 1) {
-    const root = rootNodes[0]
-    positioned.push({
-      ...root,
-      position_x: centerX,
-      position_y: centerY,
-    })
-
-    // Get children of root
-    const rootChildren = childNodes.filter((n) => n.parent_id === root.id)
-    const angleStep = (Math.PI * 2) / Math.max(rootChildren.length, 1)
-    const radius = Math.min(containerWidth, containerHeight) * 0.25
-
-    rootChildren.forEach((child, index) => {
-      const angle = angleStep * index - Math.PI / 2 // Start from top
-      const x = centerX + Math.cos(angle) * radius
-      const y = centerY + Math.sin(angle) * radius
-
-      positioned.push({
-        ...child,
-        position_x: x,
-        position_y: y,
-      })
-
-      // Position grandchildren
-      const grandchildren = childNodes.filter((n) => n.parent_id === child.id)
-      if (grandchildren.length > 0) {
-        const subAngleStep = angleStep / (grandchildren.length + 1)
-        const subRadius = radius * 0.6
-
-        grandchildren.forEach((gc, gcIndex) => {
-          const subAngle = angle + subAngleStep * (gcIndex + 1) - angleStep / 2
-          const gcX = x + Math.cos(subAngle) * subRadius
-          const gcY = y + Math.sin(subAngle) * subRadius
-
-          positioned.push({
-            ...gc,
-            position_x: gcX,
-            position_y: gcY,
-          })
-        })
-      }
-    })
-  } else {
-    // Multiple roots - arrange in circle
-    const angleStep = (Math.PI * 2) / rootNodes.length
-    const rootRadius = Math.min(containerWidth, containerHeight) * 0.15
-
-    rootNodes.forEach((root, index) => {
-      const angle = angleStep * index - Math.PI / 2
-      const x = centerX + Math.cos(angle) * rootRadius
-      const y = centerY + Math.sin(angle) * rootRadius
-
-      positioned.push({
-        ...root,
-        position_x: x,
-        position_y: y,
-      })
-
-      // Position children around their parent
-      const children = childNodes.filter((n) => n.parent_id === root.id)
-      if (children.length > 0) {
-        const childRadius = Math.min(containerWidth, containerHeight) * 0.2
-        const childAngleStep = (Math.PI * 2) / children.length
-
-        children.forEach((child, childIndex) => {
-          const childAngle = angle + childAngleStep * childIndex
-          const childX = x + Math.cos(childAngle) * childRadius
-          const childY = y + Math.sin(childAngle) * childRadius
-
-          positioned.push({
-            ...child,
-            position_x: childX,
-            position_y: childY,
-          })
-        })
-      }
-    })
-  }
-
-  return positioned
-}
-
 export function ConversationMap({ groupId, group, nodes: initialNodes, currentUserId }: ConversationMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const [containerSize, setContainerSize] = useState({ width: 800, height: 600 })
-
-  const nodes = useMemo(
-    () => calculateMindMapPositions(initialNodes, containerSize.width, containerSize.height),
-    [initialNodes, containerSize.width, containerSize.height],
-  )
-
+  const svgRef = useRef<SVGSVGElement>(null)
   const [selectedNode, setSelectedNode] = useState<ConversationNode | null>(null)
   const [nodeMessages, setNodeMessages] = useState<Message[]>([])
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [zoom, setZoom] = useState(1)
-  const [pan, setPan] = useState({ x: 0, y: 0 })
-  const [isPanning, setIsPanning] = useState(false)
-  const [startPan, setStartPan] = useState({ x: 0, y: 0 })
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [newNodeTitle, setNewNodeTitle] = useState("")
   const [newNodeDescription, setNewNodeDescription] = useState("")
@@ -153,8 +44,10 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
   const [newNodeColor, setNewNodeColor] = useState(NODE_COLORS[0])
   const [isCreating, setIsCreating] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
-  const [localNodes, setLocalNodes] = useState<ConversationNode[]>(nodes)
+  const [localNodes, setLocalNodes] = useState<ConversationNode[]>(initialNodes)
   const supabase = createClient()
+  const simulationRef = useRef<d3.Simulation<ConversationNode, undefined> | null>(null)
+  const [containerSize, setContainerSize] = useState({ width: 800, height: 600 })
 
   useEffect(() => {
     const updateSize = () => {
@@ -172,8 +65,8 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
   }, [])
 
   useEffect(() => {
-    setLocalNodes(nodes)
-  }, [nodes])
+    setLocalNodes(initialNodes)
+  }, [initialNodes])
 
   useEffect(() => {
     const channel = supabase
@@ -194,7 +87,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
             .order("created_at", { ascending: true })
 
           if (data) {
-            setLocalNodes(calculateMindMapPositions(data, containerSize.width, containerSize.height))
+            setLocalNodes(data)
           }
         },
       )
@@ -203,7 +96,34 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [groupId, supabase, containerSize])
+  }, [groupId, supabase])
+
+  const createNode = async () => {
+    if (!newNodeTitle.trim()) return
+
+    setIsCreating(true)
+    try {
+      const { error } = await supabase.from("conversation_nodes").insert({
+        group_id: groupId,
+        title: newNodeTitle.trim(),
+        description: newNodeDescription.trim() || null,
+        parent_id: newNodeParent,
+        color: newNodeColor,
+        position_x: 0,
+        position_y: 0,
+        created_by: currentUserId,
+      })
+
+      if (!error) {
+        setNewNodeTitle("")
+        setNewNodeDescription("")
+        setNewNodeParent(null)
+        setIsCreateOpen(false)
+      }
+    } finally {
+      setIsCreating(false)
+    }
+  }
 
   const handleNodeClick = async (node: ConversationNode) => {
     setSelectedNode(node)
@@ -237,63 +157,155 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
     }
   }
 
-  const createNode = async () => {
-    if (!newNodeTitle.trim()) return
+  useEffect(() => {
+    if (!svgRef.current || localNodes.length === 0) return
 
-    setIsCreating(true)
-    try {
-      const { error } = await supabase.from("conversation_nodes").insert({
-        group_id: groupId,
-        title: newNodeTitle.trim(),
-        description: newNodeDescription.trim() || null,
-        parent_id: newNodeParent,
-        color: newNodeColor,
-        position_x: 0,
-        position_y: 0,
-        created_by: currentUserId,
+    const width = containerSize.width
+    const height = containerSize.height
+
+    d3.select(svgRef.current).selectAll("*").remove()
+
+    const links = localNodes
+      .filter((n) => n.parent_id)
+      .map((n) => ({
+        source: n.parent_id!,
+        target: n.id,
+      }))
+
+    const simulation = d3
+      .forceSimulation(localNodes as any)
+      .force(
+        "link",
+        d3
+          .forceLink(links as any)
+          .id((d: any) => d.id)
+          .distance(150)
+          .strength(0.5),
+      )
+      .force("charge", d3.forceManyBody().strength(-300))
+      .force("center", d3.forceCenter(width / 2, height / 2))
+      .force("collision", d3.forceCollide().radius(80))
+
+    simulationRef.current = simulation
+
+    const svg = d3.select(svgRef.current).attr("width", width).attr("height", height)
+
+    const zoomBehavior = d3.zoom().on("zoom", (event) => {
+      svg.attr("transform", event.transform)
+      setZoom(event.transform.k)
+    })
+
+    svg.call(zoomBehavior as any)
+
+    const g = svg.append("g")
+
+    const linkLines = g
+      .selectAll("line")
+      .data(links)
+      .join("line")
+      .attr("stroke", (d: any) => {
+        const node = localNodes.find((n) => n.id === d.source.id || n.id === d.source)
+        return node?.color || "#999"
       })
+      .attr("stroke-width", 2.5)
+      .attr("stroke-opacity", 0.6)
+      .attr("marker-end", "url(#arrowhead)")
 
-      if (!error) {
-        setNewNodeTitle("")
-        setNewNodeDescription("")
-        setNewNodeParent(null)
-        setIsCreateOpen(false)
-      }
-    } finally {
-      setIsCreating(false)
-    }
-  }
+    svg
+      .append("defs")
+      .append("marker")
+      .attr("id", "arrowhead")
+      .attr("markerWidth", 10)
+      .attr("markerHeight", 10)
+      .attr("refX", 25)
+      .attr("refY", 3)
+      .attr("orient", "auto")
+      .append("polygon")
+      .attr("points", "0 0, 10 3, 0 6")
+      .attr("fill", "#999")
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.target === containerRef.current || (e.target as HTMLElement).classList.contains("map-canvas")) {
-      setIsPanning(true)
-      setStartPan({ x: e.clientX - pan.x, y: e.clientY - pan.y })
-    }
-  }
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (isPanning) {
-      setPan({
-        x: e.clientX - startPan.x,
-        y: e.clientY - startPan.y,
+    const nodeGroups = g
+      .selectAll("g.node")
+      .data(localNodes as any)
+      .join("g")
+      .attr("class", "node")
+      .attr("cursor", "pointer")
+      .on("click", (event: any, d: any) => {
+        event.stopPropagation()
+        handleNodeClick(d)
       })
+      .call(
+        d3
+          .drag()
+          .on("start", (event: any, d: any) => {
+            if (!event.active) simulation.alphaTarget(0.3).restart()
+            d.fx = d.x
+            d.fy = d.y
+          })
+          .on("drag", (event: any, d: any) => {
+            d.fx = event.x
+            d.fy = event.y
+          })
+          .on("end", (event: any, d: any) => {
+            if (!event.active) simulation.alphaTarget(0)
+            d.fx = null
+            d.fy = null
+          }) as any,
+      )
+
+    nodeGroups
+      .append("circle")
+      .attr("r", (d: any) => (d.messages_count > 0 ? 45 : 40))
+      .attr("fill", (d: any) => d.color)
+      .attr("fill-opacity", 0.2)
+      .attr("stroke", (d: any) => d.color)
+      .attr("stroke-width", 2.5)
+      .style("filter", (d: any) => (selectedNode?.id === d.id ? "drop-shadow(0 0 10px rgba(0,0,0,0.3))" : "none"))
+
+    nodeGroups
+      .append("text")
+      .attr("text-anchor", "middle")
+      .attr("dominant-baseline", "middle")
+      .attr("font-size", 13)
+      .attr("font-weight", "bold")
+      .attr("fill", (d: any) => d.color)
+      .attr("pointer-events", "none")
+      .text((d: any) => d.title.substring(0, 20))
+
+    nodeGroups
+      .append("circle")
+      .attr("r", 18)
+      .attr("cx", (d: any) => (d.messages_count > 0 ? 35 : -100))
+      .attr("cy", -30)
+      .attr("fill", (d: any) => d.color)
+      .style("display", (d: any) => (d.messages_count > 0 ? "block" : "none"))
+
+    nodeGroups
+      .append("text")
+      .attr("text-anchor", "middle")
+      .attr("dominant-baseline", "middle")
+      .attr("font-size", 12)
+      .attr("font-weight", "bold")
+      .attr("fill", "white")
+      .attr("cx", (d: any) => (d.messages_count > 0 ? 35 : -100))
+      .attr("cy", -30)
+      .attr("pointer-events", "none")
+      .text((d: any) => (d.messages_count > 0 ? d.messages_count : ""))
+
+    simulation.on("tick", () => {
+      linkLines
+        .attr("x1", (d: any) => d.source.x)
+        .attr("y1", (d: any) => d.source.y)
+        .attr("x2", (d: any) => d.target.x)
+        .attr("y2", (d: any) => d.target.y)
+
+      nodeGroups.attr("transform", (d: any) => `translate(${d.x},${d.y})`)
+    })
+
+    return () => {
+      simulation.stop()
     }
-  }
-
-  const handleMouseUp = () => {
-    setIsPanning(false)
-  }
-
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault()
-    const delta = e.deltaY > 0 ? -0.1 : 0.1
-    setZoom((prev) => Math.min(Math.max(prev + delta, 0.3), 2))
-  }
-
-  const resetView = () => {
-    setZoom(1)
-    setPan({ x: 0, y: 0 })
-  }
+  }, [localNodes, selectedNode?.id, containerSize])
 
   const filteredNodes = searchQuery
     ? localNodes.filter(
@@ -305,7 +317,6 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
 
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
-      {/* Header */}
       <div className="h-14 border-b border-border px-3 md:px-4 flex items-center justify-between bg-card/50 shrink-0">
         <div className="flex items-center gap-2 md:gap-3 min-w-0">
           <Link href={`/chat/${groupId}`}>
@@ -322,7 +333,6 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Search - hidden on mobile */}
           <div className="relative hidden md:block">
             <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -333,31 +343,21 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
             />
           </div>
 
-          {/* Zoom Controls */}
           <div className="hidden md:flex items-center gap-1 border border-border rounded-lg p-0.5">
             <Button
               variant="ghost"
               size="icon"
               className="h-7 w-7"
-              onClick={() => setZoom((z) => Math.max(z - 0.1, 0.3))}
+              onClick={() => {
+                if (simulationRef.current) {
+                  simulationRef.current.nodes([...localNodes])
+                }
+              }}
             >
-              <ZoomOut className="h-3.5 w-3.5" />
-            </Button>
-            <span className="text-xs w-12 text-center">{Math.round(zoom * 100)}%</span>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => setZoom((z) => Math.min(z + 0.1, 2))}
-            >
-              <ZoomIn className="h-3.5 w-3.5" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={resetView}>
               <Maximize className="h-3.5 w-3.5" />
             </Button>
           </div>
 
-          {/* Create Node */}
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
               <Button size="sm" className="h-8">
@@ -437,90 +437,11 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
         </div>
       </div>
 
-      {/* Main Content - Fixed layout */}
       <div className="flex-1 flex overflow-hidden min-h-0">
-        {/* Map Canvas */}
-        <div
-          ref={containerRef}
-          className="flex-1 overflow-hidden cursor-grab active:cursor-grabbing map-canvas relative"
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          onWheel={handleWheel}
-          style={{ touchAction: "none" }}
-        >
-          <div
-            className="absolute inset-0 map-canvas"
-            style={{
-              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-              transformOrigin: "center center",
-              minWidth: "100%",
-              minHeight: "100%",
-            }}
-          >
-            <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ overflow: "visible" }}>
-              {localNodes.map((node) => {
-                if (!node.parent_id) return null
-                const parent = localNodes.find((n) => n.id === node.parent_id)
-                if (!parent) return null
-
-                const x1 = parent.position_x
-                const y1 = parent.position_y
-                const x2 = node.position_x
-                const y2 = node.position_y
-
-                // Calculate control point for curved line
-                const midX = (x1 + x2) / 2
-                const midY = (y1 + y2) / 2
-                const dx = x2 - x1
-                const dy = y2 - y1
-                const distance = Math.sqrt(dx * dx + dy * dy)
-                const curveOffset = distance * 0.15
-
-                const controlX = midX - (dy / distance) * curveOffset
-                const controlY = midY + (dx / distance) * curveOffset
-
-                return (
-                  <path
-                    key={`line-${node.id}`}
-                    d={`M ${x1} ${y1} Q ${controlX} ${controlY} ${x2} ${y2}`}
-                    stroke={node.color}
-                    strokeWidth={3}
-                    strokeOpacity={0.6}
-                    fill="none"
-                    strokeLinecap="round"
-                  />
-                )
-              })}
-            </svg>
-
-            {/* Nodes */}
-            {filteredNodes.map((node) => (
-              <MapNode
-                key={node.id}
-                node={node}
-                isSelected={selectedNode?.id === node.id}
-                onClick={() => handleNodeClick(node)}
-              />
-            ))}
-
-            {/* Empty State */}
-            {localNodes.length === 0 && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center p-4">
-                  <p className="text-muted-foreground mb-4">لا توجد عقد بعد. أنشئ عقدتك الأولى!</p>
-                  <Button onClick={() => setIsCreateOpen(true)}>
-                    <Plus className="w-4 h-4 ml-1" />
-                    إنشاء عقدة
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
+        <div ref={containerRef} className="flex-1 overflow-hidden relative">
+          <svg ref={svgRef} className="w-full h-full" />
         </div>
 
-        {/* Node Details Panel - Fixed height */}
         {selectedNode && (
           <div className="w-72 md:w-80 border-r border-border bg-card flex flex-col shrink-0 h-full overflow-hidden">
             <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
@@ -582,66 +503,6 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
             </div>
           </div>
         )}
-      </div>
-    </div>
-  )
-}
-
-function MapNode({
-  node,
-  isSelected,
-  onClick,
-}: {
-  node: ConversationNode
-  isSelected: boolean
-  onClick: () => void
-}) {
-  const hasParent = !!node.parent_id
-
-  return (
-    <div
-      className={cn("absolute cursor-pointer transition-all duration-200 group", isSelected && "z-10")}
-      style={{
-        left: node.position_x - (hasParent ? 70 : 90),
-        top: node.position_y - (hasParent ? 25 : 30),
-        transform: isSelected ? "scale(1.05)" : "scale(1)",
-      }}
-      onClick={onClick}
-    >
-      {/* Node container */}
-      <div
-        className={cn(
-          "rounded-full px-4 py-2 shadow-lg transition-all duration-200",
-          "border-2 backdrop-blur-sm",
-          hasParent ? "min-w-[140px]" : "min-w-[180px]",
-          isSelected ? "shadow-2xl ring-4 ring-primary/30" : "hover:shadow-xl hover:scale-105",
-        )}
-        style={{
-          backgroundColor: node.color + "15",
-          borderColor: node.color,
-        }}
-      >
-        <div className="flex items-center justify-center gap-2">
-          <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: node.color }} />
-          <span
-            className={cn("font-medium text-center leading-tight", hasParent ? "text-sm" : "text-base")}
-            style={{ color: node.color }}
-          >
-            {node.title}
-          </span>
-          {node.messages_count > 0 && (
-            <div
-              className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full shrink-0"
-              style={{
-                backgroundColor: node.color + "30",
-                color: node.color,
-              }}
-            >
-              <MessageSquare className="w-3 h-3" />
-              <span>{node.messages_count}</span>
-            </div>
-          )}
-        </div>
       </div>
     </div>
   )
