@@ -10,9 +10,7 @@ export async function GET(request: Request) {
 
   if (error_param) {
     console.error("[v0] OAuth provider error:", error_param, error_description)
-    return NextResponse.redirect(
-      `${origin}/auth/auth-code-error?error=${encodeURIComponent(error_description || error_param)}`,
-    )
+    return NextResponse.redirect(`${origin}/auth/login`)
   }
 
   if (!code) {
@@ -36,7 +34,7 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.redirect(`${origin}/auth/auth-code-error?error=missing_code`)
+    return NextResponse.redirect(`${origin}/auth/login`)
   }
 
   const supabase = await createClient()
@@ -52,13 +50,7 @@ export async function GET(request: Request) {
       name: error.name,
     })
 
-    if (error.message.includes("OAuth")) {
-      return NextResponse.redirect(
-        `${origin}/auth/auth-code-error?error=oauth_not_enabled&details=${encodeURIComponent(error.message)}`,
-      )
-    }
-
-    return NextResponse.redirect(`${origin}/auth/auth-code-error?error=${encodeURIComponent(error.message)}`)
+    return NextResponse.redirect(`${origin}/auth/login`)
   }
 
   console.log("[v0] Session exchange successful, user:", data.user?.email)
@@ -106,5 +98,5 @@ export async function GET(request: Request) {
   }
 
   console.error("[v0] No user data after successful exchange")
-  return NextResponse.redirect(`${origin}/auth/auth-code-error?error=no_user_data`)
+  return NextResponse.redirect(`${origin}/auth/login`)
 }
