@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Card, CardContent } from "@/components/ui/card"
 import {
   Dialog,
@@ -363,123 +362,127 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
   }
 
   return (
-    <div className="flex flex-col h-full w-full overflow-x-hidden bg-background pb-16 md:pb-0">
+    <div className="flex flex-col h-full w-full overflow-hidden bg-background pb-16 md:pb-0">
       {/* Header */}
-      <header className="sticky top-0 z-10 w-full bg-background/80 backdrop-blur-xl border-b border-border/50 py-4 px-4">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold">
-              {t.welcome}، {profile?.display_name?.split(" ")[0] || ""}
-            </h1>
-            <p className="text-sm text-muted-foreground">{t.cells}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Dialog
-              open={isInviteDialogOpen}
-              onOpenChange={(open) => {
-                setIsInviteDialogOpen(open)
-                setInviteError(null)
-                setInviteLink("")
-              }}
-            >
-              <DialogTrigger asChild>
-                <Button variant="outline" size="icon" className="rounded-full h-10 w-10 bg-transparent">
-                  <Link2 className="w-5 h-5" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>{t.joinByInvite}</DialogTitle>
-                  <DialogDescription>
-                    {language === "ar" ? "الصق رابط الدعوة للانضمام إلى خلية" : "Paste invite link to join a cell"}
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 mt-4">
-                  {inviteError && (
-                    <div className="p-3 rounded-xl bg-destructive/10 text-destructive text-sm">{inviteError}</div>
-                  )}
-                  <div className="space-y-2">
-                    <Label htmlFor="inviteLinkHome">{language === "ar" ? "رابط الدعوة" : "Invite Link"}</Label>
-                    <Input
-                      id="inviteLinkHome"
-                      value={inviteLink}
-                      onChange={(e) => setInviteLink(e.target.value)}
-                      placeholder={t.inviteLinkPlaceholder}
-                      className="bg-background rounded-xl w-full"
-                      dir="ltr"
-                    />
-                  </div>
-                  <Button
-                    onClick={handleJoinByInvite}
-                    disabled={!inviteLink.trim() || isJoining}
-                    className="w-full rounded-xl h-11"
-                  >
-                    {isJoining ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin ml-2" />
-                        {t.joining}
-                      </>
-                    ) : (
-                      t.join
-                    )}
+      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border/50 py-4 shrink-0">
+        <div className="max-w-full px-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl font-bold truncate">
+                {t.welcome}، {profile?.display_name?.split(" ")[0] || ""}
+              </h1>
+              <p className="text-sm text-muted-foreground">{t.cells}</p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Dialog
+                open={isInviteDialogOpen}
+                onOpenChange={(open) => {
+                  setIsInviteDialogOpen(open)
+                  setInviteError(null)
+                  setInviteLink("")
+                }}
+              >
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="icon" className="rounded-full h-10 w-10 bg-transparent">
+                    <Link2 className="w-5 h-5" />
                   </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-            <Button onClick={() => setIsCreateDialogOpen(true)} size="icon" className="rounded-full h-10 w-10">
-              <PlusIcon className="w-5 h-5" />
-            </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>{t.joinByInvite}</DialogTitle>
+                    <DialogDescription>
+                      {language === "ar" ? "الصق رابط الدعوة للانضمام إلى خلية" : "Paste invite link to join a cell"}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 mt-4">
+                    {inviteError && (
+                      <div className="p-3 rounded-xl bg-destructive/10 text-destructive text-sm">{inviteError}</div>
+                    )}
+                    <div className="space-y-2">
+                      <Label htmlFor="inviteLinkHome">{language === "ar" ? "رابط الدعوة" : "Invite Link"}</Label>
+                      <Input
+                        id="inviteLinkHome"
+                        value={inviteLink}
+                        onChange={(e) => setInviteLink(e.target.value)}
+                        placeholder={t.inviteLinkPlaceholder}
+                        className="bg-background rounded-xl"
+                        dir="ltr"
+                      />
+                    </div>
+                    <Button
+                      onClick={handleJoinByInvite}
+                      disabled={!inviteLink.trim() || isJoining}
+                      className="w-full rounded-xl h-11"
+                    >
+                      {isJoining ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                          {t.joining}
+                        </>
+                      ) : (
+                        t.join
+                      )}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              <Button onClick={() => setIsCreateDialogOpen(true)} size="icon" className="rounded-full h-10 w-10">
+                <PlusIcon className="w-5 h-5" />
+              </Button>
+            </div>
           </div>
-        </div>
 
-        {/* Search */}
-        <div className="relative px-3 md:px-4">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t.search}
-            className="pr-10 bg-muted/50 border-0 rounded-xl h-11 w-full"
-          />
+          {/* Search */}
+          <div className="relative w-full">
+            <Search className="absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t.search}
+              className="pe-10 bg-muted/50 border-0 rounded-xl h-11 w-full"
+            />
+          </div>
         </div>
       </header>
 
-      <ScrollArea className="flex-1 w-full overflow-x-hidden">
-        <div className="py-6 space-y-6 w-full px-4">
-          {/* Quick Actions */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-full">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+        <div className="max-w-full px-4 py-6 space-y-6">
+          {/* Quick Actions Grid - Responsive 2 column layout */}
+          <div className="grid grid-cols-2 gap-3 w-full">
             <Card
-              className="cursor-pointer hover:bg-muted/50 transition-colors"
+              className="cursor-pointer hover:bg-muted/50 transition-colors overflow-hidden"
               onClick={() => setIsCreateDialogOpen(true)}
             >
-              <CardContent className="p-4 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <CardContent className="p-4 flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                   <PlusIcon className="w-5 h-5 text-primary" />
                 </div>
-                <span className="font-medium">{t.newCell}</span>
+                <span className="font-medium truncate">{t.newCell}</span>
               </CardContent>
             </Card>
 
             <Card
-              className="cursor-pointer hover:bg-muted/50 transition-colors"
+              className="cursor-pointer hover:bg-muted/50 transition-colors overflow-hidden"
               onClick={() => setShowSupportDialog(true)}
             >
-              <CardContent className="p-4 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center">
+              <CardContent className="p-4 flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center shrink-0">
                   <MessageCircle className="w-5 h-5 text-cyan-500" />
                 </div>
-                <span className="font-medium">{t.supportAgent}</span>
+                <span className="font-medium truncate">{t.supportAgent}</span>
               </CardContent>
             </Card>
           </div>
 
           {/* Suggested Cells */}
-          <SuggestedCells userId={userId} />
+          <div className="w-full">
+            <SuggestedCells userId={userId} />
+          </div>
 
           {/* Cells List */}
-          <div className="w-full max-w-full">
+          <div className="w-full">
             {filteredGroups.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="flex flex-col items-center justify-center py-12 text-center px-4">
                 <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center mb-4">
                   <UsersIcon className="w-10 h-10 text-muted-foreground" />
                 </div>
@@ -493,14 +496,14 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
                 )}
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2 w-full">
                 <h3 className="text-sm font-medium text-muted-foreground px-1">{t.cells}</h3>
-                <div className="space-y-2">
+                <div className="space-y-2 w-full">
                   {filteredGroups.map((group) => (
-                    <Link key={group.id} href={`/chat/${group.id}`}>
-                      <Card className="hover:bg-muted/50 transition-colors">
-                        <CardContent className="p-4 flex items-center gap-4">
-                          <Avatar className="h-12 w-12 rounded-xl">
+                    <Link key={group.id} href={`/chat/${group.id}`} className="block w-full">
+                      <Card className="hover:bg-muted/50 transition-colors overflow-hidden">
+                        <CardContent className="p-4 flex items-center gap-4 min-w-0">
+                          <Avatar className="h-12 w-12 rounded-xl shrink-0">
                             {group.avatar_url ? (
                               <AvatarImage src={group.avatar_url || "/placeholder.svg"} />
                             ) : (
@@ -515,10 +518,10 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
                             )}
                           </Avatar>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between gap-2">
                               <h3 className="font-semibold truncate">{group.name}</h3>
                               {unreadCounts[group.id] > 0 && (
-                                <span className="h-5 min-w-5 px-1.5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold">
+                                <span className="h-5 min-w-5 px-1.5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold shrink-0">
                                   {unreadCounts[group.id]}
                                 </span>
                               )}
@@ -536,9 +539,13 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
             )}
           </div>
           {/* Smart Recommendations */}
-          {hasCompletedSurvey && <SmartRecommendations userId={userId} />}
+          {hasCompletedSurvey && (
+            <div className="w-full">
+              <SmartRecommendations userId={userId} />
+            </div>
+          )}
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Create Cell Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
