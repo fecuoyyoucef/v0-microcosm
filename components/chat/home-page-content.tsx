@@ -363,9 +363,9 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
   }
 
   return (
-    <div className="flex flex-col h-full bg-background pb-16 md:pb-0">
+    <div className="flex flex-col h-full max-w-full bg-background pb-16 md:pb-0">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border/50 py-4 px-4">
+      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border/50 py-4 px-3 md:px-4">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold">
@@ -433,7 +433,7 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
         </div>
 
         {/* Search */}
-        <div className="relative px-4">
+        <div className="relative px-3 md:px-4">
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             value={searchQuery}
@@ -447,7 +447,7 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
       <ScrollArea className="flex-1 w-full">
         <div className="py-6 space-y-6 max-w-full">
           {/* Quick Actions */}
-          <div className="grid grid-cols-2 gap-3 px-3 md:px-4">
+          <div className="grid grid-cols-2 gap-2 px-3 md:gap-3 md:px-4">
             <Card
               className="cursor-pointer hover:bg-muted/50 transition-colors"
               onClick={() => setIsCreateDialogOpen(true)}
