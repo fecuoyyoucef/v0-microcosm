@@ -447,7 +447,7 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
       <ScrollArea className="flex-1 w-full">
         <div className="py-6 space-y-6 max-w-full">
           {/* Quick Actions */}
-          <div className="grid grid-cols-2 gap-3 md:px-4">
+          <div className="grid grid-cols-2 gap-3 px-3 md:px-4">
             <Card
               className="cursor-pointer hover:bg-muted/50 transition-colors"
               onClick={() => setIsCreateDialogOpen(true)}
@@ -474,12 +474,12 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
           </div>
 
           {/* Suggested Cells */}
-          <div className="md:px-4">
+          <div className="px-3 md:px-4">
             <SuggestedCells userId={userId} />
           </div>
 
           {/* Cells List */}
-          <div className="md:px-4">
+          <div className="px-3 md:px-4">
             {filteredGroups.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center mb-4">
