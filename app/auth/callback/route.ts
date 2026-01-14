@@ -87,13 +87,22 @@ export async function GET(request: Request) {
 
     console.log("[v0] Final redirect path:", redirectPath)
 
-    if (isLocalEnv) {
-      return NextResponse.redirect(`${origin}${redirectPath}`)
-    } else if (forwardedHost) {
-      return NextResponse.redirect(`https://${forwardedHost}${redirectPath}`)
-    } else {
-      return NextResponse.redirect(`${origin}${redirectPath}`)
+    const response = NextResponse.redirect(
+      isLocalEnv
+        ? `${origin}${redirectPath}`
+        : forwardedHost
+          ? `https://${forwardedHost}${redirectPath}`
+          : `${origin}${redirectPath}`,
+    )
+
+    const sessionCookies = request.headers.get("cookie")
+    if (sessionCookies) {
+      response.headers.set("Set-Cookie", sessionCookies)
     }
+
+    response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate")
+
+    return response
   }
 
   console.error("[v0] No user data after successful exchange")

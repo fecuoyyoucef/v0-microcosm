@@ -26,6 +26,10 @@ export async function updateSession(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser()
 
+    if (request.nextUrl.pathname.startsWith("/chat")) {
+      console.log("[v0] Middleware /chat check - User:", user?.email || "not found")
+    }
+
     if (request.nextUrl.pathname.startsWith("/test-push")) {
       const adminSession = request.cookies.get("admin_session")?.value
       if (!adminSession) {
@@ -94,8 +98,15 @@ export async function updateSession(request: NextRequest) {
       }
     }
 
-    // حماية صفحات التطبيق
     if (request.nextUrl.pathname.startsWith("/chat") && !user) {
+      const referer = request.headers.get("referer")
+      if (referer && referer.includes("/auth/callback")) {
+        console.log("[v0] Just came from OAuth callback, allowing access")
+        // Allow the request to proceed - session will be established
+        return supabaseResponse
+      }
+
+      console.log("[v0] No user found in /chat, redirecting to login")
       const url = request.nextUrl.clone()
       url.pathname = "/auth/login"
       return NextResponse.redirect(url)
