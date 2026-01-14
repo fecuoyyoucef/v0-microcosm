@@ -457,7 +457,7 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                   <PlusIcon className="w-5 h-5 text-primary" />
                 </div>
-                <span className="font-medium truncate">{t.newCell}</span>
+                <span className="font-medium text-balance">{t.newCell}</span>
               </CardContent>
             </Card>
 
@@ -469,7 +469,7 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
                 <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center shrink-0">
                   <MessageCircle className="w-5 h-5 text-cyan-500" />
                 </div>
-                <span className="font-medium truncate">{t.supportAgent}</span>
+                <span className="font-medium text-balance">{t.supportAgent}</span>
               </CardContent>
             </Card>
           </div>
