@@ -39,6 +39,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import type { Group, GroupMember } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { MetricCard } from "@/components/ui/metric-card"
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -51,17 +52,9 @@ interface ChatHeaderProps {
   currentUserRole: "admin" | "member"
   currentUserId: string
   onMembersUpdate?: () => void
-  language: string // Assuming language is passed as a prop
 }
 
-export function ChatHeader({
-  group,
-  members,
-  currentUserRole,
-  currentUserId,
-  onMembersUpdate,
-  language,
-}: ChatHeaderProps) {
+export function ChatHeader({ group, members, currentUserRole, currentUserId, onMembersUpdate }: ChatHeaderProps) {
   const [isInviteOpen, setIsInviteOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
@@ -211,13 +204,11 @@ export function ChatHeader({
   }
 
   return (
-    <div
-      className={cn("sticky top-0 z-10 bg-background/95 backdrop-blur-lg", "border-b border-border/50", "py-4 px-5")}
-    >
-      <div className="flex items-center justify-between gap-4">
-        {/* Group Info */}
-        <div className="flex items-center gap-3 min-w-0 flex-1">
-          <Avatar className="h-10 w-10 shrink-0">
+    <div className="shrink-0 border-b border-border/30 bg-black/30 backdrop-blur-xl">
+      <div className="h-14 md:h-16 px-3 md:px-4 flex items-center justify-between">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+          {/* Group Avatar */}
+          <Avatar className="w-9 h-9 md:w-10 md:h-10 rounded-xl ring-2 ring-background shadow-md shrink-0">
             {group.avatar_url ? (
               <AvatarImage
                 src={group.avatar_url || "/placeholder.svg"}
@@ -232,11 +223,61 @@ export function ChatHeader({
             </AvatarFallback>
           </Avatar>
 
-          {/* Increase spacing */}
-          <div className="min-w-0 space-y-0.5">
-            <h2 className="font-semibold text-base truncate">{group.name}</h2>
-            <p className="text-xs text-muted-foreground truncate">
-              {members.length} {language === "ar" ? "عضو" : "members"}
+          {/* Group Info */}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="font-bold text-sm md:text-base truncate">{group.name}</h1>
+              {classificationEnabled && group.cell_category && (
+                <span
+                  className={cn(
+                    "text-[9px] md:text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0",
+                    group.cell_category === "project"
+                      ? "bg-blue-500/20 text-blue-300"
+                      : "bg-purple-500/20 text-purple-300",
+                  )}
+                >
+                  {group.cell_category === "project" ? "مشروع" : "حوار"}
+                </span>
+              )}
+              {metricsEnabled && (
+                <div className="flex gap-1">
+                  <MetricCard
+                    label="المسؤولية"
+                    value={group.responsibility_score ?? 100}
+                    size="sm"
+                    onClick={() => setSelectedMetric("responsibility")}
+                  />
+                  {group.cell_category === "project" && (
+                    <MetricCard
+                      label="التقدم"
+                      value={group.progress_score ?? 0}
+                      size="sm"
+                      onClick={() => setSelectedMetric("progress")}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+            <p className="text-[10px] md:text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+              <span>{members.length} أعضاء</span>
+              <span className="text-muted-foreground/50">•</span>
+              <span className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                {onlineCount} متصل
+              </span>
+              {group.responsibility_score !== undefined && group.responsibility_score < 75 && (
+                <>
+                  <span className="text-muted-foreground/50">•</span>
+                  <span
+                    className={cn(
+                      "flex items-center gap-1",
+                      group.responsibility_score < 60 ? "text-red-400" : "text-yellow-400",
+                    )}
+                  >
+                    ⚠ {group.responsibility_score}%
+                  </span>
+                </>
+              )}
             </p>
           </div>
         </div>

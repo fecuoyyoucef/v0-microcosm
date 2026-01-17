@@ -4,7 +4,7 @@ import React from "react"
 import { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { Avatar } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
@@ -75,28 +75,6 @@ interface MessageListProps {
   onEditSelect?: (message: Message) => void
   onMessageDeleted?: (messageId: string) => void
   setMessages: (messages: Message[]) => void
-}
-
-const MessageItem = ({ message, isOwn }: { message: Message; isOwn: boolean }) => {
-  return (
-    <div
-      className={cn("group relative", "py-3 px-4 hover:bg-muted/40 transition-colors rounded-lg", isOwn && "ms-auto")}
-    >
-      {/* Message content */}
-      <div className="flex gap-3">
-        <Avatar className="h-9 w-9 shrink-0"></Avatar>
-
-        <div className="flex-1 min-w-0 space-y-1.5">
-          <div className="flex items-baseline gap-2">
-            <span className="font-semibold text-sm"></span>
-            <span className="text-xs text-muted-foreground"></span>
-          </div>
-
-          <div className="text-sm leading-relaxed break-words"></div>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 export const MessageList = React.memo(function MessageList({
@@ -439,74 +417,104 @@ export const MessageList = React.memo(function MessageList({
               const replyToMessage = (message as any).reply_to_message
 
               return (
-                <MessageItem key={message.id} message={message} isOwn={isOwn}>
-                  {!isOwn && (message.sender?.display_name || message.sender?.username) && (
-                    <Link
-                      href={`/chat/profile/${message.sender_id}`}
-                      className="text-xs font-medium text-foreground px-2 hover:underline hover:text-primary transition-colors"
-                    >
-                      {message.sender?.display_name || message.sender?.username}
+                <div
+                  key={message.id}
+                  className={cn("flex gap-2 group", isOwn ? "flex-row-reverse" : "flex-row")}
+                  onTouchStart={(e) => handleTouchStart(e, message)}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                  onTouchCancel={handleTouchEnd}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    setSelectedMessage(message)
+                    setShowActionSheet(true)
+                  }}
+                >
+                  {!isOwn && (
+                    <Link href={`/chat/profile/${message.sender_id}`} className="shrink-0">
+                      <Avatar className="h-8 w-8 shrink-0 cursor-pointer hover:opacity-80 transition-opacity">
+                        <AvatarImage src={message.sender?.avatar_url || undefined} />
+                        <AvatarFallback className={getAvatarColor(message.sender_id)}>
+                          {message.sender?.username?.[0]?.toUpperCase() || "؟"}
+                        </AvatarFallback>
+                      </Avatar>
                     </Link>
                   )}
 
-                  {message.reply_to && (message as any).reply_preview ? (
-                    <div className="text-xs bg-muted/50 rounded px-2 py-1 mb-1 opacity-70 border-r-2 border-primary">
-                      <span className="font-medium">{(message as any).reply_preview.user_name}</span>
-                      <p className="truncate max-w-[200px]">{(message as any).reply_preview.content}</p>
-                    </div>
-                  ) : message.reply_to && replyToMessage ? (
-                    <div className="text-xs bg-muted/50 rounded px-2 py-1 mb-1 opacity-70 border-r-2 border-primary">
-                      <span className="font-medium">{replyToMessage.sender?.display_name || "مستخدم"}</span>
-                      <p className="truncate max-w-[200px]">{replyToMessage.content}</p>
-                    </div>
-                  ) : null}
-
-                  <div
-                    className={cn("rounded-2xl px-4 py-2 break-words", isOwn ? style.ownBg + " text-white" : style.bg)}
-                  >
-                    {message.content && message.content !== "📁 مرفقات" && (
-                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                  <div className={cn("max-w-[75%] space-y-1", isOwn ? "items-end" : "items-start")}>
+                    {!isOwn && (message.sender?.display_name || message.sender?.username) && (
+                      <Link
+                        href={`/chat/profile/${message.sender_id}`}
+                        className="text-xs font-medium text-foreground px-2 hover:underline hover:text-primary transition-colors"
+                      >
+                        {message.sender?.display_name || message.sender?.username}
+                      </Link>
                     )}
-                    {message.attachments && <AttachmentsGallery attachments={message.attachments} isOwn={isOwn} />}
-                    {isTranslating && <p className="text-xs opacity-70 mt-1">جاري الترجمة...</p>}
-                    {translation && <p className="text-xs opacity-70 mt-1 border-t pt-1">{translation}</p>}
-                  </div>
 
-                  <div className={cn("flex items-center gap-1 px-2", isOwn ? "justify-end" : "justify-start")}>
-                    <span className="text-[10px] text-muted-foreground">
-                      {formatDistanceToNow(new Date(message.created_at), { addSuffix: true, locale: ar })}
-                    </span>
-                    {message.updated_at && message.updated_at !== message.created_at && (
-                      <Badge variant="outline" className="text-[8px] px-1 py-0">
-                        معدّلة
-                      </Badge>
-                    )}
-                    <Pin className="h-3 w-3 text-primary fill-primary" />
-                    {layer !== "standard" && <span className="text-[10px]">{style.icon}</span>}
-                  </div>
+                    {message.reply_to && (message as any).reply_preview ? (
+                      <div className="text-xs bg-muted/50 rounded px-2 py-1 mb-1 opacity-70 border-r-2 border-primary">
+                        <span className="font-medium">{(message as any).reply_preview.user_name}</span>
+                        <p className="truncate max-w-[200px]">{(message as any).reply_preview.content}</p>
+                      </div>
+                    ) : message.reply_to && replyToMessage ? (
+                      <div className="text-xs bg-muted/50 rounded px-2 py-1 mb-1 opacity-70 border-r-2 border-primary">
+                        <span className="font-medium">{replyToMessage.sender?.display_name || "مستخدم"}</span>
+                        <p className="truncate max-w-[200px]">{replyToMessage.content}</p>
+                      </div>
+                    ) : null}
 
-                  {allReactions.length > 0 && (
-                    <div className="flex gap-1 flex-wrap mt-1">
-                      {quickReactions.map((emoji) => {
-                        const count = allReactions.filter((r) => r.reaction === emoji).length
-                        if (count === 0) return null
-                        const hasReacted = allReactions.some((r) => r.reaction === emoji && r.user_id === currentUserId)
-                        return (
-                          <button
-                            key={emoji}
-                            onClick={() => handleReaction(message.id, emoji)}
-                            className={cn(
-                              "text-xs px-1.5 py-0.5 rounded-full transition-all",
-                              hasReacted ? "bg-primary/20 border border-primary/50" : "bg-muted/50",
-                            )}
-                          >
-                            {emoji} {count}
-                          </button>
-                        )
-                      })}
+                    <div
+                      className={cn(
+                        "rounded-2xl px-4 py-2 break-words",
+                        isOwn ? style.ownBg + " text-white" : style.bg,
+                      )}
+                    >
+                      {message.content && message.content !== "📁 مرفقات" && (
+                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      )}
+                      {message.attachments && <AttachmentsGallery attachments={message.attachments} isOwn={isOwn} />}
+                      {isTranslating && <p className="text-xs opacity-70 mt-1">جاري الترجمة...</p>}
+                      {translation && <p className="text-xs opacity-70 mt-1 border-t pt-1">{translation}</p>}
                     </div>
-                  )}
-                </MessageItem>
+
+                    <div className={cn("flex items-center gap-1 px-2", isOwn ? "justify-end" : "justify-start")}>
+                      <span className="text-[10px] text-muted-foreground">
+                        {formatDistanceToNow(new Date(message.created_at), { addSuffix: true, locale: ar })}
+                      </span>
+                      {message.updated_at && message.updated_at !== message.created_at && (
+                        <Badge variant="outline" className="text-[8px] px-1 py-0">
+                          معدّلة
+                        </Badge>
+                      )}
+                      <Pin className="h-3 w-3 text-primary fill-primary" />
+                      {layer !== "standard" && <span className="text-[10px]">{style.icon}</span>}
+                    </div>
+
+                    {allReactions.length > 0 && (
+                      <div className="flex gap-1 flex-wrap mt-1">
+                        {quickReactions.map((emoji) => {
+                          const count = allReactions.filter((r) => r.reaction === emoji).length
+                          if (count === 0) return null
+                          const hasReacted = allReactions.some(
+                            (r) => r.reaction === emoji && r.user_id === currentUserId,
+                          )
+                          return (
+                            <button
+                              key={emoji}
+                              onClick={() => handleReaction(message.id, emoji)}
+                              className={cn(
+                                "text-xs px-1.5 py-0.5 rounded-full transition-all",
+                                hasReacted ? "bg-primary/20 border border-primary/50" : "bg-muted/50",
+                              )}
+                            >
+                              {emoji} {count}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
               )
             })}
           </div>
@@ -529,71 +537,98 @@ export const MessageList = React.memo(function MessageList({
           const replyToMessage = (message as any).reply_to_message
 
           return (
-            <MessageItem key={message.id} message={message} isOwn={isOwn}>
-              {!isOwn && (message.sender?.display_name || message.sender?.username) && (
-                <Link
-                  href={`/chat/profile/${message.sender_id}`}
-                  className="text-xs font-medium text-foreground px-2 hover:underline hover:text-primary transition-colors"
-                >
-                  {message.sender?.display_name || message.sender?.username}
+            <div
+              key={message.id}
+              className={cn("flex gap-2 group", isOwn ? "flex-row-reverse" : "flex-row")}
+              onTouchStart={(e) => handleTouchStart(e, message)}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              onTouchCancel={handleTouchEnd}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                setSelectedMessage(message)
+                setShowActionSheet(true)
+              }}
+            >
+              {!isOwn && (
+                <Link href={`/chat/profile/${message.sender_id}`} className="shrink-0">
+                  <Avatar className="h-8 w-8 shrink-0 cursor-pointer hover:opacity-80 transition-opacity">
+                    <AvatarImage src={message.sender?.avatar_url || undefined} />
+                    <AvatarFallback className={getAvatarColor(message.sender_id)}>
+                      {message.sender?.username?.[0]?.toUpperCase() || "؟"}
+                    </AvatarFallback>
+                  </Avatar>
                 </Link>
               )}
 
-              {message.reply_to && (message as any).reply_preview ? (
-                <div className="text-xs bg-muted/50 rounded px-2 py-1 mb-1 opacity-70 border-r-2 border-primary">
-                  <span className="font-medium">{(message as any).reply_preview.user_name}</span>
-                  <p className="truncate max-w-[200px]">{(message as any).reply_preview.content}</p>
-                </div>
-              ) : message.reply_to && replyToMessage ? (
-                <div className="text-xs bg-muted/50 rounded px-2 py-1 mb-1 opacity-70 border-r-2 border-primary">
-                  <span className="font-medium">{replyToMessage.sender?.display_name || "مستخدم"}</span>
-                  <p className="truncate max-w-[200px]">{replyToMessage.content}</p>
-                </div>
-              ) : null}
-
-              <div className={cn("rounded-2xl px-4 py-2 break-words", isOwn ? style.ownBg + " text-white" : style.bg)}>
-                {message.content && message.content !== "📁 مرفقات" && (
-                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              <div className={cn("max-w-[75%] space-y-1", isOwn ? "items-end" : "items-start")}>
+                {!isOwn && (message.sender?.display_name || message.sender?.username) && (
+                  <Link
+                    href={`/chat/profile/${message.sender_id}`}
+                    className="text-xs font-medium text-foreground px-2 hover:underline hover:text-primary transition-colors"
+                  >
+                    {message.sender?.display_name || message.sender?.username}
+                  </Link>
                 )}
-                {message.attachments && <AttachmentsGallery attachments={message.attachments} isOwn={isOwn} />}
-                {isTranslating && <p className="text-xs opacity-70 mt-1">جاري الترجمة...</p>}
-                {translation && <p className="text-xs opacity-70 mt-1 border-t pt-1">{translation}</p>}
-              </div>
 
-              <div className={cn("flex items-center gap-1 px-2", isOwn ? "justify-end" : "justify-start")}>
-                <span className="text-[10px] text-muted-foreground">
-                  {formatDistanceToNow(new Date(message.created_at), { addSuffix: true, locale: ar })}
-                </span>
-                {message.updated_at && message.updated_at !== message.created_at && (
-                  <Badge variant="outline" className="text-[8px] px-1 py-0">
-                    معدّلة
-                  </Badge>
-                )}
-                {layer !== "standard" && <span className="text-[10px]">{style.icon}</span>}
-              </div>
+                {message.reply_to && (message as any).reply_preview ? (
+                  <div className="text-xs bg-muted/50 rounded px-2 py-1 mb-1 opacity-70 border-r-2 border-primary">
+                    <span className="font-medium">{(message as any).reply_preview.user_name}</span>
+                    <p className="truncate max-w-[200px]">{(message as any).reply_preview.content}</p>
+                  </div>
+                ) : message.reply_to && replyToMessage ? (
+                  <div className="text-xs bg-muted/50 rounded px-2 py-1 mb-1 opacity-70 border-r-2 border-primary">
+                    <span className="font-medium">{replyToMessage.sender?.display_name || "مستخدم"}</span>
+                    <p className="truncate max-w-[200px]">{replyToMessage.content}</p>
+                  </div>
+                ) : null}
 
-              {allReactions.length > 0 && (
-                <div className="flex gap-1 flex-wrap mt-1">
-                  {quickReactions.map((emoji) => {
-                    const count = allReactions.filter((r) => r.reaction === emoji).length
-                    if (count === 0) return null
-                    const hasReacted = allReactions.some((r) => r.reaction === emoji && r.user_id === currentUserId)
-                    return (
-                      <button
-                        key={emoji}
-                        onClick={() => handleReaction(message.id, emoji)}
-                        className={cn(
-                          "text-xs px-1.5 py-0.5 rounded-full transition-all",
-                          hasReacted ? "bg-primary/20 border border-primary/50" : "bg-muted/50",
-                        )}
-                      >
-                        {emoji} {count}
-                      </button>
-                    )
-                  })}
+                <div
+                  className={cn("rounded-2xl px-4 py-2 break-words", isOwn ? style.ownBg + " text-white" : style.bg)}
+                >
+                  {message.content && message.content !== "📁 مرفقات" && (
+                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                  )}
+                  {message.attachments && <AttachmentsGallery attachments={message.attachments} isOwn={isOwn} />}
+                  {isTranslating && <p className="text-xs opacity-70 mt-1">جاري الترجمة...</p>}
+                  {translation && <p className="text-xs opacity-70 mt-1 border-t pt-1">{translation}</p>}
                 </div>
-              )}
-            </MessageItem>
+
+                <div className={cn("flex items-center gap-1 px-2", isOwn ? "justify-end" : "justify-start")}>
+                  <span className="text-[10px] text-muted-foreground">
+                    {formatDistanceToNow(new Date(message.created_at), { addSuffix: true, locale: ar })}
+                  </span>
+                  {message.updated_at && message.updated_at !== message.created_at && (
+                    <Badge variant="outline" className="text-[8px] px-1 py-0">
+                      معدّلة
+                    </Badge>
+                  )}
+                  {layer !== "standard" && <span className="text-[10px]">{style.icon}</span>}
+                </div>
+
+                {allReactions.length > 0 && (
+                  <div className="flex gap-1 flex-wrap mt-1">
+                    {quickReactions.map((emoji) => {
+                      const count = allReactions.filter((r) => r.reaction === emoji).length
+                      if (count === 0) return null
+                      const hasReacted = allReactions.some((r) => r.reaction === emoji && r.user_id === currentUserId)
+                      return (
+                        <button
+                          key={emoji}
+                          onClick={() => handleReaction(message.id, emoji)}
+                          className={cn(
+                            "text-xs px-1.5 py-0.5 rounded-full transition-all",
+                            hasReacted ? "bg-primary/20 border border-primary/50" : "bg-muted/50",
+                          )}
+                        >
+                          {emoji} {count}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
           )
         })}
         <div ref={messagesEndRef} />
