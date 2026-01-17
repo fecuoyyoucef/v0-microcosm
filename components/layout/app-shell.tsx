@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { TooltipProvider } from "@/components/ui/tooltip"
 import { Badge } from "@/components/ui/badge"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import {
@@ -31,7 +30,6 @@ import {
 import type { Group, Profile } from "@/lib/types"
 import { useTheme } from "next-themes"
 import { useSettings } from "@/components/settings-provider"
-import { PushNotificationManager } from "@/components/notifications/push-notification-manager"
 import { FirebasePushProvider } from "@/components/notifications/firebase-push-provider"
 import { ScrollProvider } from "@/lib/contexts/scroll-context"
 import { TutorialShell } from "@/components/tutorial/tutorial-shell"
@@ -147,6 +145,7 @@ function AppShellContent({ children, userId, profile, groups }: AppShellProps) {
   const [isAdmin, setIsAdmin] = useState(false)
   const [touchStart, setTouchStart] = useState<number | null>(null)
   const [touchEnd, setTouchEnd] = useState<number | null>(null)
+  const [touchInToolbar, setTouchInToolbar] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
 
@@ -452,13 +451,29 @@ function AppShellContent({ children, userId, profile, groups }: AppShellProps) {
   const onTouchStart = (e: React.TouchEvent) => {
     setTouchEnd(null)
     setTouchStart(e.targetTouches[0].clientX)
+    const target = e.target as HTMLElement
+    const isInPopover = target.closest('[role="dialog"]') || target.closest("[data-radix-popper-content-wrapper]")
+    const isInToolbar = target.closest("[data-toolbar]") || target.closest("button")
+
+    if (isInPopover || isInToolbar) {
+      setTouchInToolbar(true)
+      return
+    }
+
+    setTouchInToolbar(false)
   }
 
   const onTouchMove = (e: React.TouchEvent) => {
+    if (touchInToolbar) return
     setTouchEnd(e.targetTouches[0].clientX)
   }
 
   const onTouchEnd = () => {
+    if (touchInToolbar) {
+      setTouchInToolbar(false)
+      return
+    }
+
     if (!touchStart || !touchEnd) return
 
     const distance = touchStart - touchEnd
@@ -473,42 +488,40 @@ function AppShellContent({ children, userId, profile, groups }: AppShellProps) {
   }
 
   return (
-    <ScrollProvider>
-      <TooltipProvider delayDuration={0}>
-        <PushNotificationManager userId={userId} />
-        <FirebasePushProvider userId={userId} />
+    <div
+      className="relative h-screen flex bg-background overflow-hidden"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex w-64 flex-col bg-card border-l border-border">
+        <SidebarContent />
+      </aside>
 
-        <div
-          className="relative h-screen flex bg-background overflow-hidden"
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-        >
-          {/* Desktop Sidebar */}
-          <aside className="hidden md:flex w-64 flex-col bg-card border-l border-border">
-            <SidebarContent />
-          </aside>
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <div className="flex-1 overflow-auto">{children}</div>
 
-          {/* Main Content */}
-          <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            <div className="flex-1 overflow-auto">{children}</div>
-
-            {/* Mobile Sidebar */}
-            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-              <SheetContent side="left" className="p-0 w-64">
-                <SidebarContent isMobile={true} />
-              </SheetContent>
-            </Sheet>
-          </main>
-
-          {/* Tutorial Shell */}
-          <TutorialShell />
-        </div>
-      </TooltipProvider>
-    </ScrollProvider>
+        {/* Mobile Sidebar */}
+        <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+          <SheetContent side="left" className="p-0 w-64">
+            <SidebarContent isMobile={true} />
+          </SheetContent>
+        </Sheet>
+      </main>
+    </div>
   )
 }
 
 export function AppShell(props: AppShellProps) {
-  return <AppShellContent {...props} />
+  return (
+    <ScrollProvider>
+      <FirebasePushProvider userId={props.userId}>
+        <TutorialShell>
+          <AppShellContent {...props} />
+        </TutorialShell>
+      </FirebasePushProvider>
+    </ScrollProvider>
+  )
 }

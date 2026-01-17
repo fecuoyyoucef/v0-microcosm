@@ -212,13 +212,13 @@ export function AIToolbar({ groupId, messages, onInsertSummary }: AIToolbarProps
     <>
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
-          <Button variant="ghost" size="sm" className="gap-2 text-primary hover:text-primary">
+          <Button variant="ghost" size="sm" className="gap-2 text-primary hover:text-primary" data-toolbar>
             <Sparkles className="w-4 h-4" />
             <span className="hidden sm:inline">AI</span>
             <ChevronDown className="w-3 h-3" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-64 p-2" align="end">
+        <PopoverContent className="w-64 p-2" align="end" data-toolbar>
           <div className="space-y-1">
             {smartSummaryEnabled && (
               <Button
