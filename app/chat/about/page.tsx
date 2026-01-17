@@ -550,7 +550,6 @@ export default function AboutPage() {
           {/* Footer */}
           <div className="text-center space-y-2 pt-8 border-t border-border">
             <p className="text-sm text-muted-foreground">© 2025 Synaptic Space. {t.copyright}</p>
-            <p className="text-sm text-muted-foreground">{t.madeWith}</p>
           </div>
         </div>
       </div>
