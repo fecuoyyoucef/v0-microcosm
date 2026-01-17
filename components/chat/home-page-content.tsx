@@ -364,14 +364,14 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-background pb-16 md:pb-0">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border/50 py-4 shrink-0">
-        <div className="max-w-full px-4 space-y-4">
+      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border/50 py-6 shrink-0">
+        <div className="max-w-full px-5 space-y-6">
           <div className="flex items-center justify-between">
             <div className="min-w-0 flex-1">
-              <h1 className="text-2xl font-bold truncate">
+              <h1 className="text-3xl font-bold tracking-tight truncate mb-1">
                 {t.welcome}، {profile?.display_name?.split(" ")[0] || ""}
               </h1>
-              <p className="text-sm text-muted-foreground">{t.cells}</p>
+              <p className="text-base text-muted-foreground">{t.cells}</p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <Dialog
@@ -434,19 +434,19 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
 
           {/* Search */}
           <div className="relative w-full">
-            <Search className="absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Search className="absolute end-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t.search}
-              className="pe-10 bg-muted/50 border-0 rounded-xl h-11 w-full"
+              className="pe-12 ps-4 bg-muted/50 border-0 rounded-xl h-12 w-full text-base"
             />
           </div>
         </div>
       </header>
 
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
-        <div className="max-w-full px-4 py-6 space-y-6">
+        <div className="max-w-full px-5 py-8 space-y-8">
           {/* Quick Actions Grid - Responsive 2 column layout */}
           <div className="grid grid-cols-2 gap-3 w-full">
             <Card
