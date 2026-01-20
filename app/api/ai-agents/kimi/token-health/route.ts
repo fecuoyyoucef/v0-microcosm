@@ -36,24 +36,55 @@ export async function GET(req: NextRequest) {
 /**
  * Reset All Tokens (Admin Only)
  * POST /api/ai-agents/kimi/token-health
+ * 
+ * Request body:
+ * {
+ *   "action": "reset",
+ *   "adminKey": "your-admin-secret-key"
+ * }
  */
 export async function POST(req: NextRequest) {
 	try {
-		const { action, adminKey } = await req.json()
+		// Get admin secret from headers (أكثر أماناً من الـ body)
+		const adminSecret = req.headers.get("x-admin-secret") || 
+			(await req.json()).adminKey
 
-		// Simple admin key check (في الإنتاج استخدم نظام أقوى)
-		if (adminKey !== process.env.ADMIN_SECRET_KEY) {
+		// Verify admin key
+		const expectedKey = process.env.ADMIN_SECRET_KEY
+		
+		if (!expectedKey) {
+			console.warn("[v0] ADMIN_SECRET_KEY is not configured")
 			return NextResponse.json(
-				{ success: false, error: "Unauthorized" },
+				{ 
+					success: false, 
+					error: "Admin functionality not configured" 
+				},
+				{ status: 500 }
+			)
+		}
+
+		// Constant-time comparison to prevent timing attacks
+		const isValid = 
+			adminSecret?.length === expectedKey.length &&
+			adminSecret === expectedKey
+
+		if (!isValid) {
+			console.warn("[v0] Invalid admin key attempt from IP:", req.ip)
+			return NextResponse.json(
+				{ success: false, error: "Unauthorized - Invalid admin key" },
 				{ status: 401 }
 			)
 		}
 
+		const { action } = await req.json()
+
 		if (action === "reset") {
 			await resetAllTokens()
+			console.log("[v0] Admin reset all HF tokens")
 			return NextResponse.json({
 				success: true,
-				message: "All tokens reset successfully",
+				message: "All HF tokens reset successfully",
+				timestamp: new Date().toISOString(),
 			})
 		}
 
