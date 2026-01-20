@@ -1,13 +1,15 @@
+/**
+ * Proxy Route: /api/ai-agents/analyze-errors
+ * Forwards to the new Kimi-K2 system at /api/ai-agents/kimi/analyze-error
+ * Maintained for backward compatibility
+ */
+
 import { type NextRequest, NextResponse } from "next/server"
-import { ErrorAnalyzer } from "@/lib/ai-agents/error-analyzer"
-import { createServiceClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: NextRequest) {
   try {
-    const { ticketIds, githubConfig } = await request.json()
-
-    // Validate admin
-    const supabase = createServiceClient()
+    const supabase = await createClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -27,34 +29,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    // Initialize error analyzer with GitHub config
-    const analyzer = new ErrorAnalyzer({
-      owner: githubConfig?.owner || process.env.GITHUB_OWNER || "your-username",
-      repo: githubConfig?.repo || process.env.GITHUB_REPO || "microcosm",
-      token: process.env.GITHUB_TOKEN, // Optional for public repos
-    })
+    const body = await request.json()
 
-    // Analyze errors
-    if (ticketIds && ticketIds.length > 0) {
-      // Analyze multiple tickets
-      const patterns = await analyzer.analyzeErrorPatterns(ticketIds)
-      return NextResponse.json(patterns)
-    } else {
-      // Get recent unresolved tickets and analyze them
-      const { data: tickets } = await supabase
-        .from("support_tickets")
-        .select("id")
-        .eq("status", "open")
-        .order("created_at", { ascending: false })
-        .limit(10)
+    console.log("[v0] Error analysis proxy: Forwarding to Kimi system for admin:", user.id)
 
-      const ids = tickets?.map((t) => t.id) || []
-      const patterns = await analyzer.analyzeErrorPatterns(ids)
+    // Forward to new Kimi endpoint
+    const kimiResponse = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/ai-agents/kimi/analyze-error`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(request.headers.get("authorization") && {
+            authorization: request.headers.get("authorization")!,
+          }),
+        },
+        body: JSON.stringify(body),
+      }
+    )
 
-      return NextResponse.json(patterns)
-    }
+    const data = await kimiResponse.json()
+    console.log("[v0] Error analysis proxy: Kimi response received")
+    
+    return NextResponse.json(data, { status: kimiResponse.status })
   } catch (error) {
-    console.error("[AI Agent] Error analysis failed:", error)
+    console.error("[v0] Error analysis proxy error:", error)
     return NextResponse.json({ error: "Failed to analyze errors" }, { status: 500 })
   }
 }

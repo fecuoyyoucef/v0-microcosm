@@ -1,10 +1,15 @@
+/**
+ * Proxy Route: /api/ai-agents/decide
+ * Forwards to the new Kimi-K2 system at /api/ai-agents/kimi/decide
+ * Maintained for backward compatibility
+ */
+
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { ChiefAgent } from "@/lib/ai-agents/chief-agent"
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Verify owner
     const {
@@ -20,30 +25,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Only owner can use Chief Agent" }, { status: 403 })
     }
 
-    const { scenario, context } = await request.json()
+    const body = await request.json()
 
-    const agent = new ChiefAgent()
-    const decision = await agent.makeDecision(scenario, context)
+    console.log("[v0] Decide proxy: Forwarding to Kimi system for owner:", user.id)
 
-    // If auto_execute, execute immediately
-    if (decision.auto_execute) {
-      const success = await agent.executeAction(decision, context)
+    // Forward to new Kimi endpoint
+    const kimiResponse = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/ai-agents/kimi/decide`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(request.headers.get("authorization") && {
+            authorization: request.headers.get("authorization")!,
+          }),
+        },
+        body: JSON.stringify(body),
+      }
+    )
 
-      return NextResponse.json({
-        decision,
-        executed: true,
-        success,
-      })
-    }
-
-    // Otherwise, return decision for owner approval
-    return NextResponse.json({
-      decision,
-      executed: false,
-      message: "Decision requires owner approval",
-    })
+    const data = await kimiResponse.json()
+    console.log("[v0] Decide proxy: Kimi response received")
+    
+    return NextResponse.json(data, { status: kimiResponse.status })
   } catch (error: any) {
-    console.error("[v0] Error in decide route:", error)
+    console.error("[v0] Decide proxy error:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

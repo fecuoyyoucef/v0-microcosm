@@ -1,116 +1,52 @@
+/**
+ * Proxy Route: /api/ai-agents/chat
+ * Forwards to the new Kimi-K2 system at /api/ai-agents/kimi/chat
+ * Maintained for backward compatibility
+ */
+
+import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { type NextRequest, NextResponse } from "next/server"
-import { generateAIText } from "@/lib/ai"
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("[v0] Chat API called")
-
     const supabase = await createClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
 
     if (!user) {
-      console.log("[v0] No user found")
+      console.log("[v0] Chat proxy: No user found")
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    console.log("[v0] User authenticated:", user.id)
+    const body = await request.json()
 
-    const { message } = await request.json()
+    console.log("[v0] Chat proxy: Forwarding to Kimi system for user:", user.id)
 
-    if (!message?.trim()) {
-      return NextResponse.json({ error: "Message is required" }, { status: 400 })
-    }
-
-    console.log("[v0] Message received:", message)
-
-    const { data: agentStatus } = await supabase.from("agent_status").select("*").limit(1).single()
-
-    const { data: recentActions } = await supabase
-      .from("agent_actions")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(5)
-
-    const stats = {
-      actions_today: agentStatus?.actions_today || 0,
-      accuracy_rate: agentStatus?.accuracy_rate || 100,
-      is_active: agentStatus?.is_active ?? true,
-    }
-
-    console.log("[v0] Building AI prompt...")
-
-    const prompt = `أنت الوكيل الرئيسي (Chief AI Agent) لتطبيق Synaptic Space.
-أنت نائب المالك ولديك صلاحيات كاملة لإدارة المنصة.
-
-دورك:
-- الإجابة على أسئلة المالك عن حالة النظام
-- تنفيذ التعليمات التي يعطيك إياها
-- تقديم تقارير وتحليلات
-- اقتراح تحسينات
-
-المعلومات الحالية:
-- عدد الإجراءات اليوم: ${stats.actions_today}
-- نسبة الدقة: ${stats.accuracy_rate}%
-- حالة التفعيل: ${stats.is_active ? "نشط" : "متوقف"}
-- آخر الإجراءات: ${recentActions?.length || 0} إجراء
-
-آخر الإجراءات المنفذة:
-${recentActions?.map((a: any) => `- ${a.action_type}: ${a.reasoning?.substring(0, 100)}`).join("\n") || "لا توجد إجراءات"}
-
-سؤال المالك: ${message}
-
-تحدث بالعربية دائماً، كن محترفاً ومباشراً، وقدم إجابات مفيدة ودقيقة.`
-
-    console.log("[v0] Calling AI SDK...")
-    const response = await generateAIText(prompt, {
-      maxTokens: 1000,
-      temperature: 0.7,
-    })
-    console.log("[v0] AI responded successfully")
-
-    console.log("[v0] Saving chat to database...")
-    const { error: saveError } = await supabase.from("agent_chat_logs").insert([
+    // Forward to new Kimi endpoint
+    const kimiResponse = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/ai-agents/kimi/chat`,
       {
-        user_id: user.id,
-        message: message,
-        sender: "owner",
-      },
-      {
-        user_id: user.id,
-        message: response,
-        sender: "agent",
-      },
-    ])
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(request.headers.get("authorization") && {
+            authorization: request.headers.get("authorization")!,
+          }),
+        },
+        body: JSON.stringify(body),
+      }
+    )
 
-    if (saveError) {
-      console.error("[v0] Error saving chat:", saveError)
-    } else {
-      console.log("[v0] Chat saved successfully")
-    }
-
-    return NextResponse.json({ success: true, response })
-  } catch (error: any) {
-    console.error("[v0] Chief Agent chat error:", error)
-    console.error("[v0] Error stack:", error.stack)
-
-    let errorMessage = "عذراً، حدث خطأ غير متوقع. يرجى المحاولة لاحقاً."
-
-    if (error.message?.includes("API key")) {
-      errorMessage = "عذراً، مفتاح API الخاص بـ Groq غير مُعرّف. يرجى إضافته في إعدادات المشروع."
-    } else if (error.message?.includes("حدث خطأ في خدمة الذكاء الاصطناعي")) {
-      errorMessage = "عذراً، خدمة الذكاء الاصطناعي غير متاحة حالياً. يرجى المحاولة لاحقاً."
-    }
-
+    const data = await kimiResponse.json()
+    console.log("[v0] Chat proxy: Kimi response received")
+    
+    return NextResponse.json(data, { status: kimiResponse.status })
+  } catch (error) {
+    console.error("[v0] Chat proxy error:", error)
     return NextResponse.json(
-      {
-        success: false,
-        response: errorMessage,
-        error: error.message,
-      },
-      { status: 500 },
+      { success: false, response: "عذراً، حدث خطأ. يرجى المحاولة لاحقاً.", error: String(error) },
+      { status: 500 }
     )
   }
 }
