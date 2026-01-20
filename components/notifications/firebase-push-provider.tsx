@@ -1,5 +1,7 @@
 "use client"
 
+import React from "react"
+
 import { useEffect, useState, useCallback, useRef } from "react"
 import { requestNotificationPermission, onForegroundMessage } from "@/lib/firebase-push"
 import { toast } from "sonner"
@@ -7,9 +9,10 @@ import { useRouter } from "next/navigation"
 
 interface FirebasePushProviderProps {
   userId: string
+  children: React.ReactNode
 }
 
-export function FirebasePushProvider({ userId }: FirebasePushProviderProps) {
+export function FirebasePushProvider({ userId, children }: FirebasePushProviderProps) {
   const [isSupported, setIsSupported] = useState(false)
   const [permissionState, setPermissionState] = useState<NotificationPermission | null>(null)
   const isRegisteredRef = useRef(false)
@@ -99,5 +102,5 @@ export function FirebasePushProvider({ userId }: FirebasePushProviderProps) {
     })
   }, [isSupported, permissionState, router])
 
-  return null
+  return <>{children}</>
 }
