@@ -1,0 +1,29 @@
+# OpenDevin Configuration for Kimi-K2-Instruct
+
+[core]
+workspace_base = "/workspace"
+cache_dir = "/tmp/opendevin_cache"
+max_iterations = 30
+max_budget_per_task = 10.0
+
+[llm]
+model = "moonshotai/Kimi-K2-Instruct-0905"
+api_key = "${HF_TOKEN1}"
+api_base = "https://api-inference.huggingface.co/models"
+temperature = 0.2
+max_tokens = 8000
+timeout = 120
+
+[agent]
+name = "CodeActAgent"
+memory_enabled = true
+memory_max_threads = 5
+
+[sandbox]
+type = "local"
+timeout = 300
+
+[security]
+enable_auto_lint = true
+enable_auto_test = false
+sandbox_user_id = 1000
