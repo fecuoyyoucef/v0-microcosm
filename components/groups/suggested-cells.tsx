@@ -38,39 +38,53 @@ export function SuggestedCells({ userId }: SuggestedCellsProps) {
 
   useEffect(() => {
     const checkAndLoad = async () => {
-      // فحص إذا كان النظام مفعلاً
-      const { data: setting } = await supabase
-        .from("system_settings")
-        .select("value")
-        .eq("key", "synaptic_matching_enabled")
-        .single()
+      try {
+        // فحص إذا كان النظام مفعلاً
+        const { data: setting, error: settingError } = await supabase
+          .from("system_settings")
+          .select("value")
+          .eq("key", "synaptic_matching_enabled")
+          .single()
 
-      const isEnabled = setting?.value === "true" || setting?.value === true
-      setEnabled(isEnabled)
-
-      if (!isEnabled) {
-        setLoading(false)
-        return
-      }
-
-      // جلب الخلايا المقترحة
-      let suggested = await getSuggestedCells(userId, 10)
-
-      // تجربة تحسين التوافق باستخدام الذكاء الاصطناعي
-      if (suggested.length > 0) {
-        try {
-          const enhanced = await getEnhancedCompatibility(userId, suggested)
-          if (enhanced && enhanced.length > 0) {
-            suggested = enhanced
-            setEnhancedMode(true)
-          }
-        } catch (error) {
-          console.log("[v0] AI enhancement not available, using basic matching")
+        if (settingError && settingError.code !== "PGRST116") {
+          console.error("[v0] Error fetching setting:", settingError)
+          setLoading(false)
+          return
         }
-      }
 
-      setCells(suggested)
-      setLoading(false)
+        const isEnabled = setting?.value === "true" || setting?.value === true
+        setEnabled(isEnabled)
+
+        if (!isEnabled) {
+          setLoading(false)
+          return
+        }
+
+        console.log("[v0] Fetching suggested cells for user:", userId)
+
+        // جلب الخلايا المقترحة
+        let suggested = await getSuggestedCells(userId, 10)
+
+        // تجربة تحسين التوافق باستخدام الذكاء الاصطناعي
+        if (suggested.length > 0) {
+          try {
+            const enhanced = await getEnhancedCompatibility(userId, suggested)
+            if (enhanced && enhanced.length > 0) {
+              suggested = enhanced
+              setEnhancedMode(true)
+            }
+          } catch (error) {
+            console.log("[v0] AI enhancement not available, using basic matching")
+          }
+        }
+
+        console.log("[v0] Loaded suggested cells:", suggested.length)
+        setCells(suggested)
+      } catch (error) {
+        console.error("[v0] Error loading suggested cells:", error)
+      } finally {
+        setLoading(false)
+      }
     }
 
     checkAndLoad()

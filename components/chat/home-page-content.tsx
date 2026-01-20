@@ -171,12 +171,23 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
   const [inviteLink, setInviteLink] = useState("")
   const [isJoining, setIsJoining] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
   const { language } = useSettings()
   const t = translations[language]
+
+  useEffect(() => {
+    console.log("[v0] HomePageContent mounted with initialGroups:", initialGroups?.length || 0)
+    console.log("[v0] Profile loaded:", profile?.display_name)
+    setIsLoading(false)
+    
+    // Initialize component
+    fetchMemberCounts()
+    fetchUnreadCounts()
+  }, [])
 
   useEffect(() => {
     if (searchParams.get("new") === "true") {
