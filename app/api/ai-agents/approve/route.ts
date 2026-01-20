@@ -1,15 +1,9 @@
-/**
- * Proxy Route: /api/ai-agents/approve
- * Forwards to the new Kimi-K2 system at /api/ai-agents/kimi/approvals
- * Maintained for backward compatibility
- */
-
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = createClient()
 
     const {
       data: { user },
@@ -24,31 +18,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Only owner can approve" }, { status: 403 })
     }
 
-    const body = await request.json()
+    const { action_id } = await request.json()
 
-    console.log("[v0] Approve proxy: Forwarding to Kimi system for owner:", user.id)
+    // Mark action as approved
+    const { error } = await supabase
+      .from("agent_actions")
+      .update({
+        approved_by: user.id,
+        approved_at: new Date().toISOString(),
+      })
+      .eq("id", action_id)
 
-    // Forward to new Kimi endpoint
-    const kimiResponse = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/ai-agents/kimi/approvals`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(request.headers.get("authorization") && {
-            authorization: request.headers.get("authorization")!,
-          }),
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Learn from approval
+    const { data: action } = await supabase.from("agent_actions").select("*").eq("id", action_id).single()
+
+    if (action) {
+      await supabase.from("agent_memory").insert({
+        agent_id: action.agent_id,
+        memory_type: "owner_approval",
+        content: {
+          action_type: action.action_type,
+          reasoning: action.reasoning,
+          confidence: action.confidence,
+          context: action.context,
+          owner_approved: true,
         },
-        body: JSON.stringify({ action: "approve", ...body }),
-      }
-    )
+        importance: 8,
+      })
+    }
 
-    const data = await kimiResponse.json()
-    console.log("[v0] Approve proxy: Kimi response received")
-    
-    return NextResponse.json(data, { status: kimiResponse.status })
+    return NextResponse.json({ success: true })
   } catch (error: any) {
-    console.error("[v0] Approve proxy error:", error)
+    console.error("[v0] Error in approve route:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

@@ -1,38 +1,33 @@
-/**
- * Proxy Route: /api/ai-agents/monitor
- * Forwards to the new Kimi-K2 system at /api/ai-agents/kimi/moderate
- * Maintained for backward compatibility
- */
-
 import { type NextRequest, NextResponse } from "next/server"
+import { ContentGuardian, SystemMonitor, AnalyticsBot } from "@/lib/ai-agents/specialized-agents"
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    const { type, target_id } = await request.json()
 
-    console.log("[v0] Monitor proxy: Forwarding to Kimi system")
+    switch (type) {
+      case "message":
+        const guardian = new ContentGuardian()
+        await guardian.monitorMessage(target_id)
+        break
 
-    // Forward to new Kimi endpoint
-    const kimiResponse = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/ai-agents/kimi/moderate`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(request.headers.get("authorization") && {
-            authorization: request.headers.get("authorization")!,
-          }),
-        },
-        body: JSON.stringify(body),
-      }
-    )
+      case "system_health":
+        const monitor = new SystemMonitor()
+        const health = await monitor.checkSystemHealth()
+        return NextResponse.json({ health })
 
-    const data = await kimiResponse.json()
-    console.log("[v0] Monitor proxy: Kimi response received")
-    
-    return NextResponse.json(data, { status: kimiResponse.status })
+      case "daily_report":
+        const analytics = new AnalyticsBot()
+        const report = await analytics.generateDailyReport()
+        return NextResponse.json({ report })
+
+      default:
+        return NextResponse.json({ error: "Unknown monitor type" }, { status: 400 })
+    }
+
+    return NextResponse.json({ success: true })
   } catch (error: any) {
-    console.error("[v0] Monitor proxy error:", error)
+    console.error("[v0] Error in monitor route:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
