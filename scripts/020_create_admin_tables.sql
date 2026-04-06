@@ -50,16 +50,10 @@ CREATE TABLE IF NOT EXISTS system_announcements (
   recipients_count integer DEFAULT 0
 );
 
--- إنشاء حساب super_admin بكلمة مرور نص عادي (سيتم التحقق منها في الكود)
-INSERT INTO admins (email, password_hash, role, display_name)
-VALUES (
-  'youcef192837@gmail.com',
-  'F1E2C3U4O5Y6',
-  'super_admin',
-  'Youcef'
-) ON CONFLICT (email) DO UPDATE SET 
-  password_hash = 'F1E2C3U4O5Y6',
-  display_name = 'Youcef';
+-- ملاحظة: لا يتم إدراج كلمة مرور هنا. 
+-- بعد تشغيل هذا السكريبت، استخدم لوحة الإدارة أو script/hash-admin-password.mjs
+-- لإنشاء hash مشفر وتحديث قاعدة البيانات يدوياً.
+-- INSERT INTO admins يجب أن يتم عبر API أو script مشفر فقط.
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_admin_activity_log_admin ON admin_activity_log(admin_id);

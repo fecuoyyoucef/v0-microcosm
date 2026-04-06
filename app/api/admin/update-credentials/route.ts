@@ -1,6 +1,13 @@
 import { cookies } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+import { createHash, randomBytes } from "crypto"
+
+function hashPassword(password: string): { hash: string; salt: string } {
+  const salt = randomBytes(16).toString("hex") + "_synaptic_admin"
+  const hash = createHash("sha256").update(salt + password).digest("hex")
+  return { hash, salt }
+}
 
 export async function POST(request: Request) {
   try {
@@ -39,10 +46,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "البريد الإلكتروني مطلوب" }, { status: 400 })
     }
 
-    // Update admin credentials
-    const updates: { email: string; password_hash?: string } = { email }
+    // Update admin credentials - تشفير كلمة المرور دائماً
+    const updates: { email: string; password_hash?: string; salt?: string } = { email }
     if (password) {
-      updates.password_hash = password
+      const { hash, salt } = hashPassword(password)
+      updates.password_hash = hash
+      updates.salt = salt
     }
 
     const { error } = await supabase.from("admins").update(updates).eq("id", currentAdmin.id)
