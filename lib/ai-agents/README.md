@@ -111,49 +111,59 @@ SUPABASE_SERVICE_ROLE_KEY=...
 ```
 lib/ai-agents/
 ├── types.ts                    ✅ تعريفات الأنواع
-├── config.ts                   ✅ الإعدادات
-├── kimi-client.ts             🔄 قيد الإنشاء (المرحلة 3)
-├── tool-executor.ts           🔄 قيد الإنشاء (المرحلة 2)
+├── config.ts                   ✅ الإعدادات (HF_TOKEN1/2/3 rotation + GitHub)
+├── kimi-client.ts              ✅ Kimi Client مكتمل (streaming + function calling)
+├── token-rotation.ts           ✅ نظام تدوير التوكنات (HF_TOKEN1→2→3 تلقائي)
+├── tool-executor.ts            ✅ مكتمل - يوجه لجميع الأدوات
 ├── tools/
-│   ├── index.ts               🔄 قيد الإنشاء (المرحلة 2)
-│   ├── github-tools.ts        🔄 قيد الإنشاء (المرحلة 2)
-│   ├── supabase-tools.ts      🔄 قيد الإنشاء (المرحلة 2)
-│   ├── analysis-tools.ts      🔄 قيد الإنشاء (المرحلة 2)
-│   ├── monitoring-tools.ts    🔄 قيد الإنشاء (المرحلة 2)
-│   └── moderation-tools.ts    🔄 قيد الإنشاء (المرحلة 2)
-├── chief-agent.ts             🔄 قيد التحديث (المرحلة 4)
-├── specialized-agents.ts      🔄 قيد التحديث (المرحلة 4)
-├── approval-system.ts         🔄 قيد الإنشاء (المرحلة 5)
-└── monitoring.ts              🔄 قيد التحديث (المرحلة 7)
+│   ├── index.ts                ✅ مكتمل - 25+ أداة معرّفة
+│   ├── github-tools.ts         ✅ مكتمل - 9 دوال GitHub عبر Octokit
+│   └── supabase-tools.ts       ✅ مكتمل - query/insert/update/delete/rpc
+├── chief-agent.ts              ✅ الوكيل الرئيسي
+├── chief-agent-enhanced.ts     ✅ نسخة محسّنة
+├── chief-agent-kimi.ts         ✅ نسخة Kimi المتخصصة
+├── specialized-agents.ts       ✅ وكلاء متخصصون
+├── approval-system.ts          ✅ نظام الموافقات
+├── monitoring.ts               ✅ المراقبة
+├── monitoring-kimi.ts          ✅ مراقبة Kimi
+├── error-analysis.ts           ✅ تحليل الأخطاء
+├── error-analyzer.ts           ✅ محلل الأخطاء
+├── github-agent.ts             ✅ وكيل GitHub
+├── github-analyzer.ts          ✅ محلل GitHub
+└── undo-system.ts              ✅ نظام التراجع
 ```
 
-## المراحل المتبقية
+## حالة المراحل
 
 ### ✅ المرحلة 1: البنية التحتية (مكتملة)
 - ✅ إضافة @huggingface/inference
-- ✅ إنشاء database schema
+- ✅ إنشاء database schema (7 جداول)
 - ✅ تحديث config.ts
 - ✅ إنشاء types.ts
 
-### 🔄 المرحلة 2: الأدوات (التالية)
-- إنشاء tools/index.ts مع tool schemas
-- إنشاء tool-executor.ts
-- إنشاء github-tools.ts
-- إنشاء supabase-tools.ts
-- إنشاء باقي الأدوات
+### ✅ المرحلة 2: الأدوات (مكتملة)
+- ✅ tools/index.ts مع 25+ tool schema
+- ✅ tool-executor.ts مع routing كامل
+- ✅ github-tools.ts (Octokit)
+- ✅ supabase-tools.ts (query/insert/update/delete/rpc)
+- ✅ أدوات التحليل والمراقبة والإشراف داخل tool-executor
 
-### ⏳ المرحلة 3: Kimi Client
-- إنشاء kimi-client.ts
-- تطبيق function calling
-- تطبيق streaming
-- معالجة الأخطاء
+### ✅ المرحلة 3: Kimi Client (مكتملة)
+- ✅ kimi-client.ts مع streaming كامل
+- ✅ function calling + parseToolCallsFromText
+- ✅ تدوير تلقائي بين HF_TOKEN1/2/3
+- ✅ fallback إلى نموذج بديل عند الفشل
 
-### ⏳ المراحل 4-8
-- تحديث الوكلاء
-- نظام الموافقات
-- API Routes
-- Testing
-- Monitoring
+### ✅ المراحل 4-7 (مكتملة)
+- ✅ الوكلاء المتخصصون (specialized-agents.ts)
+- ✅ نظام الموافقات (approval-system.ts)
+- ✅ مراقبة الأداء (monitoring.ts + monitoring-kimi.ts)
+- ✅ تحليل الأخطاء (error-analysis.ts)
+
+### ⚠️ نقاط تحتاج انتباه
+- `analyze_error` و`suggest_fix` في tool-executor تعيد placeholder، يمكن تحسينها لاحقاً
+- `check_performance` غير مطبّقة بالكامل بعد
+- إشعارات المدير تعتمد على console.log بدلاً من webhook فعلي
 
 ## ملاحظات مهمة
 
