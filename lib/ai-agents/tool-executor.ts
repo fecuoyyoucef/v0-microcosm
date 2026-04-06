@@ -12,9 +12,31 @@ import { createClient } from "@/lib/supabase/server"
 
 /**
  * Execute a single tool call
+ * Accepts either a ToolCall object OR (name, args) directly for internal use
  */
-export async function executeToolCall(toolCall: ToolCall): Promise<ToolResult> {
-  const { name, args } = toolCall
+export async function executeToolCall(
+  toolCallOrName: ToolCall | string,
+  argsOverride?: Record<string, any>
+): Promise<ToolResult> {
+  let name: string
+  let args: Record<string, any>
+
+  if (typeof toolCallOrName === "string") {
+    // Called as executeToolCall(name, args)
+    name = toolCallOrName
+    args = argsOverride || {}
+  } else {
+    // Called as executeToolCall(toolCall)
+    // Support both {name, arguments} and {function: {name, arguments}} formats
+    if (toolCallOrName.name) {
+      name = toolCallOrName.name
+      args = toolCallOrName.arguments || toolCallOrName.args || {}
+    } else {
+      name = toolCallOrName.function?.name || ""
+      const rawArgs = toolCallOrName.function?.arguments
+      args = typeof rawArgs === "string" ? JSON.parse(rawArgs || "{}") : (rawArgs || {})
+    }
+  }
 
   console.log("[v0] Executing tool:", name, "with args:", args)
 
@@ -26,6 +48,25 @@ export async function executeToolCall(toolCall: ToolCall): Promise<ToolResult> {
         error: `Tool "${name}" requires manual approval`,
         requires_approval: true,
       }
+    }
+
+    // Route to appropriate tool handler
+    const result = await routeToolCall(name, args)
+
+    // Log execution to database
+    await logToolExecution({ name, args, id: crypto.randomUUID() }, result)
+
+    console.log("[v0] Tool execution result:", result)
+
+    return result
+  } catch (error: any) {
+    console.error("[v0] Tool execution error:", error)
+    return {
+      success: false,
+      error: `Tool execution failed: ${error.message}`,
+    }
+  }
+}
     }
 
     // Route to appropriate tool handler
@@ -59,7 +100,8 @@ export async function executeToolCalls(
     results.push(result)
 
     // Stop if a critical tool fails
-    if (!result.success && isCriticalTool(toolCall.name)) {
+    const toolName = toolCall.name || toolCall.function?.name || ""
+    if (!result.success && isCriticalTool(toolName)) {
       break
     }
   }
@@ -505,7 +547,7 @@ function isCriticalTool(toolName: string): boolean {
  * Log tool execution to database
  */
 async function logToolExecution(
-  toolCall: ToolCall,
+  toolCall: { name: string; args: Record<string, any>; id: string },
   result: ToolResult
 ): Promise<void> {
   try {
@@ -517,7 +559,7 @@ async function logToolExecution(
       result: result.data,
       success: result.success,
       error_message: result.error,
-      execution_time_ms: 0, // TODO: Track actual execution time
+      execution_time_ms: 0,
     })
   } catch (error) {
     console.error("[v0] Failed to log tool execution:", error)

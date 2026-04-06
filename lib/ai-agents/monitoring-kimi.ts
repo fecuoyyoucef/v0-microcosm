@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
-import type { AgentDecision, ToolExecutionResult } from "./types"
+import type { ToolResult as ToolExecutionResult } from "./types"
 
 /**
  * Agent Monitoring & Metrics System

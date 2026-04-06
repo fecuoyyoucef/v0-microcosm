@@ -4,9 +4,17 @@ import { executeToolCall } from "./tool-executor"
 import type {
 	AgentMessage,
 	ToolCall,
-	AgentResponse,
 	ConversationContext,
 } from "./types"
+
+// Local AgentResponse for this client (richer than the shared type)
+interface AgentResponse {
+	response: string
+	toolCalls: ToolCall[]
+	reasoning?: string
+	conversationId?: string
+	executionTime?: number
+}
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentHFToken, handleHFError, getTokenManager } from "./token-rotation"
 
@@ -257,7 +265,7 @@ export class KimiAgentClient {
 			try {
 				console.log(`[v0] Executing tool: ${toolCall.name}`)
 
-				const result = await executeToolCall(toolCall.name, toolCall.arguments)
+				const result = await executeToolCall(toolCall.name, toolCall.arguments as Record<string, any>)
 
 				console.log(`[v0] Tool ${toolCall.name} executed successfully`)
 

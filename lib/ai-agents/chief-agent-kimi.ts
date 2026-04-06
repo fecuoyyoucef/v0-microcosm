@@ -1,15 +1,26 @@
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 import { KimiAgentClient } from "./kimi-client"
 import { ApprovalSystem } from "./approval-system"
 import { CHIEF_AGENT_CONFIG } from "./config"
-import type { AgentDecision, AgentContext, ConversationContext } from "./types"
+import type { AgentContext, ConversationContext } from "./types"
+
+// Local AgentDecision type compatible with this agent's usage
+interface AgentDecision {
+	action: string
+	target_id: string
+	reasoning: string
+	confidence: number
+	severity: "low" | "medium" | "high" | "critical"
+	auto_execute: boolean
+	tool_calls_used?: string[]
+}
 
 /**
  * Chief Agent - Kimi-K2 Powered
  * Main decision-making agent with full tool access
  */
 export class ChiefAgent {
-	private supabase = createClient()
+	private supabase = createServiceClient()
 	private agent: KimiAgentClient
 	private approvalSystem: ApprovalSystem
 
