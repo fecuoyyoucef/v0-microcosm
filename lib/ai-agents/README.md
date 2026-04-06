@@ -1,8 +1,30 @@
-# نظام الوكلاء الذكية - Kimi-K2 Agentic System
+# نظام الوكلاء الذكية - Groq Agent System
 
 ## نظرة عامة
 
-نظام وكلاء ذكي متكامل يستخدم **Kimi-K2-Instruct** كوكيل حقيقي (Agentic AI) مع قدرات كاملة على استخدام الأدوات واتخاذ القرارات.
+نظام وكلاء ذكي متكامل يستخدم **Groq** (llama-3.1-405b-reasoning) كمحرك ذكاء اصطناعي مع قدرات كاملة على استخدام الأدوات واتخاذ القرارات.
+
+## نموذج الذكاء الاصطناعي
+
+### المحرك الحالي: Groq ✅
+
+- **النموذج الأساسي**: `llama-3.1-405b-reasoning` (أقوى نموذج مجاني)
+- **النموذج الاحتياطي**: `mixtral-8x7b-32768` (سريع وموثوق)
+- **المميزات**:
+  - ✅ سرعة عالية جداً (latency <100ms)
+  - ✅ مجاني تماماً (free tier بلا حدود)
+  - ✅ قدرات reasoning قوية جداً (405 بليون معاملة)
+  - ✅ دعم function calling الكامل
+  - ✅ لا يحتاج لتدوير توكنات
+
+### الترقية من HuggingFace
+
+تم استبدال `HuggingFace Inference` (Kimi-K2) بـ Groq لأن:
+- ❌ رصيد HF انتهى
+- ✅ Groq أسرع بـ 10x من HF
+- ✅ Groq مجاني بلا حدود
+- ✅ `llama-3.1-405b-reasoning` أقوى بكثير من Kimi-K2
+- ✅ استقرار أفضل وموثوقية أعلى
 
 ## البنية التحتية
 
@@ -20,20 +42,16 @@
 
 ### النماذج المستخدمة
 
-- **Primary**: `moonshotai/Kimi-K2-Instruct-0905` (الوكيل الرئيسي)
-- **Fallback**: `Qwen/QwQ-32B-Preview` (للمهام المعقدة)
-- **Fast**: `meta-llama/Llama-3.3-70B-Instruct` (للمهام السريعة)
+- **Primary**: `llama-3.1-405b-reasoning` (Groq - محرك الإنتاج)
+- **Fallback**: `mixtral-8x7b-32768` (احتياطي سريع)
 
 ### Environment Variables
 
 ```env
-# Hugging Face
-HF_TOKEN=your_huggingface_api_key
-HF_PRIMARY_MODEL=moonshotai/Kimi-K2-Instruct-0905
-HF_FALLBACK_MODEL=Qwen/QwQ-32B-Preview
-HF_FAST_MODEL=meta-llama/Llama-3.3-70B-Instruct
+# Groq
+GROQ_API_KEY=your_groq_api_key  # مجاني من https://console.groq.com
 
-# GitHub
+# GitHub (اختياري - للوظائف المتقدمة)
 GITHUB_TOKEN=your_github_token
 GITHUB_OWNER=your_org_or_username
 GITHUB_REPO=your_repo_name
@@ -148,11 +166,11 @@ lib/ai-agents/
 - ✅ supabase-tools.ts (query/insert/update/delete/rpc)
 - ✅ أدوات التحليل والمراقبة والإشراف داخل tool-executor
 
-### ✅ المرحلة 3: Kimi Client (مكتملة)
-- ✅ kimi-client.ts مع streaming كامل
-- ✅ function calling + parseToolCallsFromText
-- ✅ تدوير تلقائي بين HF_TOKEN1/2/3
-- ✅ fallback إلى نموذج بديل عند الفشل
+### ✅ المرحلة 3: Groq Client (مكتملة)
+- ✅ kimi-client.ts متحدث لاستخدام Groq (llama-3.1-405b)
+- ✅ streaming مع AI SDK
+- ✅ function calling كامل
+- ✅ fallback إلى mixtral-8x7b عند الحاجة
 
 ### ✅ المراحل 4-7 (مكتملة)
 - ✅ الوكلاء المتخصصون (specialized-agents.ts)
@@ -167,10 +185,11 @@ lib/ai-agents/
 
 ## ملاحظات مهمة
 
-1. **Kimi-K2 وكيل حقيقي** - ليس مجرد LLM، بل لديه قدرات كاملة على استخدام الأدوات
-2. **نظام الأمان** - جميع الإجراءات عالية المخاطر تحتاج موافقة
-3. **التتبع الكامل** - كل قرار وإجراء مسجل في قاعدة البيانات
-4. **GitHub Integration** - تكامل عميق مع GitHub للإصلاحات التلقائية
+1. **Groq أسرع وأقوى** - llama-3.1-405b هو أقوى نموذج مفتوح المصدر متاح
+2. **مجاني بلا حدود** - لا تحتاج لدفع أو قلق من انتهاء الرصيد
+3. **نظام الأمان** - جميع الإجراءات عالية المخاطر تحتاج موافقة
+4. **التتبع الكامل** - كل قرار وإجراء مسجل في قاعدة البيانات
+5. **GitHub Integration** - تكامل عميق مع GitHub للإصلاحات التلقائية
 
 ## الاستخدام
 

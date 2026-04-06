@@ -1,13 +1,13 @@
-import { InferenceClient } from "@huggingface/inference"
-import { AI_MODELS, AI_CONFIG, CHIEF_AGENT_CONFIG } from "./config"
+import { generateText, streamText } from "ai"
+import { createGroq } from "@ai-sdk/groq"
 import { executeToolCall } from "./tool-executor"
+import { CHIEF_AGENT_CONFIG } from "./config"
 import type {
 	AgentMessage,
 	ToolCall,
 	ConversationContext,
 } from "./types"
 import { createServiceClient } from "@/lib/supabase/server"
-import { getCurrentHFToken, handleHFError, getTokenManager } from "./token-rotation"
 
 // Local AgentResponse for this client (richer than the shared type)
 interface AgentResponse {
@@ -19,27 +19,26 @@ interface AgentResponse {
 }
 
 /**
- * Kimi-K2 Agentic Client with Automatic Token Rotation
- * Full wrapper for Kimi-K2-Instruct with function calling support
- * Automatically rotates between HF_TOKEN1, HF_TOKEN2, HF_TOKEN3
+ * Groq-powered Chief Agent Client
+ * Uses llama-3.1-405b-reasoning for powerful reasoning and function calling
  */
 export class KimiAgentClient {
-	private client: InferenceClient
-	private model: string
-	private fallbackModel: string
+	private groq: ReturnType<typeof createGroq>
+	private model: string = "llama-3.1-405b-reasoning"
+	private fallbackModel: string = "mixtral-8x7b-32768"
 	private conversationHistory: AgentMessage[]
 	private systemPrompt: string
 	private supabase = createServiceClient()
 	private conversationId?: string
 	private retryCount = 0
-	private maxRetries = 3
+	private maxRetries = 2
 
 	constructor(systemPrompt: string, conversationId?: string) {
-		// Get current token from rotation manager
-		const currentToken = getCurrentHFToken()
-		this.client = new InferenceClient(currentToken)
-		this.model = AI_MODELS.PRIMARY
-		this.fallbackModel = AI_MODELS.FALLBACK
+		// Initialize Groq client with API key
+		this.groq = createGroq({
+			apiKey: process.env.GROQ_API_KEY,
+		})
+		
 		this.systemPrompt = systemPrompt
 		this.conversationId = conversationId
 		this.conversationHistory = [
@@ -49,16 +48,7 @@ export class KimiAgentClient {
 			},
 		]
 		
-		console.log(`[v0] Kimi client initialized with HF_TOKEN${getTokenManager().getCurrentTokenIndex()}`)
-	}
-	
-	/**
-	 * Refresh client with new token after rotation
-	 */
-	private refreshClient(): void {
-		const currentToken = getCurrentHFToken()
-		this.client = new InferenceClient(currentToken)
-		console.log(`[v0] Client refreshed with HF_TOKEN${getTokenManager().getCurrentTokenIndex()}`)
+		console.log("[v0] Kimi client initialized with Groq (llama-3.1-405b-reasoning)")
 	}
 
 	/**
@@ -108,18 +98,6 @@ export class KimiAgentClient {
 		} catch (error) {
 			console.error("[v0] Kimi chat error:", error)
 
-			// Check if it's a rate limit error and rotate token
-			if (error instanceof Error) {
-				const rotated = await handleHFError(error)
-				
-				if (rotated) {
-					// Token rotated successfully, refresh client and retry
-					this.refreshClient()
-					console.log("[v0] Retrying with new token...")
-					return await this.chat(userMessage, context)
-				}
-			}
-
 			// Try fallback model
 			if (this.retryCount < this.maxRetries) {
 				this.retryCount++
@@ -134,7 +112,7 @@ export class KimiAgentClient {
 	}
 
 	/**
-	 * Generate response with tool calling
+	 * Generate response with tool calling using Groq
 	 */
 	private async generateWithTools(
 		context?: ConversationContext
@@ -146,48 +124,29 @@ export class KimiAgentClient {
 		// Build messages with context
 		const messages = this.buildMessages(context)
 
-		console.log("[v0] Sending request to Kimi-K2...")
+		console.log("[v0] Sending request to Groq (llama-3.1-405b-reasoning)...")
 
 		try {
-			// Stream completion from Kimi
-			const stream = this.client.chatCompletionStream({
-				model: this.model,
-				messages,
-				temperature: AI_CONFIG.temperature,
-				max_tokens: AI_CONFIG.maxTokens,
-				top_p: AI_CONFIG.topP,
+			// Stream completion from Groq
+			const stream = await streamText({
+				model: this.groq(this.model),
+				messages: messages as any,
+				system: this.systemPrompt,
+				temperature: 0.7,
+				maxTokens: 4000,
+				topP: 0.9,
 			})
 
 			// Process stream
-			for await (const chunk of stream) {
-				if (chunk.choices && chunk.choices.length > 0) {
-					const delta = chunk.choices[0].delta
-
-					// Handle content
-					if (delta.content) {
-						response += delta.content
-					}
-
-					// Handle tool calls (if model supports it)
-					if (delta.tool_calls) {
-						for (const toolCall of delta.tool_calls) {
-							toolCalls.push({
-								id: toolCall.id || crypto.randomUUID(),
-								name: toolCall.function?.name || "",
-								arguments: JSON.parse(toolCall.function?.arguments || "{}"),
-							})
-						}
-					}
-				}
+			for await (const chunk of stream.textStream) {
+				response += chunk
 			}
 
-			console.log("[v0] Received response from Kimi-K2")
+			console.log("[v0] Received response from Groq")
 
-			// Parse tool calls from response if not provided directly
-			if (toolCalls.length === 0) {
-				const parsedTools = this.parseToolCallsFromText(response)
-				toolCalls.push(...parsedTools)
-			}
+			// Parse tool calls from response
+			const parsedTools = this.parseToolCallsFromText(response)
+			toolCalls.push(...parsedTools)
 
 			// Execute tool calls
 			if (toolCalls.length > 0) {
@@ -405,21 +364,17 @@ export class KimiAgentClient {
 		// Build messages
 		const messages = this.buildMessages(context)
 
-		// Stream completion
-		const stream = this.client.chatCompletionStream({
-			model: this.model,
-			messages,
-			temperature: AI_CONFIG.temperature,
-			max_tokens: AI_CONFIG.maxTokens,
+		// Stream completion from Groq
+		const stream = await streamText({
+			model: this.groq(this.model),
+			messages: messages as any,
+			system: this.systemPrompt,
+			temperature: 0.7,
+			maxTokens: 4000,
 		})
 
-		for await (const chunk of stream) {
-			if (chunk.choices && chunk.choices.length > 0) {
-				const content = chunk.choices[0].delta.content
-				if (content) {
-					yield content
-				}
-			}
+		for await (const chunk of stream.textStream) {
+			yield chunk
 		}
 	}
 
