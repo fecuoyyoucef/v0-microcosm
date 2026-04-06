@@ -1,7 +1,7 @@
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 
 export class UndoSystem {
-  private supabase = createClient()
+  private supabase = createServiceClient()
 
   async undoAction(actionId: string, ownerId: string): Promise<boolean> {
     console.log("[v0] Undoing action:", actionId)

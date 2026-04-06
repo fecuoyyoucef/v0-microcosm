@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createApprovalSystem } from "@/lib/ai-agents/approval-system"
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
 
@@ -10,7 +10,7 @@ export const runtime = "nodejs"
  */
 export async function GET(req: NextRequest) {
 	try {
-		const supabase = createClient()
+		const supabase = createServiceClient()
 
 		// Check authentication
 		const {
@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
 	try {
-		const supabase = createClient()
+		const supabase = createServiceClient()
 
 		// Check authentication
 		const {

@@ -1,10 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 import { UndoSystem } from "@/lib/ai-agents/undo-system"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = createServiceClient()
 
     const {
       data: { user },
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = createServiceClient()
 
     const {
       data: { user },

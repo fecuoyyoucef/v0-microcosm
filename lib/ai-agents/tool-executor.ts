@@ -392,7 +392,7 @@ async function executeModerationTool(
   name: string,
   args: Record<string, any>
 ): Promise<ToolResult> {
-  const supabase = await createClient()
+  const supabase = createServiceClient()
 
   switch (name) {
     case "moderate_message": {

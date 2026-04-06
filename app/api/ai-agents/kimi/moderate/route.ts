@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createChiefAgent } from "@/lib/ai-agents/chief-agent-kimi"
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
 export const maxDuration = 30
@@ -11,7 +11,7 @@ export const maxDuration = 30
  */
 export async function POST(req: NextRequest) {
 	try {
-		const supabase = createClient()
+		const supabase = createServiceClient()
 
 		// Check authentication
 		const {
