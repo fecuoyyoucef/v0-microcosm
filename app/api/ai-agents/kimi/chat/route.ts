@@ -1,45 +1,38 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createChiefAgent } from "@/lib/ai-agents/chief-agent-kimi"
-import { createClient } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
 
+// Singleton per server instance
+let agentInstance: ReturnType<typeof createChiefAgent> | null = null
+function getAgent(conversationId?: string) {
+	if (!agentInstance || conversationId) {
+		agentInstance = createChiefAgent(conversationId)
+	}
+	return agentInstance
+}
+
 /**
  * POST /api/ai-agents/kimi/chat
- * Chat with the Kimi-powered Chief Agent
+ * Chat with the Kimi-powered Chief Agent (admin only - no auth check needed, protected by admin middleware)
  */
 export async function POST(req: NextRequest) {
 	try {
-		const supabase = createClient()
-
-		// Check authentication
-		const {
-			data: { user },
-		} = await supabase.auth.getUser()
-
-		if (!user) {
-			return NextResponse.json(
-				{ success: false, error: "Unauthorized" },
-				{ status: 401 }
-			)
-		}
-
-		const { message, context, conversationId } = await req.json()
+		const { message, context, conversationId, resetHistory } = await req.json()
 
 		if (!message) {
 			return NextResponse.json(
-				{ success: false, error: "Message is required" },
+				{ success: false, error: "الرسالة مطلوبة" },
 				{ status: 400 }
 			)
 		}
 
-		console.log("[v0] Chief Agent chat request:", { message, context })
+		if (resetHistory) {
+			agentInstance = null
+		}
 
-		// Create agent instance
-		const agent = createChiefAgent(conversationId)
-
-		// Get response
+		const agent = getAgent(conversationId)
 		const response = await agent.chat(message, context)
 
 		return NextResponse.json({
@@ -48,12 +41,10 @@ export async function POST(req: NextRequest) {
 			conversationId,
 		})
 	} catch (error) {
-		console.error("[v0] Chief Agent chat error:", error)
+		console.error("[v0] Chief Agent kimi/chat error:", error)
+		const msg = error instanceof Error ? error.message : "Unknown error"
 		return NextResponse.json(
-			{
-				success: false,
-				error: error instanceof Error ? error.message : "Unknown error",
-			},
+			{ success: false, error: msg, response: "عذراً، حدث خطأ في معالجة طلبك." },
 			{ status: 500 }
 		)
 	}

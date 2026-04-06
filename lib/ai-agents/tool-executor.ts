@@ -8,7 +8,7 @@ import { getGitHubTools } from "./tools/github-tools"
 import { getSupabaseTools } from "./tools/supabase-tools"
 import { CHIEF_AGENT_CONFIG } from "./config"
 import type { ToolResult, ToolCall } from "./types"
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 
 /**
  * Execute a single tool call
@@ -121,9 +121,23 @@ async function routeToolCall(
     return await executeGitHubTool(name, args)
   }
 
-  // Database Tools
+  // Database Tools - support both "database_query" and "query_database" naming
   if (name.startsWith("database_")) {
     return await executeDatabaseTool(name, args)
+  }
+
+  // Alias: query_database → database_query (Kimi may use either form)
+  if (name === "query_database") {
+    return await executeDatabaseTool("database_query", { table: args.table, select: args.select || "*", filters: args.filters, limit: args.limit || 100, order_by: args.order_by })
+  }
+  if (name === "update_record") {
+    return await executeDatabaseTool("database_update", args)
+  }
+  if (name === "delete_record") {
+    return await executeDatabaseTool("database_delete", args)
+  }
+  if (name === "execute_rpc") {
+    return await executeDatabaseTool("database_rpc", args)
   }
 
   // Analysis Tools
@@ -306,7 +320,7 @@ async function executeMonitoringTool(
   name: string,
   args: Record<string, any>
 ): Promise<ToolResult> {
-  const supabase = await createClient()
+  const supabase = createServiceClient()
 
   switch (name) {
     case "get_system_health": {
@@ -551,7 +565,7 @@ async function logToolExecution(
   result: ToolResult
 ): Promise<void> {
   try {
-    const supabase = await createClient()
+    const supabase = createServiceClient()
 
     await supabase.from("tool_executions").insert({
       tool_name: toolCall.name,

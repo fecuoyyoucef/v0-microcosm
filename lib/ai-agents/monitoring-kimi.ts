@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 import type { ToolResult as ToolExecutionResult } from "./types"
 
 /**
@@ -6,7 +6,7 @@ import type { ToolResult as ToolExecutionResult } from "./types"
  * Tracks all agent activities, performance, and decisions
  */
 export class AgentMonitoring {
-	private supabase = createClient()
+	private supabase = createServiceClient()
 
 	/**
 	 * Track agent decision

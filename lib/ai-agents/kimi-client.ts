@@ -6,6 +6,8 @@ import type {
 	ToolCall,
 	ConversationContext,
 } from "./types"
+import { createServiceClient } from "@/lib/supabase/server"
+import { getCurrentHFToken, handleHFError, getTokenManager } from "./token-rotation"
 
 // Local AgentResponse for this client (richer than the shared type)
 interface AgentResponse {
@@ -15,8 +17,6 @@ interface AgentResponse {
 	conversationId?: string
 	executionTime?: number
 }
-import { createClient } from "@/lib/supabase/server"
-import { getCurrentHFToken, handleHFError, getTokenManager } from "./token-rotation"
 
 /**
  * Kimi-K2 Agentic Client with Automatic Token Rotation
@@ -29,7 +29,7 @@ export class KimiAgentClient {
 	private fallbackModel: string
 	private conversationHistory: AgentMessage[]
 	private systemPrompt: string
-	private supabase = createClient()
+	private supabase = createServiceClient()
 	private conversationId?: string
 	private retryCount = 0
 	private maxRetries = 3

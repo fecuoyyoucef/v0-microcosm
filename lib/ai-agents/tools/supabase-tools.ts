@@ -4,12 +4,12 @@
  * Provides tools for interacting with Supabase database
  */
 
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 import type { ToolResult } from "../types"
 
 export class SupabaseTools {
-  private async getClient() {
-    return createClient()
+  private getClient() {
+    return createServiceClient()
   }
 
   /**
@@ -23,7 +23,7 @@ export class SupabaseTools {
     order_by?: string
   }): Promise<ToolResult> {
     try {
-      const supabase = await this.getClient()
+      const supabase = this.getClient()
       
       let query = supabase
         .from(params.table)
@@ -82,7 +82,7 @@ export class SupabaseTools {
     data: Record<string, any> | Record<string, any>[]
   }): Promise<ToolResult> {
     try {
-      const supabase = await this.getClient()
+      const supabase = this.getClient()
 
       const { data, error } = await supabase
         .from(params.table)
@@ -121,7 +121,7 @@ export class SupabaseTools {
     data: Record<string, any>
   }): Promise<ToolResult> {
     try {
-      const supabase = await this.getClient()
+      const supabase = this.getClient()
 
       let query = supabase
         .from(params.table)
@@ -165,7 +165,7 @@ export class SupabaseTools {
     filters: Record<string, any>
   }): Promise<ToolResult> {
     try {
-      const supabase = await this.getClient()
+      const supabase = this.getClient()
 
       let query = supabase.from(params.table).delete()
 
@@ -207,7 +207,7 @@ export class SupabaseTools {
     params?: Record<string, any>
   }): Promise<ToolResult> {
     try {
-      const supabase = await this.getClient()
+      const supabase = this.getClient()
 
       const { data, error } = await supabase.rpc(
         params.function_name,

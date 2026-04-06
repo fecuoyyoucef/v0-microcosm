@@ -158,16 +158,14 @@ export default function ChiefAgentContent() {
 
       const data = await res.json()
 
-      const agentResponse = data.response || data.error || "عذراً، حدث خطأ غير متوقع."
-      setChatMessages((prev) => [...prev, { role: "agent", content: agentResponse }])
-
-      if (!data.success && data.error) {
-        toast({
-          title: "تحذير",
-          description: "حدثت مشكلة في الرد",
-          variant: "destructive",
-        })
+      if (!res.ok || !data.success) {
+        const errMsg = data.response || `خطأ (${res.status}): تعذّر الاتصال بالوكيل.`
+        setChatMessages((prev) => [...prev, { role: "agent", content: errMsg }])
+        toast({ title: "خطأ في الوكيل", description: data.error || "حدثت مشكلة", variant: "destructive" })
+        return
       }
+
+      setChatMessages((prev) => [...prev, { role: "agent", content: data.response }])
     } catch (error) {
       setChatMessages((prev) => [
         ...prev,
