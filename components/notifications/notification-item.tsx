@@ -97,9 +97,10 @@ export function NotificationItem({ notification, onRead, onClick, showFullDate =
   return (
     <div
       className={cn(
-        "flex items-start gap-3 p-3 cursor-pointer transition-colors hover:bg-secondary/50",
-        !notification.is_read && "bg-primary/5",
-        isSystemNotification && !notification.is_read && "bg-primary/10 border-r-2 border-primary",
+        "flex items-start gap-3 p-3 cursor-pointer transition-all hover:bg-secondary/50 relative",
+        !notification.is_read && "bg-primary/5 border-r-2 border-primary",
+        notification.is_read && "opacity-70",
+        isSystemNotification && !notification.is_read && "bg-primary/10 border-r-4 border-primary",
       )}
       onClick={handleClick}
     >

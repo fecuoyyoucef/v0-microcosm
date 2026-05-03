@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { NotificationItem } from "@/components/notifications/notification-item"
+import { GroupedNotificationItem } from "@/components/notifications/grouped-notification-item"
 import type { Notification } from "@/lib/types"
 import { ArrowRight, Bell, CheckCheck, Trash2, BellRing, Loader2 } from "lucide-react"
 import { useSettings } from "@/components/settings-provider"
@@ -18,6 +19,7 @@ const translations = {
     all: "الكل",
     unread: "غير مقروءة",
     read: "مقروءة",
+    grouped: "مجمّعة",
     markAllRead: "تحديد الكل كمقروء",
     deleteAll: "حذف الكل",
     noNotifications: "لا توجد إشعارات",
@@ -27,12 +29,14 @@ const translations = {
     enableNotifications: "تفعيل الإشعارات",
     notificationsEnabled: "الإشعارات مفعّلة",
     notificationsBlocked: "الإشعارات محظورة",
+    systemNotifications: "إشعارات النظام",
   },
   en: {
     notifications: "Notifications",
     all: "All",
     unread: "Unread",
     read: "Read",
+    grouped: "Grouped",
     markAllRead: "Mark all as read",
     deleteAll: "Delete all",
     noNotifications: "No notifications",
@@ -42,12 +46,14 @@ const translations = {
     enableNotifications: "Enable Notifications",
     notificationsEnabled: "Notifications Enabled",
     notificationsBlocked: "Notifications Blocked",
+    systemNotifications: "System Notifications",
   },
   fr: {
     notifications: "Notifications",
     all: "Tout",
     unread: "Non lues",
     read: "Lues",
+    grouped: "Groupées",
     markAllRead: "Tout marquer comme lu",
     deleteAll: "Tout supprimer",
     noNotifications: "Pas de notifications",
@@ -57,6 +63,7 @@ const translations = {
     enableNotifications: "Activer les notifications",
     notificationsEnabled: "Notifications activées",
     notificationsBlocked: "Notifications bloquées",
+    systemNotifications: "Notifications système",
   },
 }
 
@@ -64,13 +71,54 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [userId, setUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState("all")
+  const [activeTab, setActiveTab] = useState("grouped")
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>("default")
   const router = useRouter()
   const supabase = createClient()
   const { language } = useSettings()
   const t = translations[language]
   const isRTL = language === "ar"
+
+  // Group notifications by cell
+  const { groupedNotifications, systemNotifications } = useMemo(() => {
+    const grouped: Record<string, { groupInfo: { name: string; avatar: string | null }; notifications: Notification[] }> = {}
+    const system: Notification[] = []
+
+    notifications.forEach((notif) => {
+      if (!notif.group_id || notif.type === "system") {
+        system.push(notif)
+      } else {
+        if (!grouped[notif.group_id]) {
+          grouped[notif.group_id] = {
+            groupInfo: {
+              name: notif.group?.name || "Unknown",
+              avatar: notif.group?.avatar_url || null,
+            },
+            notifications: [],
+          }
+        }
+        grouped[notif.group_id].notifications.push(notif)
+      }
+    })
+
+    // Sort each group's notifications by created_at descending
+    Object.values(grouped).forEach((group) => {
+      group.notifications.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    })
+
+    return { groupedNotifications: grouped, systemNotifications: system }
+  }, [notifications])
+
+  // Sort grouped notifications by latest message time
+  const sortedGroupIds = useMemo(() => {
+    return Object.entries(groupedNotifications)
+      .sort((a, b) => {
+        const aLatest = a[1].notifications[0]?.created_at || ""
+        const bLatest = b[1].notifications[0]?.created_at || ""
+        return new Date(bLatest).getTime() - new Date(aLatest).getTime()
+      })
+      .map(([groupId]) => groupId)
+  }, [groupedNotifications])
 
   useEffect(() => {
     checkUser()
@@ -93,7 +141,7 @@ export default function NotificationsPage() {
     setLoading(false)
   }
 
-  const fetchNotifications = async (uid: string) => {
+  const fetchNotifications = useCallback(async (uid: string) => {
     const { data, error } = await supabase
       .from("notifications")
       .select("*")
@@ -101,16 +149,42 @@ export default function NotificationsPage() {
       .order("created_at", { ascending: false })
 
     if (error) {
-      console.error("[v0] Error fetching notifications:", error)
+      console.error("Error fetching notifications:", error)
       return
     }
 
-    console.log("[v0] Fetched notifications count:", data?.length || 0)
-
     if (data) {
-      setNotifications(data)
+      // Fetch related data separately to handle nulls
+      const notificationsWithRelations = await Promise.all(
+        data.map(async (notif) => {
+          let sender = null
+          let group = null
+
+          if (notif.sender_id) {
+            const { data: senderData } = await supabase
+              .from("profiles")
+              .select("id, display_name, avatar_url")
+              .eq("id", notif.sender_id)
+              .single()
+            sender = senderData
+          }
+
+          if (notif.group_id) {
+            const { data: groupData } = await supabase
+              .from("groups")
+              .select("id, name, avatar_url")
+              .eq("id", notif.group_id)
+              .single()
+            group = groupData
+          }
+
+          return { ...notif, sender, group }
+        }),
+      )
+
+      setNotifications(notificationsWithRelations)
     }
-  }
+  }, [supabase])
 
   const requestNotificationPermission = async () => {
     if ("Notification" in window) {
@@ -127,6 +201,19 @@ export default function NotificationsPage() {
 
     setNotifications((prev) =>
       prev.map((n) => (n.id === notificationId ? { ...n, is_read: true, read_at: new Date().toISOString() } : n)),
+    )
+  }
+
+  const markMultipleAsRead = async (notificationIds: string[]) => {
+    await supabase
+      .from("notifications")
+      .update({ is_read: true, read_at: new Date().toISOString() })
+      .in("id", notificationIds)
+
+    setNotifications((prev) =>
+      prev.map((n) =>
+        notificationIds.includes(n.id) ? { ...n, is_read: true, read_at: new Date().toISOString() } : n
+      ),
     )
   }
 

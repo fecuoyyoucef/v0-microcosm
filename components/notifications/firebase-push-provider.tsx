@@ -5,7 +5,7 @@ import React from "react"
 import { useEffect, useState, useCallback, useRef } from "react"
 import { requestNotificationPermission, onForegroundMessage } from "@/lib/firebase-push"
 import { toast } from "sonner"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 
 interface FirebasePushProviderProps {
   userId: string
@@ -16,7 +16,15 @@ export function FirebasePushProvider({ userId, children }: FirebasePushProviderP
   const [isSupported, setIsSupported] = useState(false)
   const [permissionState, setPermissionState] = useState<NotificationPermission | null>(null)
   const isRegisteredRef = useRef(false)
+  const activeCellIdRef = useRef<string | null>(null)
   const router = useRouter()
+  const pathname = usePathname()
+
+  // Track which cell user is currently viewing
+  useEffect(() => {
+    const match = pathname.match(/\/chat\/([a-f0-9-]+)/)
+    activeCellIdRef.current = match ? match[1] : null
+  }, [pathname])
 
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window && "serviceWorker" in navigator) {
@@ -88,6 +96,13 @@ export function FirebasePushProvider({ userId, children }: FirebasePushProviderP
     onForegroundMessage((payload) => {
       const { notification, data, fcmOptions } = payload
       const notificationUrl = fcmOptions?.link || data?.action_url || data?.url || "/chat/notifications"
+      
+      // Don't show notification if user is currently in that cell
+      const groupId = data?.group_id || data?.groupId
+      if (groupId && activeCellIdRef.current === groupId) {
+        console.log("[FirebasePush] Suppressing notification - user is in active cell:", groupId)
+        return
+      }
 
       toast(notification?.title || "إشعار جديد", {
         description: notification?.body,
