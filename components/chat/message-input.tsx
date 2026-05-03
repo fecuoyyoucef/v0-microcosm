@@ -395,35 +395,39 @@ export function MessageInput({
   return (
     <div className="shrink-0 border-t border-border/50 bg-background w-full max-w-full overflow-hidden relative">
       {editingMessage && (
-        <div className="px-3 py-1.5 bg-muted/50 border-b border-border/50 flex items-center justify-between animate-in slide-in-from-bottom-2 duration-200">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className="w-0.5 h-6 bg-primary rounded-full shrink-0" />
-            <Edit2Icon className="w-3.5 h-3.5 text-primary shrink-0" />
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-medium text-primary truncate">تعديل الرسالة</p>
-              <p className="text-[11px] text-muted-foreground truncate">{editingMessage.content}</p>
-            </div>
+        <div className="px-3 py-2 bg-accent/10 border-b border-accent/20 flex items-center gap-2.5 animate-in slide-in-from-bottom-2 duration-200">
+          <Edit2Icon className="w-4 h-4 text-accent-foreground shrink-0" />
+          <div className="flex-1 min-w-0 border-s-[3px] border-accent ps-2.5 py-0.5">
+            <p className="text-[11px] font-bold text-accent-foreground truncate leading-tight">تعديل الرسالة</p>
+            <p className="text-xs text-muted-foreground truncate leading-tight">{editingMessage.content}</p>
           </div>
-          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 rounded-full" onClick={onCancelEdit}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0 rounded-full hover:bg-destructive/10 hover:text-destructive"
+            onClick={onCancelEdit}
+          >
             <XIcon className="w-3.5 h-3.5" />
           </Button>
         </div>
       )}
 
-      {/* Reply preview */}
+      {/* Reply preview - Telegram-style banner with start-side accent */}
       {replyingTo && !editingMessage && (
-        <div className="px-3 py-1.5 bg-muted/50 border-b border-border/50 flex items-center justify-between animate-in slide-in-from-bottom-2 duration-200">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className="w-0.5 h-6 bg-primary rounded-full shrink-0" />
-            <ReplyIcon className="w-3.5 h-3.5 text-primary shrink-0" />
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-medium text-primary truncate">
-                {replyingTo.sender?.display_name || "مستخدم"}
-              </p>
-              <p className="text-[11px] text-muted-foreground truncate">{replyingTo.content}</p>
-            </div>
+        <div className="px-3 py-2 bg-primary/[0.04] border-b border-primary/10 flex items-center gap-2.5 animate-in slide-in-from-bottom-2 duration-200">
+          <ReplyIcon className="w-4 h-4 text-primary shrink-0" />
+          <div className="flex-1 min-w-0 border-s-[3px] border-primary ps-2.5 py-0.5">
+            <p className="text-[11px] font-bold text-primary truncate leading-tight">
+              رد على {replyingTo.sender?.display_name || "مستخدم"}
+            </p>
+            <p className="text-xs text-muted-foreground truncate leading-tight">{replyingTo.content}</p>
           </div>
-          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 rounded-full" onClick={onCancelReply}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0 rounded-full hover:bg-destructive/10 hover:text-destructive"
+            onClick={onCancelReply}
+          >
             <XIcon className="w-3.5 h-3.5" />
           </Button>
         </div>

@@ -9,7 +9,6 @@ import { LayerFilter } from "./layer-filter"
 import { AnimatedBackground, type BackgroundStyle } from "@/components/background/animated-background"
 import { useRealtimePresence } from "@/hooks/use-realtime-presence"
 import { TypingIndicator } from "./typing-indicator"
-import { OnlineIndicator } from "./online-indicator"
 import { ImportantMessageToast } from "./important-message-toast"
 import type { Group, GroupMember, Message, MessageLayer, ConversationNode, GroupSettings } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -601,8 +600,6 @@ export function ChatContainer({
           currentUserId={currentUserId}
           onMembersUpdate={fetchMembers}
         />
-
-        <OnlineIndicator onlineUsers={onlineUsers} />
 
         <LayerFilter
           activeLayer={activeLayer}

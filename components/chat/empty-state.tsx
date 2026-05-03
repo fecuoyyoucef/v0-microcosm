@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { MessageSquare, Users, Link2 } from "lucide-react"
+import { MessageSquareText, Users, Link2, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -30,7 +30,6 @@ export function EmptyState() {
     }
 
     try {
-      // Extract group ID from invite link
       const url = new URL(inviteLink.trim())
       const pathParts = url.pathname.split("/")
       const inviteIndex = pathParts.indexOf("invite")
@@ -43,7 +42,6 @@ export function EmptyState() {
         setError("رابط الدعوة غير صالح")
       }
     } catch {
-      // If not a valid URL, try treating it as just the group ID
       if (inviteLink.trim().match(/^[0-9a-f-]{36}$/i)) {
         setIsOpen(false)
         router.push(`/invite/${inviteLink.trim()}`)
@@ -55,19 +53,28 @@ export function EmptyState() {
 
   return (
     <div className="flex-1 flex items-center justify-center p-6">
-      <div className="text-center max-w-md">
-        <div className="w-20 h-20 rounded-2xl bg-primary/20 flex items-center justify-center mx-auto mb-6">
-          <MessageSquare className="w-10 h-10 text-primary" />
+      <div className="text-center max-w-sm">
+        {/* Brand icon block */}
+        <div className="relative w-20 h-20 rounded-3xl bg-primary/10 flex items-center justify-center mx-auto mb-6 shadow-synaptic-glow">
+          <MessageSquareText className="w-9 h-9 text-primary" />
+          <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-accent ring-4 ring-background" />
         </div>
-        <h2 className="text-2xl font-bold mb-3">مرحباً بك في محادثات</h2>
-        <p className="text-muted-foreground mb-6">
-          ابدأ بإنشاء مجموعة جديدة من القائمة الجانبية أو انتظر دعوة من صديق للانضمام لمجموعة موجودة.
+
+        <h2 className="text-2xl font-bold mb-2 tracking-tight">ابدأ خليتك الأولى</h2>
+        <p className="text-sm text-muted-foreground leading-relaxed mb-6">
+          أنشئ خلية جديدة لك ولأصدقائك، أو انضم إلى خلية موجودة عبر رابط دعوة.
         </p>
-        <div className="flex items-center justify-center gap-3">
+
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
+          <Button className="w-full sm:w-auto h-11 rounded-xl gap-2 shadow-synaptic-glow">
+            <Plus className="w-4 h-4" />
+            خلية جديدة
+          </Button>
+
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline">
-                <Users className="w-4 h-4 ml-2" />
+              <Button variant="outline" className="w-full sm:w-auto h-11 rounded-xl gap-2">
+                <Users className="w-4 h-4" />
                 انضم بدعوة
               </Button>
             </DialogTrigger>
@@ -77,23 +84,23 @@ export function EmptyState() {
                 <DialogDescription>أدخل رابط الدعوة الذي حصلت عليه من صديقك</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 mt-4">
-                {error && <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>}
+                {error && (
+                  <div className="p-3 rounded-xl bg-destructive/10 text-destructive text-sm">{error}</div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="inviteLink">رابط الدعوة</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="inviteLink"
-                      value={inviteLink}
-                      onChange={(e) => setInviteLink(e.target.value)}
-                      placeholder="https://example.com/invite/..."
-                      className="bg-background"
-                      dir="ltr"
-                    />
-                  </div>
+                  <Input
+                    id="inviteLink"
+                    value={inviteLink}
+                    onChange={(e) => setInviteLink(e.target.value)}
+                    placeholder="https://..."
+                    className="bg-background rounded-xl"
+                    dir="ltr"
+                  />
                   <p className="text-xs text-muted-foreground">الصق رابط الدعوة كاملاً هنا</p>
                 </div>
-                <Button onClick={handleJoinWithLink} className="w-full">
-                  <Link2 className="w-4 h-4 ml-2" />
+                <Button onClick={handleJoinWithLink} className="w-full h-11 rounded-xl gap-2">
+                  <Link2 className="w-4 h-4" />
                   انضم الآن
                 </Button>
               </div>
