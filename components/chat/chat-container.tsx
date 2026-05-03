@@ -76,6 +76,20 @@ export function ChatContainer({
     }
   }, [groupId, currentUserId, supabase])
 
+  // Mark all notifications for this cell as read when user enters
+  const markCellNotificationsAsRead = useCallback(async () => {
+    try {
+      await supabase
+        .from("notifications")
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .eq("user_id", currentUserId)
+        .eq("group_id", groupId)
+        .eq("is_read", false)
+    } catch (error) {
+      console.error("Error marking cell notifications as read:", error)
+    }
+  }, [groupId, currentUserId, supabase])
+
   const fetchMembers = useCallback(async () => {
     const { data: membersData } = await supabase.from("group_members").select("*").eq("group_id", groupId)
 
@@ -306,6 +320,7 @@ export function ChatContainer({
     fetchMembers()
     fetchNodes()
     resetUnreadCount()
+    markCellNotificationsAsRead()
 
     const channelId = `chat-${groupId}-${Date.now()}`
 
@@ -483,7 +498,7 @@ export function ChatContainer({
       supabase.removeChannel(nodesChannel)
       document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
-  }, [groupId, fetchMessages, fetchMembers, fetchNodes, supabase, currentUserId, resetUnreadCount])
+  }, [groupId, fetchMessages, fetchMembers, fetchNodes, supabase, currentUserId, resetUnreadCount, markCellNotificationsAsRead])
 
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current

@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 
 interface PushNotificationManagerProps {
   userId: string
@@ -27,6 +27,14 @@ export function PushNotificationManager({ userId }: PushNotificationManagerProps
   const [isSubscribed, setIsSubscribed] = useState(false)
   const supabase = createClient()
   const router = useRouter()
+  const pathname = usePathname()
+  const activeCellIdRef = useRef<string | null>(null)
+
+  // Track which cell user is currently viewing
+  useEffect(() => {
+    const match = pathname.match(/\/chat\/([a-f0-9-]+)/)
+    activeCellIdRef.current = match ? match[1] : null
+  }, [pathname])
 
   useEffect(() => {
     if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
@@ -103,6 +111,19 @@ export function PushNotificationManager({ userId }: PushNotificationManagerProps
             group_id?: string
             message_id?: string
             data?: any
+          }
+
+          // Don't show notification if user is currently in that cell
+          const isInActiveCell = activeCellIdRef.current && notif.group_id === activeCellIdRef.current
+          
+          if (isInActiveCell) {
+            // Auto-mark as read since user is already in the cell
+            supabase
+              .from("notifications")
+              .update({ is_read: true, read_at: new Date().toISOString() })
+              .eq("id", notif.id)
+              .then(() => updateBadgeCount())
+            return
           }
 
           if (Notification.permission === "granted" && document.visibilityState === "visible") {
