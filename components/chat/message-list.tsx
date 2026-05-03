@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Copy, Edit2, Trash2, Languages, Check, Pin, Reply, MessageSquareText } from "lucide-react"
+import { Copy, Edit2, Trash2, Languages, Check, Pin, Reply, MessageSquareText, Loader2, ChevronUp } from "lucide-react"
 import Link from "next/link"
 import type { Message, GroupMember, ConversationNode } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -168,12 +168,16 @@ interface MessageListProps {
   currentUserId: string
   members?: GroupMember[]
   isLoading: boolean
+  isLoadingMore?: boolean
+  hasMoreMessages?: boolean
+  onLoadMore?: () => void
   messagesEndRef: React.RefObject<HTMLDivElement | null>
   nodes?: ConversationNode[]
   onReplySelect?: (message: Message) => void
   onEditSelect?: (message: Message) => void
   onMessageDeleted?: (messageId: string) => void
   setMessages?: React.Dispatch<React.SetStateAction<Message[]>>
+  scrollContainerRef?: React.RefObject<HTMLDivElement | null>
 }
 
 export const MessageList = React.memo(function MessageList({
@@ -181,6 +185,9 @@ export const MessageList = React.memo(function MessageList({
   groupId,
   currentUserId,
   isLoading,
+  isLoadingMore = false,
+  hasMoreMessages = false,
+  onLoadMore,
   messagesEndRef,
   onReplySelect,
   onEditSelect,
@@ -710,6 +717,26 @@ export const MessageList = React.memo(function MessageList({
       )}
 
       <div className="flex-1 px-3 pt-3 space-y-0">
+        {/* Load older messages — shown when history exceeds initial window */}
+        {hasMoreMessages && (
+          <div className="flex justify-center pb-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onLoadMore}
+              disabled={isLoadingMore}
+              className="h-8 px-4 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 rounded-full gap-1.5"
+            >
+              {isLoadingMore ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <ChevronUp className="h-3.5 w-3.5" />
+              )}
+              {isLoadingMore ? "جاري التحميل..." : "رسائل أقدم"}
+            </Button>
+          </div>
+        )}
+
         {regularEnriched.map((message) => (
           <React.Fragment key={message.id}>
             {message._showDateSeparator && (

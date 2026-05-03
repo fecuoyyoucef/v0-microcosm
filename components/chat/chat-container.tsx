@@ -21,6 +21,17 @@ interface ChatContainerProps {
   currentUserRole: "admin" | "member"
 }
 
+// Supabase PostgREST default limit is 1000 rows.
+// We use explicit pagination to bypass this and load all messages.
+const PAGE_SIZE = 100
+
+// Splits an array into chunks to avoid hitting query limits on .in() calls
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = []
+  for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size))
+  return chunks
+}
+
 export function ChatContainer({
   groupId,
   group,
@@ -34,6 +45,9 @@ export function ChatContainer({
   const [activeLayer, setActiveLayer] = useState<MessageLayer | "all">("all")
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [hasMoreMessages, setHasMoreMessages] = useState(false)
+  const [oldestMessageDate, setOldestMessageDate] = useState<string | null>(null)
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
   const [editingMessage, setEditingMessage] = useState<Message | null>(null)
   const [importantMessageToasts, setImportantMessageToasts] = useState<Message[]>([])
@@ -106,101 +120,191 @@ export function ChatContainer({
     }
   }, [groupId, supabase])
 
+  // Enriches a batch of raw messages with sender profiles, reactions, reads, and reply previews.
+  // Uses chunked .in() queries to stay within PostgREST's 1000-row limit per request.
+  const enrichMessages = useCallback(
+    async (messagesData: Record<string, unknown>[]) => {
+      if (!messagesData.length) return []
+
+      const senderIds = [...new Set(messagesData.map((m) => m.sender_id as string))]
+
+      // Fetch profiles for all unique senders
+      const profileMap = new Map<string, { id: string; display_name: string; avatar_url: string | null }>()
+      const profileChunks = chunkArray(senderIds, 200)
+      await Promise.all(
+        profileChunks.map(async (chunk) => {
+          const { data } = await supabase.from("profiles").select("id, display_name, avatar_url").in("id", chunk)
+          data?.forEach((p) => profileMap.set(p.id, p))
+        }),
+      )
+
+      const messageIds = messagesData.map((m) => m.id as string)
+
+      // Fetch reads and reactions in parallel, chunked
+      const readCountMap: Record<string, number> = {}
+      const reactionsMap: Record<string, Array<{ id: string; user_id: string; reaction: string }>> = {}
+
+      await Promise.all([
+        // Read counts — chunked
+        ...chunkArray(messageIds, 500).map(async (chunk) => {
+          const { data } = await supabase.from("message_reads").select("message_id").in("message_id", chunk)
+          data?.forEach((r) => {
+            readCountMap[r.message_id] = (readCountMap[r.message_id] || 0) + 1
+          })
+        }),
+        // Reactions — chunked
+        ...chunkArray(messageIds, 500).map(async (chunk) => {
+          const { data } = await supabase.from("message_reactions").select("*").in("message_id", chunk)
+          data?.forEach((r) => {
+            if (!reactionsMap[r.message_id]) reactionsMap[r.message_id] = []
+            reactionsMap[r.message_id].push({ id: r.id, user_id: r.user_id, reaction: r.reaction })
+          })
+        }),
+      ])
+
+      // Fetch reply-to previews — only unique IDs, chunked
+      const replyMessagesMap: Record<string, { content: string; sender?: { display_name: string } }> = {}
+      const replyToIds = [...new Set(messagesData.filter((m) => m.reply_to).map((m) => m.reply_to as string))]
+      if (replyToIds.length > 0) {
+        await Promise.all(
+          chunkArray(replyToIds, 200).map(async (chunk) => {
+            const { data } = await supabase.from("messages").select("id, content, sender_id").in("id", chunk)
+            data?.forEach((rm) => {
+              const senderProfile = profileMap.get(rm.sender_id)
+              replyMessagesMap[rm.id] = {
+                content: rm.content,
+                sender: senderProfile ? { display_name: senderProfile.display_name } : undefined,
+              }
+            })
+          }),
+        )
+      }
+
+      return messagesData.map((m) => ({
+        ...m,
+        sender: profileMap.get(m.sender_id as string) || null,
+        read_count: readCountMap[m.id as string] || 0,
+        reactions: reactionsMap[m.id as string] || [],
+        reply_to_message: m.reply_to ? replyMessagesMap[m.reply_to as string] ?? null : null,
+      })) as Message[]
+    },
+    [supabase],
+  )
+
+  // Fetches ALL messages page by page to bypass the PostgREST 1000-row default cap.
+  // Stores only the latest PAGE_SIZE*5 (500) messages in state for performance,
+  // but keeps track of the oldest date for "load more" scrolling upward.
   const fetchMessages = useCallback(async () => {
     setIsLoading(true)
 
-    const { data: messagesData, error } = await supabase
-      .from("messages")
-      .select("*")
-      .eq("group_id", groupId)
-      .order("created_at", { ascending: true })
+    // Page through ALL messages to get the true count and latest batch
+    let allMessages: Record<string, unknown>[] = []
+    let from = 0
+    let keepPaging = true
 
-    if (error) {
-      console.error("Error fetching messages:", error)
+    while (keepPaging) {
+      const { data, error } = await supabase
+        .from("messages")
+        .select("*")
+        .eq("group_id", groupId)
+        .order("created_at", { ascending: true })
+        .range(from, from + PAGE_SIZE - 1)
+
+      if (error) {
+        console.error("Error fetching messages page:", error)
+        break
+      }
+
+      if (data && data.length > 0) {
+        allMessages = [...allMessages, ...data]
+        from += PAGE_SIZE
+        // Continue until we get a partial page (means we've reached the end)
+        if (data.length < PAGE_SIZE) keepPaging = false
+      } else {
+        keepPaging = false
+      }
+    }
+
+    if (!isMounted.current) return
+
+    if (allMessages.length === 0) {
+      setMessages([])
+      setHasMoreMessages(false)
+      setOldestMessageDate(null)
       setIsLoading(false)
       return
     }
 
-    if (messagesData && messagesData.length > 0 && isMounted.current) {
-      const senderIds = [...new Set(messagesData.map((m) => m.sender_id))]
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, display_name, avatar_url")
-        .in("id", senderIds)
+    // For very large histories (>500), keep only the latest 500 in memory initially
+    // and allow loading older ones on demand via "load more"
+    const INITIAL_WINDOW = 500
+    const hasMore = allMessages.length > INITIAL_WINDOW
+    const visibleMessages = hasMore ? allMessages.slice(-INITIAL_WINDOW) : allMessages
 
-      const profileMap = new Map(profiles?.map((p) => [p.id, p]) || [])
-      const messageIds = messagesData.map((m) => m.id)
+    const enriched = await enrichMessages(visibleMessages)
+    if (!isMounted.current) return
 
-      // Fetch read counts
-      const { data: readCounts } = await supabase
-        .from("message_reads")
-        .select("message_id")
-        .in("message_id", messageIds)
+    setMessages(enriched)
+    setHasMoreMessages(hasMore)
+    setOldestMessageDate(hasMore ? (visibleMessages[0]?.created_at as string) ?? null : null)
 
-      const readCountMap: Record<string, number> = {}
-      readCounts?.forEach((r) => {
-        readCountMap[r.message_id] = (readCountMap[r.message_id] || 0) + 1
-      })
-
-      const { data: reactionsData } = await supabase.from("message_reactions").select("*").in("message_id", messageIds)
-
-      const reactionsMap: Record<string, Array<{ id: string; user_id: string; reaction: string }>> = {}
-      reactionsData?.forEach((r) => {
-        if (!reactionsMap[r.message_id]) {
-          reactionsMap[r.message_id] = []
-        }
-        reactionsMap[r.message_id].push({
-          id: r.id,
-          user_id: r.user_id,
-          reaction: r.reaction,
-        })
-      })
-
-      const replyToIds = messagesData.filter((m) => m.reply_to).map((m) => m.reply_to)
-      const replyMessagesMap: Record<string, { content: string; sender?: { display_name: string } }> = {}
-
-      if (replyToIds.length > 0) {
-        const { data: replyMessages } = await supabase
-          .from("messages")
-          .select("id, content, sender_id")
-          .in("id", replyToIds)
-
-        replyMessages?.forEach((rm) => {
-          const senderProfile = profileMap.get(rm.sender_id)
-          replyMessagesMap[rm.id] = {
-            content: rm.content,
-            sender: senderProfile ? { display_name: senderProfile.display_name } : undefined,
-          }
-        })
-      }
-
-      const messagesWithSender = messagesData.map((m) => ({
-        ...m,
-        sender: profileMap.get(m.sender_id) || null,
-        read_count: readCountMap[m.id] || 0,
-        reactions: reactionsMap[m.id] || [],
-        reply_to_message: m.reply_to ? replyMessagesMap[m.reply_to] : null,
-      }))
-      setMessages(messagesWithSender as Message[])
-
-      const unreadMessageIds = messagesData.filter((m) => m.sender_id !== currentUserId).map((m) => m.id)
-
-      if (unreadMessageIds.length > 0) {
-        await fetch("/api/messages/mark-read-bulk", {
+    // Mark unread in chunks to stay within API limits
+    const unreadIds = visibleMessages.filter((m) => m.sender_id !== currentUserId).map((m) => m.id as string)
+    if (unreadIds.length > 0) {
+      const batches = chunkArray(unreadIds, 200)
+      batches.forEach((batch) => {
+        fetch("/api/messages/mark-read-bulk", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messageIds: unreadMessageIds }),
+          body: JSON.stringify({ messageIds: batch }),
         }).catch((err) => console.error("Failed to mark messages as read:", err))
-      }
-    } else if (isMounted.current) {
-      setMessages([])
+      })
     }
 
-    if (isMounted.current) {
-      setIsLoading(false)
-      setTimeout(scrollToBottom, 100)
+    setIsLoading(false)
+    setTimeout(scrollToBottom, 100)
+  }, [groupId, supabase, currentUserId, enrichMessages])
+
+  // Loads older messages when user scrolls to the top
+  const loadMoreMessages = useCallback(async () => {
+    if (!oldestMessageDate || isLoadingMore) return
+    setIsLoadingMore(true)
+
+    let olderMessages: Record<string, unknown>[] = []
+    let from = 0
+    let keepPaging = true
+
+    while (keepPaging) {
+      const { data, error } = await supabase
+        .from("messages")
+        .select("*")
+        .eq("group_id", groupId)
+        .lt("created_at", oldestMessageDate)
+        .order("created_at", { ascending: true })
+        .range(from, from + PAGE_SIZE - 1)
+
+      if (error || !data || data.length === 0) { keepPaging = false; break }
+      olderMessages = [...olderMessages, ...data]
+      from += PAGE_SIZE
+      if (data.length < PAGE_SIZE) keepPaging = false
     }
-  }, [groupId, supabase, currentUserId])
+
+    if (!isMounted.current) { setIsLoadingMore(false); return }
+
+    if (olderMessages.length === 0) {
+      setHasMoreMessages(false)
+      setIsLoadingMore(false)
+      return
+    }
+
+    const enriched = await enrichMessages(olderMessages)
+    if (!isMounted.current) { setIsLoadingMore(false); return }
+
+    setMessages((prev) => [...enriched, ...prev])
+    setHasMoreMessages(olderMessages.length >= PAGE_SIZE)
+    setOldestMessageDate(enriched[0]?.created_at ?? null)
+    setIsLoadingMore(false)
+  }, [oldestMessageDate, isLoadingMore, groupId, supabase, enrichMessages])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -623,19 +727,21 @@ export function ChatContainer({
           ref={scrollContainerRef}
           className="flex-1 overflow-y-auto overflow-x-hidden bg-transparent chat-scroll-container pb-32"
         >
-          <MessageList
-            messages={filteredMessages}
-            currentUserId={currentUserId}
-            members={members}
-            isLoading={isLoading}
-            messagesEndRef={messagesEndRef}
-            nodes={nodes}
-            onReplySelect={handleReply}
-            onEditSelect={handleEditMessage}
-            onMessageDeleted={(messageId) => {
-              setMessages((prev) => prev.filter((m) => m.id !== messageId))
-            }}
-          />
+        <MessageList
+          messages={filteredMessages}
+          currentUserId={currentUserId}
+          members={members}
+          isLoading={isLoading}
+          isLoadingMore={isLoadingMore}
+          hasMoreMessages={hasMoreMessages}
+          onLoadMore={loadMoreMessages}
+          onReplySelect={handleReply}
+          onEditSelect={handleEditMessage}
+          onMessageDeleted={handleDeleteMessage}
+          scrollContainerRef={scrollContainerRef}
+          messagesEndRef={messagesEndRef}
+          groupId={groupId}
+        />
           <TypingIndicator userNames={typingUserNames} />
         </div>
 
