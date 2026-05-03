@@ -62,7 +62,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col md:flex-row" dir="rtl">
+    <div className="h-screen bg-slate-950 flex flex-col md:flex-row overflow-hidden" dir="rtl">
       <Button
         variant="ghost"
         size="icon"
@@ -82,7 +82,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         />
       )}
 
-      <div className="hidden md:block">
+      <div className="hidden md:block flex-shrink-0">
         <AdminSidebar />
       </div>
 
@@ -95,7 +95,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <AdminSidebar />
       </div>
 
-      <main className="flex-1 min-h-screen overflow-auto w-full pt-16 md:pt-0">{children}</main>
+      <main className="flex-1 min-h-0 overflow-auto w-full pt-16 md:pt-0 isolate">{children}</main>
     </div>
   )
 }

@@ -6,7 +6,6 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Search, MoreVertical, Users, MessageSquare, Calendar, RefreshCw, FolderOpen } from "lucide-react"
 
@@ -158,20 +157,20 @@ export default function CellsPage() {
       {/* Cells List */}
       <Card className="bg-slate-900/50 border-slate-800">
         <CardContent className="p-0">
-          <ScrollArea className="h-[calc(100vh-380px)]">
-            <div className="divide-y divide-slate-800">
+          <div className="overflow-y-auto overflow-x-auto h-[calc(100vh-380px)]">
+            <div className="min-w-[600px] divide-y divide-slate-800">
               {filteredCells.map((cell) => (
                 <div
                   key={cell.id}
                   className="flex items-center justify-between p-4 hover:bg-slate-800/30 transition-colors"
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 min-w-0 flex-1">
                     <div
-                      className={`w-12 h-12 rounded-xl bg-gradient-to-br ${getGroupColor(cell.name)} flex items-center justify-center text-white font-bold`}
+                      className={`w-12 h-12 flex-shrink-0 rounded-xl bg-gradient-to-br ${getGroupColor(cell.name)} flex items-center justify-center text-white font-bold`}
                     >
                       {cell.name.substring(0, 2)}
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <h3 className="font-medium text-white">{cell.name}</h3>
                       <p className="text-sm text-slate-400 line-clamp-1">{cell.description || "بدون وصف"}</p>
                       <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
@@ -183,13 +182,13 @@ export default function CellsPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 flex-shrink-0 pl-4">
                     <div className="flex items-center gap-3">
-                      <Badge variant="outline" className="border-blue-500/50 text-blue-400">
+                      <Badge variant="outline" className="border-blue-500/50 text-blue-400 whitespace-nowrap">
                         <Users className="w-3 h-3 ml-1" />
                         {cell.members_count || 0}
                       </Badge>
-                      <Badge variant="outline" className="border-emerald-500/50 text-emerald-400">
+                      <Badge variant="outline" className="border-emerald-500/50 text-emerald-400 whitespace-nowrap">
                         <MessageSquare className="w-3 h-3 ml-1" />
                         {cell.messages_count || 0}
                       </Badge>
@@ -210,7 +209,7 @@ export default function CellsPage() {
                 </div>
               ))}
             </div>
-          </ScrollArea>
+          </div>
         </CardContent>
       </Card>
     </div>
