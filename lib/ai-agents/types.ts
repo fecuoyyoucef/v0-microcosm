@@ -33,13 +33,45 @@ export interface ToolCall {
     name: string
     arguments: string | Record<string, any>
   }
+  // Shorthand fields used internally by kimi-client
+  name?: string
+  arguments?: Record<string, any>
+  args?: Record<string, any>
 }
 
 export interface ToolResult {
   success: boolean
   data?: any
   error?: string
+  requires_approval?: boolean
   execution_time_ms?: number
+}
+
+// Alias for backwards compatibility
+export type ToolExecutionResult = ToolResult
+
+// Agent context for decision making
+export interface AgentContext {
+  message_id?: string
+  user_id?: string
+  group_id?: string
+  content?: string
+  event_type?: string
+  environment?: string
+  permanent?: boolean
+  table?: string
+  [key: string]: any
+}
+
+// Agent decision output
+export interface AgentDecision {
+  action: string
+  target_id: string
+  reasoning: string
+  confidence: number
+  severity: "low" | "medium" | "high" | "critical"
+  auto_execute: boolean
+  tool_calls_used?: string[]
 }
 
 // ============================
@@ -47,7 +79,7 @@ export interface ToolResult {
 // ============================
 
 export interface AgentMessage {
-  role: "system" | "user" | "assistant" | "tool"
+  role: "system" | "user" | "assistant" | "tool" | "function"
   content: string
   tool_calls?: ToolCall[]
   tool_call_id?: string
@@ -56,9 +88,30 @@ export interface AgentMessage {
 
 export interface AgentResponse {
   response: string
-  tool_calls: ToolCall[]
+  toolCalls: ToolCall[]
+  tool_calls?: ToolCall[]
   reasoning?: string
-  finish_reason: "stop" | "tool_calls" | "length" | "error"
+  finish_reason?: "stop" | "tool_calls" | "length" | "error"
+  conversationId?: string
+  executionTime?: number
+}
+
+// Context passed to agents during a conversation
+export interface ConversationContext {
+  github?: {
+    owner: string
+    repo: string
+    token?: string
+    webhookSecret?: string
+  }
+  database?: {
+    connection: string
+  }
+  user?: {
+    id: string
+    role: string
+  }
+  metadata?: Record<string, any>
 }
 
 // ============================

@@ -288,13 +288,14 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
   }
 
   const getGroupColor = (name: string) => {
+    // Cohesive palette aligned with brand system (teal/saffron/sage)
     const colors = [
-      "from-blue-500 to-blue-600",
-      "from-emerald-500 to-emerald-600",
-      "from-violet-500 to-violet-600",
-      "from-amber-500 to-amber-600",
-      "from-rose-500 to-rose-600",
-      "from-cyan-500 to-cyan-600",
+      "from-[oklch(0.55_0.13_195)] to-[oklch(0.62_0.15_165)]", // synaptic teal
+      "from-[oklch(0.78_0.16_70)] to-[oklch(0.68_0.18_35)]",   // saffron warm
+      "from-[oklch(0.62_0.15_165)] to-[oklch(0.55_0.13_195)]", // sage to teal
+      "from-[oklch(0.5_0.12_240)] to-[oklch(0.55_0.13_195)]",  // indigo to teal
+      "from-[oklch(0.68_0.18_35)] to-[oklch(0.78_0.16_70)]",   // warm orange
+      "from-[oklch(0.55_0.13_195)] to-[oklch(0.5_0.12_240)]",  // teal indigo
     ]
     return colors[name.charCodeAt(0) % colors.length]
   }
@@ -374,15 +375,15 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-background pb-16 md:pb-0">
-      {/* Header */}
-      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border/50 py-4 shrink-0">
+      {/* Header with refined styling */}
+      <header className="sticky top-0 z-10 glass border-b border-border/40 py-4 shrink-0">
         <div className="max-w-full px-4 space-y-4">
           <div className="flex items-center justify-between">
             <div className="min-w-0 flex-1">
-              <h1 className="text-2xl font-bold truncate">
+              <h1 className="text-2xl font-heading font-bold truncate">
                 {t.welcome}، {profile?.display_name?.split(" ")[0] || ""}
               </h1>
-              <p className="text-sm text-muted-foreground">{t.cells}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">{t.cells}</p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <Dialog
@@ -394,7 +395,7 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
                 }}
               >
                 <DialogTrigger asChild>
-                  <Button variant="outline" size="icon" className="rounded-full h-10 w-10 bg-transparent">
+                  <Button variant="outline" size="icon" className="rounded-full h-10 w-10">
                     <Link2 className="w-5 h-5" />
                   </Button>
                 </DialogTrigger>
@@ -437,20 +438,20 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
                   </div>
                 </DialogContent>
               </Dialog>
-              <Button onClick={() => setIsCreateDialogOpen(true)} size="icon" className="rounded-full h-10 w-10">
+              <Button onClick={() => setIsCreateDialogOpen(true)} size="icon" className="rounded-full h-10 w-10 shadow-synaptic-glow">
                 <PlusIcon className="w-5 h-5" />
               </Button>
             </div>
           </div>
 
-          {/* Search */}
+          {/* Search with refined input */}
           <div className="relative w-full">
             <Search className="absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t.search}
-              className="pe-10 bg-muted/50 border-0 rounded-xl h-11 w-full"
+              className="pe-10 bg-muted/40 border-border/50 rounded-xl h-11 w-full"
             />
           </div>
         </div>
@@ -458,29 +459,29 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
 
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
         <div className="max-w-full px-4 py-6 space-y-6">
-          {/* Quick Actions Grid - Responsive 2 column layout */}
+          {/* Quick Actions Grid */}
           <div className="grid grid-cols-2 gap-3 w-full">
             <Card
-              className="cursor-pointer hover:bg-muted/50 transition-colors overflow-hidden"
+              className="cursor-pointer hover:border-primary/40 hover:shadow-synaptic transition-all overflow-hidden border-border/50"
               onClick={() => setIsCreateDialogOpen(true)}
             >
               <CardContent className="p-4 flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                   <PlusIcon className="w-5 h-5 text-primary" />
                 </div>
-                <span className="font-medium text-balance">{t.newCell}</span>
+                <span className="font-medium text-balance text-sm">{t.newCell}</span>
               </CardContent>
             </Card>
 
             <Card
-              className="cursor-pointer hover:bg-muted/50 transition-colors overflow-hidden"
+              className="cursor-pointer hover:border-accent/40 hover:shadow-synaptic transition-all overflow-hidden border-border/50"
               onClick={() => setShowSupportDialog(true)}
             >
               <CardContent className="p-4 flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center shrink-0">
-                  <MessageCircle className="w-5 h-5 text-cyan-500" />
+                <div className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center shrink-0">
+                  <MessageCircle className="w-5 h-5 text-accent-foreground" />
                 </div>
-                <span className="font-medium text-balance">{t.supportAgent}</span>
+                <span className="font-medium text-balance text-sm">{t.supportAgent}</span>
               </CardContent>
             </Card>
           </div>
@@ -507,20 +508,29 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
                 )}
               </div>
             ) : (
-              <div className="space-y-2 w-full">
-                <h3 className="text-sm font-medium text-muted-foreground px-1">{t.cells}</h3>
-                <div className="space-y-2 w-full">
-                  {filteredGroups.map((group) => (
-                    <Link key={group.id} href={`/chat/${group.id}`} className="block w-full">
-                      <Card className="hover:bg-muted/50 transition-colors overflow-hidden">
-                        <CardContent className="p-4 flex items-center gap-4 min-w-0">
-                          <Avatar className="h-12 w-12 rounded-xl shrink-0">
+              <div className="space-y-3 w-full">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1">
+                  {t.cells}
+                </h3>
+                <div className="space-y-1.5 w-full">
+                  {filteredGroups.map((group) => {
+                    const hasUnread = unreadCounts[group.id] > 0
+                    return (
+                      <Link key={group.id} href={`/chat/${group.id}`} className="block w-full">
+                        <div
+                          className={cn(
+                            "group flex items-center gap-3 p-3 rounded-2xl transition-all min-w-0",
+                            "hover:bg-muted/60 active:scale-[0.99]",
+                            hasUnread && "bg-primary/[0.04]",
+                          )}
+                        >
+                          <Avatar className="h-12 w-12 rounded-2xl shrink-0 ring-2 ring-background shadow-sm">
                             {group.avatar_url ? (
                               <AvatarImage src={group.avatar_url || "/placeholder.svg"} />
                             ) : (
                               <AvatarFallback
                                 className={cn(
-                                  "rounded-xl bg-gradient-to-br text-white font-bold",
+                                  "rounded-2xl bg-gradient-to-br text-white font-bold text-base",
                                   getGroupColor(group.name),
                                 )}
                               >
@@ -529,22 +539,34 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
                             )}
                           </Avatar>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2">
-                              <h3 className="font-semibold truncate">{group.name}</h3>
-                              {unreadCounts[group.id] > 0 && (
-                                <span className="h-5 min-w-5 px-1.5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold shrink-0">
-                                  {unreadCounts[group.id]}
+                            <div className="flex items-center justify-between gap-2 mb-0.5">
+                              <h3
+                                className={cn(
+                                  "truncate text-[15px]",
+                                  hasUnread ? "font-bold text-foreground" : "font-semibold text-foreground/90",
+                                )}
+                              >
+                                {group.name}
+                              </h3>
+                              {hasUnread && (
+                                <span className="h-5 min-w-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[11px] flex items-center justify-center font-bold shrink-0 tabular-nums">
+                                  {unreadCounts[group.id] > 99 ? "99+" : unreadCounts[group.id]}
                                 </span>
                               )}
                             </div>
-                            <p className="text-sm text-muted-foreground truncate">
+                            <p
+                              className={cn(
+                                "text-sm truncate",
+                                hasUnread ? "text-foreground/70" : "text-muted-foreground",
+                              )}
+                            >
                               {group.description || `${memberCounts[group.id] || 1} ${t.members}`}
                             </p>
                           </div>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  ))}
+                        </div>
+                      </Link>
+                    )
+                  })}
                 </div>
               </div>
             )}

@@ -1,10 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { listIssues, getIssue, createIssueComment, updateIssue } from "@/lib/ai-agents/github-agent"
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = createServiceClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = createServiceClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()

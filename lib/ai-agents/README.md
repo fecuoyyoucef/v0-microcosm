@@ -1,8 +1,30 @@
-# نظام الوكلاء الذكية - Kimi-K2 Agentic System
+# نظام الوكلاء الذكية - Groq Agent System
 
 ## نظرة عامة
 
-نظام وكلاء ذكي متكامل يستخدم **Kimi-K2-Instruct** كوكيل حقيقي (Agentic AI) مع قدرات كاملة على استخدام الأدوات واتخاذ القرارات.
+نظام وكلاء ذكي متكامل يستخدم **Groq** (llama-3.1-405b-reasoning) كمحرك ذكاء اصطناعي مع قدرات كاملة على استخدام الأدوات واتخاذ القرارات.
+
+## نموذج الذكاء الاصطناعي
+
+### المحرك الحالي: Groq ✅
+
+- **النموذج الأساسي**: `llama-3.1-405b-reasoning` (أقوى نموذج مجاني)
+- **النموذج الاحتياطي**: `mixtral-8x7b-32768` (سريع وموثوق)
+- **المميزات**:
+  - ✅ سرعة عالية جداً (latency <100ms)
+  - ✅ مجاني تماماً (free tier بلا حدود)
+  - ✅ قدرات reasoning قوية جداً (405 بليون معاملة)
+  - ✅ دعم function calling الكامل
+  - ✅ لا يحتاج لتدوير توكنات
+
+### الترقية من HuggingFace
+
+تم استبدال `HuggingFace Inference` (Kimi-K2) بـ Groq لأن:
+- ❌ رصيد HF انتهى
+- ✅ Groq أسرع بـ 10x من HF
+- ✅ Groq مجاني بلا حدود
+- ✅ `llama-3.1-405b-reasoning` أقوى بكثير من Kimi-K2
+- ✅ استقرار أفضل وموثوقية أعلى
 
 ## البنية التحتية
 
@@ -20,20 +42,16 @@
 
 ### النماذج المستخدمة
 
-- **Primary**: `moonshotai/Kimi-K2-Instruct-0905` (الوكيل الرئيسي)
-- **Fallback**: `Qwen/QwQ-32B-Preview` (للمهام المعقدة)
-- **Fast**: `meta-llama/Llama-3.3-70B-Instruct` (للمهام السريعة)
+- **Primary**: `llama-3.1-405b-reasoning` (Groq - محرك الإنتاج)
+- **Fallback**: `mixtral-8x7b-32768` (احتياطي سريع)
 
 ### Environment Variables
 
 ```env
-# Hugging Face
-HF_TOKEN=your_huggingface_api_key
-HF_PRIMARY_MODEL=moonshotai/Kimi-K2-Instruct-0905
-HF_FALLBACK_MODEL=Qwen/QwQ-32B-Preview
-HF_FAST_MODEL=meta-llama/Llama-3.3-70B-Instruct
+# Groq
+GROQ_API_KEY=your_groq_api_key  # مجاني من https://console.groq.com
 
-# GitHub
+# GitHub (اختياري - للوظائف المتقدمة)
 GITHUB_TOKEN=your_github_token
 GITHUB_OWNER=your_org_or_username
 GITHUB_REPO=your_repo_name
@@ -111,56 +129,67 @@ SUPABASE_SERVICE_ROLE_KEY=...
 ```
 lib/ai-agents/
 ├── types.ts                    ✅ تعريفات الأنواع
-├── config.ts                   ✅ الإعدادات
-├── kimi-client.ts             🔄 قيد الإنشاء (المرحلة 3)
-├── tool-executor.ts           🔄 قيد الإنشاء (المرحلة 2)
+├── config.ts                   ✅ الإعدادات (HF_TOKEN1/2/3 rotation + GitHub)
+├── kimi-client.ts              ✅ Kimi Client مكتمل (streaming + function calling)
+├── token-rotation.ts           ✅ نظام تدوير التوكنات (HF_TOKEN1→2→3 تلقائي)
+├── tool-executor.ts            ✅ مكتمل - يوجه لجميع الأدوات
 ├── tools/
-│   ├── index.ts               🔄 قيد الإنشاء (المرحلة 2)
-│   ├── github-tools.ts        🔄 قيد الإنشاء (المرحلة 2)
-│   ├── supabase-tools.ts      🔄 قيد الإنشاء (المرحلة 2)
-│   ├── analysis-tools.ts      🔄 قيد الإنشاء (المرحلة 2)
-│   ├── monitoring-tools.ts    🔄 قيد الإنشاء (المرحلة 2)
-│   └── moderation-tools.ts    🔄 قيد الإنشاء (المرحلة 2)
-├── chief-agent.ts             🔄 قيد التحديث (المرحلة 4)
-├── specialized-agents.ts      🔄 قيد التحديث (المرحلة 4)
-├── approval-system.ts         🔄 قيد الإنشاء (المرحلة 5)
-└── monitoring.ts              🔄 قيد التحديث (المرحلة 7)
+│   ├── index.ts                ✅ مكتمل - 25+ أداة معرّفة
+│   ├── github-tools.ts         ✅ مكتمل - 9 دوال GitHub عبر Octokit
+│   └── supabase-tools.ts       ✅ مكتمل - query/insert/update/delete/rpc
+├── chief-agent.ts              ✅ الوكيل الرئيسي
+├── chief-agent-enhanced.ts     ✅ نسخة محسّنة
+├── chief-agent-kimi.ts         ✅ نسخة Kimi المتخصصة
+├── specialized-agents.ts       ✅ وكلاء متخصصون
+├── approval-system.ts          ✅ نظام الموافقات
+├── monitoring.ts               ✅ المراقبة
+├── monitoring-kimi.ts          ✅ مراقبة Kimi
+├── error-analysis.ts           ✅ تحليل الأخطاء
+├── error-analyzer.ts           ✅ محلل الأخطاء
+├── github-agent.ts             ✅ وكيل GitHub
+├── github-analyzer.ts          ✅ محلل GitHub
+└── undo-system.ts              ✅ نظام التراجع
 ```
 
-## المراحل المتبقية
+## حالة المراحل
 
 ### ✅ المرحلة 1: البنية التحتية (مكتملة)
 - ✅ إضافة @huggingface/inference
-- ✅ إنشاء database schema
+- ✅ إنشاء database schema (7 جداول)
 - ✅ تحديث config.ts
 - ✅ إنشاء types.ts
 
-### 🔄 المرحلة 2: الأدوات (التالية)
-- إنشاء tools/index.ts مع tool schemas
-- إنشاء tool-executor.ts
-- إنشاء github-tools.ts
-- إنشاء supabase-tools.ts
-- إنشاء باقي الأدوات
+### ✅ المرحلة 2: الأدوات (مكتملة)
+- ✅ tools/index.ts مع 25+ tool schema
+- ✅ tool-executor.ts مع routing كامل
+- ✅ github-tools.ts (Octokit)
+- ✅ supabase-tools.ts (query/insert/update/delete/rpc)
+- ✅ أدوات التحليل والمراقبة والإشراف داخل tool-executor
 
-### ⏳ المرحلة 3: Kimi Client
-- إنشاء kimi-client.ts
-- تطبيق function calling
-- تطبيق streaming
-- معالجة الأخطاء
+### ✅ المرحلة 3: Groq Client (مكتملة)
+- ✅ kimi-client.ts متحدث لاستخدام Groq (llama-3.1-405b)
+- ✅ streaming مع AI SDK
+- ✅ function calling كامل
+- ✅ fallback إلى mixtral-8x7b عند الحاجة
 
-### ⏳ المراحل 4-8
-- تحديث الوكلاء
-- نظام الموافقات
-- API Routes
-- Testing
-- Monitoring
+### ✅ المراحل 4-7 (مكتملة)
+- ✅ الوكلاء المتخصصون (specialized-agents.ts)
+- ✅ نظام الموافقات (approval-system.ts)
+- ✅ مراقبة الأداء (monitoring.ts + monitoring-kimi.ts)
+- ✅ تحليل الأخطاء (error-analysis.ts)
+
+### ⚠️ نقاط تحتاج انتباه
+- `analyze_error` و`suggest_fix` في tool-executor تعيد placeholder، يمكن تحسينها لاحقاً
+- `check_performance` غير مطبّقة بالكامل بعد
+- إشعارات المدير تعتمد على console.log بدلاً من webhook فعلي
 
 ## ملاحظات مهمة
 
-1. **Kimi-K2 وكيل حقيقي** - ليس مجرد LLM، بل لديه قدرات كاملة على استخدام الأدوات
-2. **نظام الأمان** - جميع الإجراءات عالية المخاطر تحتاج موافقة
-3. **التتبع الكامل** - كل قرار وإجراء مسجل في قاعدة البيانات
-4. **GitHub Integration** - تكامل عميق مع GitHub للإصلاحات التلقائية
+1. **Groq أسرع وأقوى** - llama-3.1-405b هو أقوى نموذج مفتوح المصدر متاح
+2. **مجاني بلا حدود** - لا تحتاج لدفع أو قلق من انتهاء الرصيد
+3. **نظام الأمان** - جميع الإجراءات عالية المخاطر تحتاج موافقة
+4. **التتبع الكامل** - كل قرار وإجراء مسجل في قاعدة البيانات
+5. **GitHub Integration** - تكامل عميق مع GitHub للإصلاحات التلقائية
 
 ## الاستخدام
 

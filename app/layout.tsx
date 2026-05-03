@@ -1,6 +1,6 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
-import { IBM_Plex_Sans_Arabic, Geist_Mono, Inter, Poppins } from "next/font/google"
+import { IBM_Plex_Sans_Arabic, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/theme-provider"
 import { SettingsProvider } from "@/components/settings-provider"
@@ -9,22 +9,10 @@ import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import { TutorialProvider } from "@/lib/contexts/tutorial-context"
 import "./globals.css"
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-})
-
-const poppins = Poppins({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-poppins",
-  display: "swap",
-})
-
+// Primary Arabic font for body text
 const ibmPlexArabic = IBM_Plex_Sans_Arabic({
   subsets: ["arabic", "latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["300", "400", "500", "600", "700"],
   variable: "--font-arabic",
   display: "swap",
 })
@@ -73,8 +61,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f8f9fc" },
-    { media: "(prefers-color-scheme: dark)", color: "#1a1a2e" },
+    { media: "(prefers-color-scheme: light)", color: "#f7f6f1" },
+    { media: "(prefers-color-scheme: dark)", color: "#0e1620" },
   ],
   width: "device-width",
   initialScale: 1,
@@ -93,7 +81,7 @@ export default function RootLayout({
       lang="ar"
       dir="rtl"
       suppressHydrationWarning
-      className={`${inter.variable} ${poppins.variable} ${ibmPlexArabic.variable} ${geistMono.variable}`}
+      className={`${ibmPlexArabic.variable} ${geistMono.variable} bg-background`}
     >
       <head>
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />

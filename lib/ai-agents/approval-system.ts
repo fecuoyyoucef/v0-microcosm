@@ -1,13 +1,13 @@
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 import { CHIEF_AGENT_CONFIG } from "./config"
-import type { ApprovalRequest, ToolExecutionResult } from "./types"
+import type { ApprovalRequest, ToolResult as ToolExecutionResult } from "./types"
 
 /**
  * Approval System for High-Risk Agent Actions
  * Ensures critical actions require manual approval
  */
 export class ApprovalSystem {
-	private supabase = createClient()
+	private supabase = createServiceClient()
 	private highRiskActions = CHIEF_AGENT_CONFIG.approval.highRiskActions
 
 	/**
@@ -266,7 +266,10 @@ export class ApprovalSystem {
 		// Execute the action
 		try {
 			const { executeToolCall } = await import("./tool-executor")
-			const result = await executeToolCall(request.action, request.details)
+			const result = await executeToolCall(
+				request.action as string,
+				request.details as Record<string, any>
+			)
 
 			// Log execution
 			await this.supabase.from("tool_executions").insert({

@@ -1,15 +1,26 @@
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 import { KimiAgentClient } from "./kimi-client"
 import { ApprovalSystem } from "./approval-system"
 import { CHIEF_AGENT_CONFIG } from "./config"
-import type { AgentDecision, AgentContext, ConversationContext } from "./types"
+import type { AgentContext, ConversationContext } from "./types"
+
+// Local AgentDecision type compatible with this agent's usage
+interface AgentDecision {
+	action: string
+	target_id: string
+	reasoning: string
+	confidence: number
+	severity: "low" | "medium" | "high" | "critical"
+	auto_execute: boolean
+	tool_calls_used?: string[]
+}
 
 /**
  * Chief Agent - Kimi-K2 Powered
  * Main decision-making agent with full tool access
  */
 export class ChiefAgent {
-	private supabase = createClient()
+	private supabase = createServiceClient()
 	private agent: KimiAgentClient
 	private approvalSystem: ApprovalSystem
 
@@ -23,7 +34,24 @@ export class ChiefAgent {
 	 * Build comprehensive system prompt
 	 */
 	private buildSystemPrompt(): string {
-		return `أنت الوكيل الرئيسي (Chief Agent) لتطبيق Microcosm - شبكة اجتماعية عربية مبتكرة.
+		return `أنت الوكيل الرئيسي (Chief Agent) لتطبيق Synaptic Space - شبكة اجتماعية عربية مبتكرة.
+
+# قواعد صارمة يجب اتباعها دائماً
+
+1. **لا تختلق بيانات أبداً**: إذا طُلب منك جلب بيانات (عدد المستخدمين، قائمة الخلايا، إلخ) فاستخدم أداة database_query. إذا فشلت الأداة، أخبر المستخدم بالخطأ الحقيقي ولا تخترع أرقاماً.
+2. **لا تكرر نفسك**: لا تقل "أنا الوكيل الرئيسي..." في كل رد. رد مباشرة على السؤال.
+3. **الردود الموجزة**: إذا كان السؤال بسيطاً، الرد يجب أن يكون بسيطاً.
+4. **تحقق قبل الإجابة**: لا تفترض الإجابة، استخدم الأدوات للتحقق أولاً.
+5. **إذا فشلت أداة**: أخبر المستخدم بالخطأ الحقيقي، لا تحاول الإجابة من تخمينك.
+
+# مثال صحيح
+- المستخدم: "كم عدد المستخدمين؟"
+- أنت تستخدم: database_query على جدول profiles مع count
+- الرد: "عدد المستخدمين: [النتيجة الحقيقية]"
+
+# مثال خاطئ (لا تفعل هذا)
+- المستخدم: "كم عدد المستخدمين؟"
+- الرد: "إجمالي المستخدمين: 12,543 - المستخدمين النشطين: 8,234..." (بدون استخدام الأداة - هذا اختلاق للبيانات)
 
 # دورك ومسؤولياتك
 

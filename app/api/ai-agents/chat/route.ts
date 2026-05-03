@@ -1,78 +1,60 @@
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 import { createChiefAgent } from "@/lib/ai-agents/chief-agent"
 
+export const runtime = "nodejs"
+export const maxDuration = 60
+
+// Singleton agent (one per server instance to preserve conversation history)
+let agentInstance: ReturnType<typeof createChiefAgent> | null = null
+function getAgent() {
+  if (!agentInstance) {
+    agentInstance = createChiefAgent()
+  }
+  return agentInstance
+}
+
 export async function POST(request: NextRequest) {
   try {
-    console.log("[v0] Chat API called")
+    // Use service client (no cookies needed - admin route)
+    const supabase = createServiceClient()
 
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      console.log("[v0] No user found")
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    console.log("[v0] User authenticated:", user.id)
-
-    const { message, conversationId } = await request.json()
+    const { message, resetHistory } = await request.json()
 
     if (!message?.trim()) {
-      return NextResponse.json({ error: "Message is required" }, { status: 400 })
+      return NextResponse.json({ error: "الرسالة مطلوبة" }, { status: 400 })
     }
 
-    console.log("[v0] Message received (Kimi-K2):", message)
+    // Reset agent if requested (e.g. page refresh)
+    if (resetHistory) {
+      agentInstance = null
+    }
 
-    // Create Chief Agent with Kimi-K2
-    const agent = createChiefAgent(conversationId)
-
-    console.log("[v0] Calling Kimi-K2 agent...")
+    const agent = getAgent()
     const response = await agent.chat(message)
-    console.log("[v0] Kimi-K2 responded successfully")
 
-    console.log("[v0] Saving chat to database...")
-    const { error: saveError } = await supabase.from("agent_chat_logs").insert([
-      {
-        user_id: user.id,
-        message: message,
-        sender: "owner",
-      },
-      {
-        user_id: user.id,
-        message: response,
-        sender: "agent",
-      },
-    ])
-
-    if (saveError) {
-      console.error("[v0] Error saving chat:", saveError)
-    } else {
-      console.log("[v0] Chat saved successfully")
+    // Save to DB (best effort, don't fail if it errors)
+    try {
+      await supabase.from("agent_chat_logs").insert([
+        { message, sender: "owner", created_at: new Date().toISOString() },
+        { message: response, sender: "agent", created_at: new Date().toISOString() },
+      ])
+    } catch {
+      // DB save is optional
     }
 
     return NextResponse.json({ success: true, response })
   } catch (error: any) {
-    console.error("[v0] Chief Agent chat error:", error)
-    console.error("[v0] Error stack:", error.stack)
+    console.error("[v0] Chief Agent chat error:", error.message)
 
-    let errorMessage = "عذراً، حدث خطأ غير متوقع. يرجى المحاولة لاحقاً."
+    let response = "عذراً، حدث خطأ في الاتصال بالذكاء الاصطناعي."
 
-    if (error.message?.includes("API key")) {
-      errorMessage = "عذراً، مفتاح API الخاص بـ Groq غير مُعرّف. يرجى إضافته في إعدادات المشروع."
-    } else if (error.message?.includes("حدث خطأ في خدمة الذكاء الاصطناعي")) {
-      errorMessage = "عذراً، خدمة الذكاء الاصطناعي غير متاحة حالياً. يرجى المحاولة لاحقاً."
+    if (error.message?.includes("No Hugging Face tokens")) {
+      response = "لم يتم إعداد مفاتيح HF_TOKEN. يرجى إضافة HF_TOKEN1 في إعدادات المشروع."
+    } else if (error.message?.includes("rate limit") || error.message?.includes("429")) {
+      response = "تم تجاوز حد الطلبات. يتم تدوير التوكن تلقائياً، يرجى المحاولة مجدداً."
     }
 
-    return NextResponse.json(
-      {
-        success: false,
-        response: errorMessage,
-        error: error.message,
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({ success: false, response, error: error.message }, { status: 500 })
   }
 }

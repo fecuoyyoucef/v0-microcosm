@@ -1,6 +1,29 @@
 import { createClient } from "@/lib/supabase/server"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
+import { createHash } from "crypto"
+
+// دالة مقارنة كلمة المرور بشكل آمن (مقاوم لـ timing attacks)
+function verifyPassword(input: string, stored: string, salt?: string): boolean {
+  // دعم كلمات المرور القديمة (نص عادي - للانتقال فقط)
+  if (!salt) {
+    // مقارنة بطيئة لمنع timing attacks
+    const inputBuf = Buffer.from(input)
+    const storedBuf = Buffer.from(stored)
+    if (inputBuf.length !== storedBuf.length) return false
+    let diff = 0
+    for (let i = 0; i < inputBuf.length; i++) diff |= inputBuf[i] ^ storedBuf[i]
+    return diff === 0
+  }
+  // مقارنة مشفرة
+  const inputHash = createHash("sha256").update(salt + input).digest("hex")
+  const inputBuf = Buffer.from(inputHash)
+  const storedBuf = Buffer.from(stored)
+  if (inputBuf.length !== storedBuf.length) return false
+  let diff = 0
+  for (let i = 0; i < inputBuf.length; i++) diff |= inputBuf[i] ^ storedBuf[i]
+  return diff === 0
+}
 
 export async function POST(request: Request) {
   try {
@@ -9,6 +32,9 @@ export async function POST(request: Request) {
     if (!email || !password) {
       return NextResponse.json({ error: "البريد الإلكتروني وكلمة المرور مطلوبان" }, { status: 400 })
     }
+
+    // منع brute force - تأخير ثابت
+    await new Promise((r) => setTimeout(r, 500))
 
     const supabase = await createClient()
 
@@ -24,7 +50,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "بيانات الدخول غير صحيحة" }, { status: 401 })
     }
 
-    const isValidPassword = password === admin.password_hash
+    const isValidPassword = verifyPassword(password, admin.password_hash, admin.salt ?? undefined)
 
     if (!isValidPassword) {
       return NextResponse.json({ error: "بيانات الدخول غير صحيحة" }, { status: 401 })

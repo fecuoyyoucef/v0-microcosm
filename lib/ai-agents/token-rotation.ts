@@ -4,7 +4,7 @@
  * when rate limits are hit
  */
 
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 
 interface TokenStatus {
 	token: string
@@ -19,7 +19,7 @@ class TokenRotationManager {
 	private tokens: string[] = []
 	private currentTokenIndex = 0
 	private tokenStatus: Map<number, TokenStatus> = new Map()
-	private supabase = createClient()
+	private supabase = createServiceClient()
 
 	constructor() {
 		this.initializeTokens()

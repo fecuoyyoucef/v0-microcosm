@@ -8,13 +8,35 @@ import { getGitHubTools } from "./tools/github-tools"
 import { getSupabaseTools } from "./tools/supabase-tools"
 import { CHIEF_AGENT_CONFIG } from "./config"
 import type { ToolResult, ToolCall } from "./types"
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 
 /**
  * Execute a single tool call
+ * Accepts either a ToolCall object OR (name, args) directly for internal use
  */
-export async function executeToolCall(toolCall: ToolCall): Promise<ToolResult> {
-  const { name, args } = toolCall
+export async function executeToolCall(
+  toolCallOrName: ToolCall | string,
+  argsOverride?: Record<string, any>
+): Promise<ToolResult> {
+  let name: string
+  let args: Record<string, any>
+
+  if (typeof toolCallOrName === "string") {
+    // Called as executeToolCall(name, args)
+    name = toolCallOrName
+    args = argsOverride || {}
+  } else {
+    // Called as executeToolCall(toolCall)
+    // Support both {name, arguments} and {function: {name, arguments}} formats
+    if (toolCallOrName.name) {
+      name = toolCallOrName.name
+      args = toolCallOrName.arguments || toolCallOrName.args || {}
+    } else {
+      name = toolCallOrName.function?.name || ""
+      const rawArgs = toolCallOrName.function?.arguments
+      args = typeof rawArgs === "string" ? JSON.parse(rawArgs || "{}") : (rawArgs || {})
+    }
+  }
 
   console.log("[v0] Executing tool:", name, "with args:", args)
 
@@ -32,7 +54,7 @@ export async function executeToolCall(toolCall: ToolCall): Promise<ToolResult> {
     const result = await routeToolCall(name, args)
 
     // Log execution to database
-    await logToolExecution(toolCall, result)
+    await logToolExecution({ name, args, id: crypto.randomUUID() }, result)
 
     console.log("[v0] Tool execution result:", result)
 
@@ -59,7 +81,8 @@ export async function executeToolCalls(
     results.push(result)
 
     // Stop if a critical tool fails
-    if (!result.success && isCriticalTool(toolCall.name)) {
+    const toolName = toolCall.name || toolCall.function?.name || ""
+    if (!result.success && isCriticalTool(toolName)) {
       break
     }
   }
@@ -79,9 +102,23 @@ async function routeToolCall(
     return await executeGitHubTool(name, args)
   }
 
-  // Database Tools
+  // Database Tools - support both "database_query" and "query_database" naming
   if (name.startsWith("database_")) {
     return await executeDatabaseTool(name, args)
+  }
+
+  // Alias: query_database → database_query (Kimi may use either form)
+  if (name === "query_database") {
+    return await executeDatabaseTool("database_query", { table: args.table, select: args.select || "*", filters: args.filters, limit: args.limit || 100, order_by: args.order_by })
+  }
+  if (name === "update_record") {
+    return await executeDatabaseTool("database_update", args)
+  }
+  if (name === "delete_record") {
+    return await executeDatabaseTool("database_delete", args)
+  }
+  if (name === "execute_rpc") {
+    return await executeDatabaseTool("database_rpc", args)
   }
 
   // Analysis Tools
@@ -264,7 +301,7 @@ async function executeMonitoringTool(
   name: string,
   args: Record<string, any>
 ): Promise<ToolResult> {
-  const supabase = await createClient()
+  const supabase = createServiceClient()
 
   switch (name) {
     case "get_system_health": {
@@ -336,7 +373,7 @@ async function executeModerationTool(
   name: string,
   args: Record<string, any>
 ): Promise<ToolResult> {
-  const supabase = await createClient()
+  const supabase = createServiceClient()
 
   switch (name) {
     case "moderate_message": {
@@ -505,11 +542,11 @@ function isCriticalTool(toolName: string): boolean {
  * Log tool execution to database
  */
 async function logToolExecution(
-  toolCall: ToolCall,
+  toolCall: { name: string; args: Record<string, any>; id: string },
   result: ToolResult
 ): Promise<void> {
   try {
-    const supabase = await createClient()
+    const supabase = createServiceClient()
 
     await supabase.from("tool_executions").insert({
       tool_name: toolCall.name,
@@ -517,7 +554,7 @@ async function logToolExecution(
       result: result.data,
       success: result.success,
       error_message: result.error,
-      execution_time_ms: 0, // TODO: Track actual execution time
+      execution_time_ms: 0,
     })
   } catch (error) {
     console.error("[v0] Failed to log tool execution:", error)

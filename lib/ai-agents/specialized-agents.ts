@@ -1,9 +1,9 @@
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 import { ChiefAgent } from "./chief-agent"
 import { generateText } from "ai"
 
 export class ContentGuardian {
-  private supabase = createClient()
+  private supabase = createServiceClient()
   private chief = new ChiefAgent()
 
   async monitorMessage(messageId: string): Promise<void> {
@@ -61,7 +61,7 @@ Respond in JSON:
 }
 
 export class UserManager {
-  private supabase = createClient()
+  private supabase = createServiceClient()
   private chief = new ChiefAgent()
 
   async monitorUserBehavior(userId: string): Promise<void> {
@@ -125,7 +125,7 @@ Respond in JSON:
 }
 
 export class SystemMonitor {
-  private supabase = createClient()
+  private supabase = createServiceClient()
 
   async checkSystemHealth(): Promise<any> {
     const checks = await Promise.all([this.checkDatabaseHealth(), this.checkErrorRate(), this.checkPerformance()])
@@ -215,7 +215,7 @@ export class SystemMonitor {
 }
 
 export class AnalyticsBot {
-  private supabase = createClient()
+  private supabase = createServiceClient()
 
   async generateDailyReport(): Promise<any> {
     const stats = await this.collectDailyStats()
@@ -287,7 +287,7 @@ export class AnalyticsBot {
 }
 
 export class CommunityManager {
-  private supabase = createClient()
+  private supabase = createServiceClient()
 
   async welcomeNewUser(userId: string): Promise<void> {
     const { data: user } = await this.supabase.from("profiles").select("*").eq("id", userId).single()

@@ -160,13 +160,14 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
   }
 
   const getGroupColor = () => {
+    // Aligned with brand palette in home page for consistency
     const colors = [
-      "from-blue-500 to-blue-600",
-      "from-emerald-500 to-emerald-600",
-      "from-violet-500 to-violet-600",
-      "from-amber-500 to-amber-600",
-      "from-rose-500 to-rose-600",
-      "from-cyan-500 to-cyan-600",
+      "from-[oklch(0.55_0.13_195)] to-[oklch(0.62_0.15_165)]",
+      "from-[oklch(0.78_0.16_70)] to-[oklch(0.68_0.18_35)]",
+      "from-[oklch(0.62_0.15_165)] to-[oklch(0.55_0.13_195)]",
+      "from-[oklch(0.5_0.12_240)] to-[oklch(0.55_0.13_195)]",
+      "from-[oklch(0.68_0.18_35)] to-[oklch(0.78_0.16_70)]",
+      "from-[oklch(0.55_0.13_195)] to-[oklch(0.5_0.12_240)]",
     ]
     const index = group.name.charCodeAt(0) % colors.length
     return colors[index]
@@ -204,7 +205,7 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
   }
 
   return (
-    <div className="shrink-0 border-b border-border/30 bg-black/30 backdrop-blur-xl">
+    <div className="shrink-0 border-b border-border/40 glass">
       <div className="h-14 md:h-16 px-3 md:px-4 flex items-center justify-between">
         <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
           {/* Group Avatar */}
@@ -259,22 +260,22 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
               )}
             </div>
             <p className="text-[10px] md:text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
-              <span>{members.length} أعضاء</span>
-              <span className="text-muted-foreground/50">•</span>
               <span className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse shadow-[0_0_6px_var(--success)]" />
                 {onlineCount} متصل
               </span>
+              <span className="text-muted-foreground/40">•</span>
+              <span>{members.length} أعضاء</span>
               {group.responsibility_score !== undefined && group.responsibility_score < 75 && (
                 <>
-                  <span className="text-muted-foreground/50">•</span>
+                  <span className="text-muted-foreground/40">•</span>
                   <span
                     className={cn(
-                      "flex items-center gap-1",
-                      group.responsibility_score < 60 ? "text-red-400" : "text-yellow-400",
+                      "flex items-center gap-1 font-medium",
+                      group.responsibility_score < 60 ? "text-destructive" : "text-warning",
                     )}
                   >
-                    ⚠ {group.responsibility_score}%
+                    {group.responsibility_score}%
                   </span>
                 </>
               )}
@@ -364,7 +365,7 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 rounded-xl"
+            className="h-9 w-9 rounded-xl hover:bg-primary/10 hover:text-primary transition-colors"
             onClick={handleAssessQuality}
             disabled={isAssessingQuality}
             title="تقييم جودة النقاش"
@@ -372,7 +373,7 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
             {isAssessingQuality ? (
               <Loader2Icon className="h-4 w-4 animate-spin" />
             ) : (
-              <GaugeIconHero className="h-4 w-4 text-blue-500" />
+              <GaugeIconHero className="h-4 w-4" />
             )}
           </Button>
 
@@ -380,7 +381,7 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9 rounded-xl"
+              className="h-9 w-9 rounded-xl hover:bg-primary/10 hover:text-primary transition-colors"
               onClick={handleInstall}
               title="تثبيت التطبيق"
             >
@@ -391,7 +392,12 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
           {/* Members Sheet */}
           <Sheet open={isMembersOpen} onOpenChange={setIsMembersOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" title="الأعضاء">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-xl hover:bg-primary/10 hover:text-primary transition-colors"
+                title="الأعضاء"
+              >
                 <UsersIcon className="h-4 w-4" />
               </Button>
             </SheetTrigger>
@@ -491,7 +497,12 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
           {/* More Options */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" title="المزيد">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-xl hover:bg-primary/10 hover:text-primary transition-colors"
+                title="المزيد"
+              >
                 <MoreVerticalIcon className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
