@@ -98,9 +98,8 @@ export function NotificationItem({ notification, onRead, onClick, showFullDate =
     <div
       className={cn(
         "flex items-start gap-3 p-3 cursor-pointer transition-all hover:bg-secondary/50 relative",
-        !notification.is_read && "bg-primary/5 border-r-2 border-primary",
-        notification.is_read && "opacity-70",
-        isSystemNotification && !notification.is_read && "bg-primary/10 border-r-4 border-primary",
+        !notification.is_read && "bg-primary/5",
+        isSystemNotification && "bg-primary/10",
       )}
       onClick={handleClick}
     >
@@ -110,8 +109,7 @@ export function NotificationItem({ notification, onRead, onClick, showFullDate =
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <p className={cn("text-sm line-clamp-1", !notification.is_read && "font-semibold")}>{notification.title}</p>
-          {!notification.is_read && <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0 animate-pulse" />}
+          <p className="text-sm line-clamp-1 font-medium">{notification.title}</p>
         </div>
 
         {notification.body && <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{notification.body}</p>}

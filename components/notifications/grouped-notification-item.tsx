@@ -207,9 +207,7 @@ export function GroupedNotificationItem({
                   </span>
                 </div>
               </div>
-              {!notification.is_read && (
-                <span className="h-2 w-2 rounded-full bg-primary shrink-0 mt-1.5 animate-pulse" />
-              )}
+
             </div>
           )
         })}
