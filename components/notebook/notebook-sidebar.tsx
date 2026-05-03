@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -17,9 +17,24 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus, FileText, List, Table, Link2, MoreVertical, Trash2, Lock, Unlock, Loader2 } from "lucide-react"
+import {
+  Plus,
+  FileText,
+  ListTodo,
+  Table2,
+  Link2,
+  MoreVertical,
+  Trash2,
+  Lock,
+  Unlock,
+  Loader2,
+  Search,
+  BookOpen,
+  Sparkles,
+} from "lucide-react"
 import type { NotebookPage, NotebookPageType } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { PAGE_TYPE_META } from "./page-types"
 
 interface NotebookSidebarProps {
   pages: NotebookPage[]
@@ -31,20 +46,11 @@ interface NotebookSidebarProps {
   onPageDeleted: (pageId: string) => void
 }
 
-const PAGE_TYPE_ICONS: Record<NotebookPageType, React.ReactNode> = {
+const PAGE_TYPE_ICONS: Record<Exclude<NotebookPageType, "canvas">, React.ReactNode> = {
   text: <FileText className="w-4 h-4" />,
-  list: <List className="w-4 h-4" />,
-  table: <Table className="w-4 h-4" />,
-  canvas: <FileText className="w-4 h-4" />,
+  list: <ListTodo className="w-4 h-4" />,
+  table: <Table2 className="w-4 h-4" />,
   links: <Link2 className="w-4 h-4" />,
-}
-
-const PAGE_TYPE_LABELS: Record<NotebookPageType, string> = {
-  text: "صفحة نصية",
-  list: "قائمة",
-  table: "جدول",
-  canvas: "لوحة رسم",
-  links: "مجمّع روابط",
 }
 
 export function NotebookSidebar({
@@ -58,10 +64,17 @@ export function NotebookSidebar({
 }: NotebookSidebarProps) {
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [newPageTitle, setNewPageTitle] = useState("")
-  const [newPageType, setNewPageType] = useState<NotebookPageType>("text")
+  const [newPageType, setNewPageType] = useState<Exclude<NotebookPageType, "canvas">>("text")
   const [isCreating, setIsCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
   const supabase = createClient()
+
+  const filteredPages = useMemo(() => {
+    if (!searchQuery.trim()) return pages
+    const q = searchQuery.trim().toLowerCase()
+    return pages.filter((p) => p.title.toLowerCase().includes(q))
+  }, [pages, searchQuery])
 
   const createPage = async () => {
     if (!newPageTitle.trim()) return
@@ -70,8 +83,6 @@ export function NotebookSidebar({
     setCreateError(null)
 
     try {
-      console.log("[v0] Creating notebook page:", { groupId, title: newPageTitle, type: newPageType })
-
       const { data, error } = await supabase
         .from("notebook_pages")
         .insert({
@@ -85,21 +96,19 @@ export function NotebookSidebar({
         .single()
 
       if (error) {
-        console.error("[v0] Error creating page:", error)
         setCreateError(`خطأ في إنشاء الصفحة: ${error.message}`)
         return
       }
 
       if (data) {
-        console.log("[v0] Page created successfully:", data.id)
         setNewPageTitle("")
         setNewPageType("text")
         setIsCreateOpen(false)
         onPageCreated(data.id)
       }
-    } catch (err: any) {
-      console.error("[v0] Unexpected error:", err)
-      setCreateError(`خطأ غير متوقع: ${err.message}`)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "خطأ غير معروف"
+      setCreateError(`خطأ غير متوقع: ${msg}`)
     } finally {
       setIsCreating(false)
     }
@@ -107,7 +116,6 @@ export function NotebookSidebar({
 
   const deletePage = async (pageId: string) => {
     const { error } = await supabase.from("notebook_pages").delete().eq("id", pageId)
-
     if (!error) {
       onPageDeleted(pageId)
     }
@@ -123,7 +131,7 @@ export function NotebookSidebar({
       .eq("id", page.id)
   }
 
-  const getInitialContent = (type: NotebookPageType) => {
+  const getInitialContent = (type: Exclude<NotebookPageType, "canvas">) => {
     switch (type) {
       case "text":
         return { blocks: [] }
@@ -139,132 +147,254 @@ export function NotebookSidebar({
   }
 
   return (
-    <div className="h-full border-l border-border bg-card/50 flex flex-col">
-      <div className="p-3 border-b border-border flex items-center justify-between">
-        <span className="text-sm font-medium">الصفحات</span>
-        <Dialog
-          open={isCreateOpen}
-          onOpenChange={(open) => {
-            setIsCreateOpen(open)
-            if (!open) setCreateError(null)
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-7 w-7">
-              <Plus className="h-4 w-4" />
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>إنشاء صفحة جديدة</DialogTitle>
-              <DialogDescription>اختر نوع الصفحة وأدخل عنوانها</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 mt-4">
-              {createError && (
-                <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{createError}</div>
-              )}
-              <div className="space-y-2">
-                <Label>عنوان الصفحة</Label>
-                <Input
-                  value={newPageTitle}
-                  onChange={(e) => setNewPageTitle(e.target.value)}
-                  placeholder="مثال: أفكار المشروع"
-                  className="bg-background"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>نوع الصفحة</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(Object.keys(PAGE_TYPE_LABELS) as NotebookPageType[])
-                    .filter((t) => t !== "canvas")
-                    .map((type) => (
-                      <Button
-                        key={type}
-                        variant={newPageType === type ? "secondary" : "outline"}
-                        className={cn("justify-start gap-2", newPageType !== type && "bg-transparent")}
-                        onClick={() => setNewPageType(type)}
-                      >
-                        {PAGE_TYPE_ICONS[type]}
-                        {PAGE_TYPE_LABELS[type]}
-                      </Button>
-                    ))}
-                </div>
-              </div>
-              <Button onClick={createPage} disabled={!newPageTitle.trim() || isCreating} className="w-full">
-                {isCreating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin ml-2" />
-                    جاري الإنشاء...
-                  </>
-                ) : (
-                  "إنشاء الصفحة"
-                )}
-              </Button>
+    <div className="h-full bg-sidebar/60 flex flex-col">
+      {/* Header */}
+      <div className="px-4 pt-4 pb-3 border-b border-sidebar-border">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <BookOpen className="w-4 h-4 text-primary" />
             </div>
-          </DialogContent>
-        </Dialog>
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold leading-tight">المفكرة</h2>
+              <p className="text-[11px] text-muted-foreground leading-tight">
+                {pages.length} {pages.length === 1 ? "صفحة" : "صفحات"}
+              </p>
+            </div>
+          </div>
+
+          <Dialog
+            open={isCreateOpen}
+            onOpenChange={(open) => {
+              setIsCreateOpen(open)
+              if (!open) setCreateError(null)
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button
+                size="sm"
+                className="h-8 gap-1.5 shadow-sm"
+                aria-label="إنشاء صفحة جديدة"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span className="text-xs">جديدة</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  إنشاء صفحة جديدة
+                </DialogTitle>
+                <DialogDescription>اختر نوع الصفحة المناسب لمحتواك</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-5 mt-2">
+                {createError && (
+                  <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm border border-destructive/20">
+                    {createError}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="page-title">عنوان الصفحة</Label>
+                  <Input
+                    id="page-title"
+                    value={newPageTitle}
+                    onChange={(e) => setNewPageTitle(e.target.value)}
+                    placeholder="مثال: أفكار المشروع"
+                    className="bg-background"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>نوع الصفحة</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(Object.keys(PAGE_TYPE_META) as Array<keyof typeof PAGE_TYPE_META>).map((type) => {
+                      const meta = PAGE_TYPE_META[type]
+                      const isSelected = newPageType === type
+                      return (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setNewPageType(type)}
+                          className={cn(
+                            "flex flex-col items-start gap-2 p-3 rounded-lg border text-right transition-all",
+                            isSelected
+                              ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                              : "border-border bg-card hover:border-primary/40 hover:bg-secondary/40",
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "w-8 h-8 rounded-md flex items-center justify-center",
+                              meta.bgClass,
+                              meta.fgClass,
+                            )}
+                          >
+                            {PAGE_TYPE_ICONS[type]}
+                          </div>
+                          <div className="min-w-0 w-full">
+                            <p className="text-sm font-medium leading-tight">{meta.label}</p>
+                            <p className="text-[11px] text-muted-foreground leading-tight mt-0.5 line-clamp-2">
+                              {meta.description}
+                            </p>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <Button
+                  onClick={createPage}
+                  disabled={!newPageTitle.trim() || isCreating}
+                  className="w-full"
+                  size="lg"
+                >
+                  {isCreating ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                      جاري الإنشاء...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4 ml-2" />
+                      إنشاء الصفحة
+                    </>
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        {/* Search */}
+        {pages.length > 0 && (
+          <div className="relative">
+            <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="بحث في الصفحات..."
+              className="h-8 pr-8 text-xs bg-background/60"
+            />
+          </div>
+        )}
       </div>
 
+      {/* Page list */}
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-1">
           {pages.length === 0 ? (
-            <div className="text-center py-8">
-              <FileText className="w-10 h-10 mx-auto mb-3 text-muted-foreground/50" />
-              <p className="text-sm text-muted-foreground">لا توجد صفحات بعد</p>
-              <Button variant="outline" size="sm" className="mt-3 bg-transparent" onClick={() => setIsCreateOpen(true)}>
-                <Plus className="w-4 h-4 ml-2" />
-                إنشاء صفحة
+            <div className="text-center py-12 px-4">
+              <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                <BookOpen className="w-7 h-7 text-primary" />
+              </div>
+              <p className="text-sm font-medium mb-1">لا توجد صفحات بعد</p>
+              <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
+                ابدأ بإنشاء صفحة لتنظيم أفكار مجموعتك
+              </p>
+              <Button size="sm" onClick={() => setIsCreateOpen(true)} className="gap-1.5">
+                <Plus className="w-3.5 h-3.5" />
+                إنشاء أول صفحة
               </Button>
             </div>
+          ) : filteredPages.length === 0 ? (
+            <div className="text-center py-8 px-4">
+              <Search className="w-8 h-8 mx-auto mb-3 text-muted-foreground/40" />
+              <p className="text-sm text-muted-foreground">لا توجد نتائج لـ &quot;{searchQuery}&quot;</p>
+            </div>
           ) : (
-            pages.map((page) => (
-              <div
-                key={page.id}
-                className={cn(
-                  "group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors",
-                  selectedPageId === page.id ? "bg-primary/10 text-primary" : "hover:bg-secondary",
-                )}
-                onClick={() => onSelectPage(page.id)}
-              >
-                <span className={selectedPageId === page.id ? "text-primary" : "text-muted-foreground"}>
-                  {PAGE_TYPE_ICONS[page.page_type]}
-                </span>
-                <span className="flex-1 truncate text-sm">{page.title}</span>
-                {page.is_locked && <Lock className="w-3 h-3 text-muted-foreground" />}
+            filteredPages.map((page) => {
+              const meta = PAGE_TYPE_META[page.page_type as keyof typeof PAGE_TYPE_META] ?? PAGE_TYPE_META.text
+              const isSelected = selectedPageId === page.id
+              return (
+                <div
+                  key={page.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onSelectPage(page.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault()
+                      onSelectPage(page.id)
+                    }
+                  }}
+                  className={cn(
+                    "group flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer transition-all",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    isSelected
+                      ? "bg-primary/10 shadow-sm"
+                      : "hover:bg-secondary/60",
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "w-7 h-7 rounded-md flex items-center justify-center shrink-0 transition-colors",
+                      isSelected ? cn(meta.bgClass, meta.fgClass) : "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {PAGE_TYPE_ICONS[page.page_type as keyof typeof PAGE_TYPE_ICONS] ?? PAGE_TYPE_ICONS.text}
+                  </div>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreVertical className="h-3 w-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    <DropdownMenuItem onClick={() => toggleLock(page)}>
-                      {page.is_locked ? (
-                        <>
-                          <Unlock className="h-4 w-4 ml-2" />
-                          فتح القفل
-                        </>
-                      ) : (
-                        <>
-                          <Lock className="h-4 w-4 ml-2" />
-                          قفل الصفحة
-                        </>
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className={cn(
+                        "text-sm truncate leading-tight",
+                        isSelected ? "font-semibold text-foreground" : "font-medium text-foreground/90",
                       )}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive" onClick={() => deletePage(page.id)}>
-                      <Trash2 className="h-4 w-4 ml-2" />
-                      حذف
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            ))
+                    >
+                      {page.title}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">{meta.label}</p>
+                  </div>
+
+                  {page.is_locked && (
+                    <Lock className="w-3 h-3 text-muted-foreground shrink-0" aria-label="مقفلة" />
+                  )}
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          "h-6 w-6 shrink-0 transition-opacity",
+                          isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+                        )}
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label="خيارات الصفحة"
+                      >
+                        <MoreVertical className="h-3 w-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      <DropdownMenuItem onClick={() => toggleLock(page)}>
+                        {page.is_locked ? (
+                          <>
+                            <Unlock className="h-4 w-4 ml-2" />
+                            فتح القفل
+                          </>
+                        ) : (
+                          <>
+                            <Lock className="h-4 w-4 ml-2" />
+                            قفل الصفحة
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => deletePage(page.id)}
+                      >
+                        <Trash2 className="h-4 w-4 ml-2" />
+                        حذف
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )
+            })
           )}
         </div>
       </ScrollArea>
