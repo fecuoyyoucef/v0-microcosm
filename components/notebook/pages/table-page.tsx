@@ -183,7 +183,7 @@ export function TablePage({ page, members: _members, currentUserId: _currentUser
               onTouchStart={(e) => e.stopPropagation()}
               onTouchMove={(e) => e.stopPropagation()}
             >
-              <div className="min-w-fit pl-4">
+              <div className="min-w-fit px-4">
               <table className="w-full border-collapse min-w-max">
                 <thead>
                   <tr>
