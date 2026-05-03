@@ -13,9 +13,9 @@
 **خطوات الحل:**
 
 1. **تحقق من بيانات المستخدم:**
-```bash
+\`\`\`bash
 زر: /api/debug/chat-page
-```
+\`\`\`
 
 هذا سيعطيك معلومات عن:
 - معرّف المستخدم
@@ -24,9 +24,9 @@
 - عدد الخلايا المتعلقة به
 
 2. **افتح أدوات المتطور في المتصفح:**
-```
+\`\`\`
 F12 أو Cmd+Option+I (Mac)
-```
+\`\`\`
 
 ابحث عن رسائل الخطأ في Console
 
@@ -42,11 +42,11 @@ F12 أو Cmd+Option+I (Mac)
 #### خطأ في SuggestedCells
 - تم تفعيل نظام matching ولكن حدث خطأ
 - الحل: تعطيل الميزة مؤقتاً عبر:
-```sql
+\`\`\`sql
 UPDATE system_settings 
 SET value = 'false' 
 WHERE key = 'synaptic_matching_enabled';
-```
+\`\`\`
 
 #### خطأ في SmartRecommendations
 - يحدث فقط للمستخدمين الذين أكملوا الاستبيان
@@ -55,20 +55,20 @@ WHERE key = 'synaptic_matching_enabled';
 ### 3. خطوات التشخيص
 
 **الخطوة 1:** تحقق من الاتصال
-```bash
+\`\`\`bash
 curl /api/debug/chat-page
-```
+\`\`\`
 
 **الخطوة 2:** تحقق من Console في المتصفح
-```javascript
+\`\`\`javascript
 // ستظهر رسائل مثل:
 // [v0] HomePageContent mounted with initialGroups: 5
 // [v0] Profile loaded: أحمد
 // [v0] Fetching suggested cells for user: user-123
-```
+\`\`\`
 
 **الخطوة 3:** تحقق من قاعدة البيانات
-```sql
+\`\`\`sql
 -- تحقق من وجود الملف الشخصي
 SELECT * FROM profiles WHERE id = 'your-user-id';
 
@@ -77,23 +77,23 @@ SELECT * FROM group_members WHERE user_id = 'your-user-id';
 
 -- تحقق من الإعدادات
 SELECT * FROM system_settings;
-```
+\`\`\`
 
 ### 4. حل سريع
 
 إذا لم تحل الخطوات السابقة المشكلة:
 
 1. **امسح ذاكرة التخزين المؤقت:**
-```javascript
+\`\`\`javascript
 // في Console:
 localStorage.clear()
 sessionStorage.clear()
-```
+\`\`\`
 
 2. **أعد تحميل الصفحة:**
-```
+\`\`\`
 Cmd+Shift+R (Mac) أو Ctrl+Shift+R (Windows)
-```
+\`\`\`
 
 3. **حاول تسجيل الخروج والدخول مجدداً**
 
@@ -102,15 +102,15 @@ Cmd+Shift+R (Mac) أو Ctrl+Shift+R (Windows)
 إذا كان المشكلة في مكون معين، يمكنك تعطيله مؤقتاً:
 
 **تعطيل SuggestedCells:**
-```sql
+\`\`\`sql
 UPDATE system_settings 
 SET value = 'false' 
 WHERE key = 'synaptic_matching_enabled';
-```
+\`\`\`
 
 **تعطيل SmartRecommendations:**
 في `/components/chat/home-page-content.tsx`:
-```tsx
+\`\`\`tsx
 // غيّر هذا:
 {hasCompletedSurvey && (
   <SmartRecommendations userId={userId} />
@@ -120,7 +120,7 @@ WHERE key = 'synaptic_matching_enabled';
 {false && (
   <SmartRecommendations userId={userId} />
 )}
-```
+\`\`\`
 
 ### 6. معلومات للمطورين
 

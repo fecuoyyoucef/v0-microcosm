@@ -11,7 +11,7 @@
 عند كتابة أو تعديل أي wrapper component، تأكد من:
 
 ### 1. قبول Children Type
-```typescript
+\`\`\`typescript
 // ✅ CORRECT
 interface WrapperProps {
   children: React.ReactNode
@@ -21,10 +21,10 @@ function MyWrapper({ children }: WrapperProps) { }
 
 // ❌ WRONG
 function MyWrapper() { }
-```
+\`\`\`
 
 ### 2. إرجاع Children في JSX
-```typescript
+\`\`\`typescript
 // ✅ CORRECT
 return (
   <Provider>
@@ -39,10 +39,10 @@ return (
     <Overlay />
   </Provider>
 )
-```
+\`\`\`
 
 ### 3. عدم كسر الـ Chain
-```typescript
+\`\`\`typescript
 // ✅ CORRECT - Chain كامل
 <A>
   <B>
@@ -60,13 +60,13 @@ return (
     </C>
   </B>
 </A>
-```
+\`\`\`
 
 ---
 
 ## Pattern الصحيح للـ Wrapper
 
-```typescript
+\`\`\`typescript
 interface MyWrapperProps {
   children: React.ReactNode
   // + أي props أخرى
@@ -83,14 +83,14 @@ export function MyWrapper({ children, ...otherProps }: MyWrapperProps) {
     </OuterProvider>
   )
 }
-```
+\`\`\`
 
 ---
 
 ## أمثلة من Microcosm
 
 ### ✓ ScrollProvider (صحيح)
-```typescript
+\`\`\`typescript
 export function ScrollProvider({ children }: { children: React.ReactNode }) {
   return (
     <ScrollContext.Provider value={scrollValue}>
@@ -98,10 +98,10 @@ export function ScrollProvider({ children }: { children: React.ReactNode }) {
     </ScrollContext.Provider>
   )
 }
-```
+\`\`\`
 
 ### ✓ FirebasePushProvider (صحيح)
-```typescript
+\`\`\`typescript
 export function FirebasePushProvider({ 
   userId, 
   children 
@@ -115,10 +115,10 @@ export function FirebasePushProvider({
     </FirebaseContext.Provider>
   )
 }
-```
+\`\`\`
 
 ### ✗ TutorialShell (الخطأ القديم)
-```typescript
+\`\`\`typescript
 // ❌ BAD - v699-v710
 export function TutorialShell() {
   return (
@@ -129,10 +129,10 @@ export function TutorialShell() {
     </>
   )
 }
-```
+\`\`\`
 
 ### ✓ TutorialShell (الإصلاح الجديد)
-```typescript
+\`\`\`typescript
 // ✅ GOOD - v711+
 interface TutorialShellProps {
   children: React.ReactNode
@@ -147,7 +147,7 @@ export function TutorialShell({ children }: TutorialShellProps) {
     </>
   )
 }
-```
+\`\`\`
 
 ---
 
@@ -167,14 +167,14 @@ export function TutorialShell({ children }: TutorialShellProps) {
 ## كيف تكتشف هذه الأخطاء بسرعة؟
 
 ### الطريقة 1: Visual Testing
-```typescript
+\`\`\`typescript
 // اختبر بصرياً أن المحتوى يظهر
 <MyWrapper>
   <div style={{ background: 'red', padding: '20px' }}>
     This should be visible
   </div>
 </MyWrapper>
-```
+\`\`\`
 
 ### الطريقة 2: React DevTools
 1. افتح React DevTools
@@ -182,7 +182,7 @@ export function TutorialShell({ children }: TutorialShellProps) {
 3. تحقق أن children موجودة في tree
 
 ### الطريقة 3: Unit Tests
-```typescript
+\`\`\`typescript
 describe('MyWrapper', () => {
   it('should render children', () => {
     const { getByText } = render(
@@ -194,38 +194,38 @@ describe('MyWrapper', () => {
     expect(getByText('I should be visible')).toBeInTheDocument()
   })
 })
-```
+\`\`\`
 
 ---
 
 ## Common Mistakes
 
 ### ❌ Mistake 1: نسيان children في JSX
-```typescript
+\`\`\`typescript
 function BadWrapper({ children }: { children: React.ReactNode }) {
   return <Provider />  {/* children اختفت! */}
 }
-```
+\`\`\`
 
 ### ❌ Mistake 2: إساءة استخدام children
-```typescript
+\`\`\`typescript
 function BadWrapper({ children }: { children: React.ReactNode }) {
   return <Provider>{children}</Provider>  {/* غير موثوق */}
 }
 
 // مشكلة: قد تُحذف عن طريق الخطأ
-```
+\`\`\`
 
 ### ❌ Mistake 3: Conditional rendering خاطئ
-```typescript
+\`\`\`typescript
 function BadWrapper({ children, condition }: any) {
   if (!condition) return null  {/* children اختفت! */}
   return <Provider>{children}</Provider>
 }
-```
+\`\`\`
 
 ### ✅ Solution: التعامل الآمن
-```typescript
+\`\`\`typescript
 function GoodWrapper({ 
   children, 
   condition = true 
@@ -239,14 +239,14 @@ function GoodWrapper({
     </Provider>
   )
 }
-```
+\`\`\`
 
 ---
 
 ## أفضل الممارسات
 
 ### 1. TypeScript: استخدم PropsWithChildren
-```typescript
+\`\`\`typescript
 import { PropsWithChildren } from 'react'
 
 interface MyWrapperProps extends PropsWithChildren {
@@ -256,10 +256,10 @@ interface MyWrapperProps extends PropsWithChildren {
 export function MyWrapper({ children, otherProp }: MyWrapperProps) {
   return <div>{children}</div>
 }
-```
+\`\`\`
 
 ### 2. Composition Pattern
-```typescript
+\`\`\`typescript
 export function MyWrapper({ children }: { children: React.ReactNode }) {
   return (
     <Outer>
@@ -269,10 +269,10 @@ export function MyWrapper({ children }: { children: React.ReactNode }) {
     </Outer>
   )
 }
-```
+\`\`\`
 
 ### 3. HOC Pattern
-```typescript
+\`\`\`typescript
 export function withWrapper<P extends object>(
   Component: React.ComponentType<P>
 ): React.FC<P> {
@@ -282,13 +282,13 @@ export function withWrapper<P extends object>(
     </Wrapper>
   )
 }
-```
+\`\`\`
 
 ---
 
 ## Testing Strategy
 
-```typescript
+\`\`\`typescript
 // ✅ Minimal test to catch #722 issue
 describe('Wrapper Components', () => {
   it('TutorialShell should render children', () => {
@@ -311,7 +311,7 @@ describe('Wrapper Components', () => {
     expect(getByText('Test Child')).toBeInTheDocument()
   })
 })
-```
+\`\`\`
 
 ---
 

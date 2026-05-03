@@ -8,7 +8,7 @@
 
 ## البنية المعمارية
 
-```
+\`\`\`
 lib/ai-agents/
 ├── kimi-client.ts              # Kimi Agent Client الأساسي
 ├── chief-agent-kimi.ts         # الوكيل الرئيسي
@@ -21,7 +21,7 @@ lib/ai-agents/
     ├── index.ts                # تعريف الأدوات
     ├── github-tools.ts         # أدوات GitHub
     └── supabase-tools.ts       # أدوات قاعدة البيانات
-```
+\`\`\`
 
 ---
 
@@ -59,22 +59,22 @@ lib/ai-agents/
 
 ### 1. إنشاء وكيل
 
-```typescript
+\`\`\`typescript
 import { createChiefAgent } from "@/lib/ai-agents/chief-agent-kimi"
 
 const agent = createChiefAgent("conversation-123")
-```
+\`\`\`
 
 ### 2. المحادثة
 
-```typescript
+\`\`\`typescript
 const response = await agent.chat("حلل آخر 10 أخطاء في النظام")
 console.log(response) // سيستخدم أدوات GitHub وقاعدة البيانات تلقائياً
-```
+\`\`\`
 
 ### 3. اتخاذ قرار
 
-```typescript
+\`\`\`typescript
 const decision = await agent.makeDecision(
   "رسالة تحتوي على محتوى مسيء",
   { message_id: "msg-123" }
@@ -87,11 +87,11 @@ const decision = await agent.makeDecision(
 //   severity: "high",
 //   auto_execute: true
 // }
-```
+\`\`\`
 
 ### 4. تحليل خطأ
 
-```typescript
+\`\`\`typescript
 const analysis = await agent.analyzeAndFixError(
   new Error("Database connection failed"),
   { service: "api", endpoint: "/messages" }
@@ -103,11 +103,11 @@ const analysis = await agent.analyzeAndFixError(
 //   githubIssueCreated: true,
 //   issueUrl: "https://github.com/..."
 // }
-```
+\`\`\`
 
 ### 5. الإشراف على المحتوى
 
-```typescript
+\`\`\`typescript
 const moderation = await agent.moderateContent("msg-123")
 
 // moderation = {
@@ -115,7 +115,7 @@ const moderation = await agent.moderateContent("msg-123")
 //   reason: "محتوى مسيء",
 //   action: "delete_message"
 // }
-```
+\`\`\`
 
 ---
 
@@ -124,28 +124,28 @@ const moderation = await agent.moderateContent("msg-123")
 ### POST `/api/ai-agents/kimi/chat`
 محادثة مع الوكيل
 
-```typescript
+\`\`\`typescript
 {
   "message": "ما آخر الأخطاء؟",
   "context": { "user_id": "..." },
   "conversationId": "conv-123"
 }
-```
+\`\`\`
 
 ### POST `/api/ai-agents/kimi/decide`
 اتخاذ قرار
 
-```typescript
+\`\`\`typescript
 {
   "scenario": "رسالة مخالفة",
   "context": { "message_id": "msg-123" }
 }
-```
+\`\`\`
 
 ### POST `/api/ai-agents/kimi/analyze-error`
 تحليل خطأ
 
-```typescript
+\`\`\`typescript
 {
   "error": {
     "message": "Connection timeout",
@@ -153,16 +153,16 @@ const moderation = await agent.moderateContent("msg-123")
   },
   "context": { "service": "api" }
 }
-```
+\`\`\`
 
 ### POST `/api/ai-agents/kimi/moderate`
 الإشراف على محتوى
 
-```typescript
+\`\`\`typescript
 {
   "messageId": "msg-123"
 }
-```
+\`\`\`
 
 ### GET `/api/ai-agents/kimi/approvals`
 الحصول على طلبات الموافقة
@@ -170,12 +170,12 @@ const moderation = await agent.moderateContent("msg-123")
 ### POST `/api/ai-agents/kimi/approvals`
 الموافقة/الرفض
 
-```typescript
+\`\`\`typescript
 {
   "requestId": "approval-123",
   "action": "approve" // or "reject"
 }
-```
+\`\`\`
 
 ---
 
@@ -219,7 +219,7 @@ const moderation = await agent.moderateContent("msg-123")
 
 ### الحصول على إحصائيات الوكيل:
 
-```typescript
+\`\`\`typescript
 import { createAgentMonitoring } from "@/lib/ai-agents/monitoring-kimi"
 
 const monitoring = createAgentMonitoring()
@@ -238,11 +238,11 @@ const stats = await monitoring.getAgentStats({
 //     ...
 //   ]
 // }
-```
+\`\`\`
 
 ### صحة النظام:
 
-```typescript
+\`\`\`typescript
 const health = await monitoring.getSystemHealth()
 
 // health = {
@@ -251,13 +251,13 @@ const health = await monitoring.getSystemHealth()
 //   recentErrors: [...],
 //   errorRate: 1.5
 // }
-```
+\`\`\`
 
 ---
 
 ## متغيرات البيئة
 
-```env
+\`\`\`env
 # Hugging Face
 HF_TOKEN=your_token
 
@@ -270,7 +270,7 @@ GITHUB_REPO=your_repo
 HF_PRIMARY_MODEL=moonshotai/Kimi-K2-Instruct-0905
 HF_FALLBACK_MODEL=Qwen/QwQ-32B-Preview
 HF_FAST_MODEL=meta-llama/Llama-3.3-70B-Instruct
-```
+\`\`\`
 
 ---
 
@@ -278,7 +278,7 @@ HF_FAST_MODEL=meta-llama/Llama-3.3-70B-Instruct
 
 في `lib/ai-agents/config.ts`:
 
-```typescript
+\`\`\`typescript
 export const CHIEF_AGENT_CONFIG = {
   // النماذج
   models: {
@@ -308,7 +308,7 @@ export const CHIEF_AGENT_CONFIG = {
     highRiskActions: ["ban_user", "delete_cell", ...],
   },
 }
-```
+\`\`\`
 
 ---
 
@@ -316,7 +316,7 @@ export const CHIEF_AGENT_CONFIG = {
 
 ### 1. سير عمل مخصص
 
-```typescript
+\`\`\`typescript
 const agent = createChiefAgent()
 
 // الخطوة 1: جمع المعلومات
@@ -329,11 +329,11 @@ const analysis = await agent.chat(`حلل هذه الأخطاء: ${systemInfo}`)
 if (analysis.includes("critical")) {
   await agent.chat("أنشئ GitHub issue للأخطاء الحرجة")
 }
-```
+\`\`\`
 
 ### 2. دمج مع Webhooks
 
-```typescript
+\`\`\`typescript
 // في webhook handler
 export async function POST(req: Request) {
   const event = await req.json()
@@ -346,11 +346,11 @@ export async function POST(req: Request) {
     )
   }
 }
-```
+\`\`\`
 
 ### 3. مراقبة مستمرة
 
-```typescript
+\`\`\`typescript
 // في cron job
 async function monitorSystem() {
   const agent = createChiefAgent()
@@ -362,7 +362,7 @@ async function monitorSystem() {
     await agent.chat("النظام في حالة متدهورة، حلل المشكلة")
   }
 }
-```
+\`\`\`
 
 ---
 
@@ -389,30 +389,30 @@ async function monitorSystem() {
 
 ### المشكلة: الوكيل لا يستجيب
 
-```typescript
+\`\`\`typescript
 // تحقق من:
 1. HF_TOKEN موجود
 2. النموذج متاح
 3. الوكيل مفعّل في قاعدة البيانات
-```
+\`\`\`
 
 ### المشكلة: الأدوات لا تعمل
 
-```typescript
+\`\`\`typescript
 // تحقق من:
 1. GITHUB_TOKEN صحيح
 2. أذونات قاعدة البيانات
 3. سجلات tool_executions
-```
+\`\`\`
 
 ### المشكلة: بطء في الاستجابة
 
-```typescript
+\`\`\`typescript
 // حلول:
 1. استخدم FAST model للمهام البسيطة
 2. قلل maxTokens
 3. استخدم streaming للردود الطويلة
-```
+\`\`\`
 
 ---
 

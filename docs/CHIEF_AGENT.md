@@ -33,12 +33,12 @@ Chief Agent هو وكيل ذكي يعمل كنائب للمالك في Synaptic 
 - يبحث في GitHub عن الملفات المحتملة
 
 ### 2. البحث في GitHub
-```typescript
+\`\`\`typescript
 // يستخدم GitHub API للبحث
 const results = await octokit.rest.search.code({
   q: `${keyword} repo:${owner}/${repo}`,
 })
-```
+\`\`\`
 
 ### 3. التحليل بالذكاء الاصطناعي
 - يرسل الخطأ + الكود المشتبه به إلى Claude
@@ -62,11 +62,11 @@ const results = await octokit.rest.search.code({
 1. اذهب إلى GitHub Settings > Developer settings > Personal access tokens
 2. أنشئ token جديد مع صلاحية `repo` (للمستودعات الخاصة) أو بدون صلاحيات (للعامة)
 3. أضف المتغيرات:
-   ```env
+   \`\`\`env
    GITHUB_TOKEN=ghp_xxxxxxxxxxxxx
    GITHUB_OWNER=your-username
    GITHUB_REPO=microcosm
-   ```
+   \`\`\`
 
 ### AI Model
 يستخدم النظام حالياً:
@@ -76,21 +76,21 @@ const results = await octokit.rest.search.code({
 ## أمثلة على الاستخدام
 
 ### مثال 1: تحليل خطأ في الإشعارات
-```
+\`\`\`
 الخطأ: "Push notifications not working"
 النتيجة:
 - الملفات المشتبه بها: lib/firebase-admin-server.ts, app/api/notifications/send/route.ts
 - السبب المحتمل: حلقة تسلسلية في إرسال الإشعارات
 - الحل المقترح: استخدام Promise.all للإرسال المتوازي
 - الثقة: 92%
-```
+\`\`\`
 
 ### مثال 2: اكتشاف نمط متكرر
-```
+\`\`\`
 النمط: lib/notifications-server.ts
 التكرار: 5 مرات
 التوصية: "يوجد أخطاء متكررة في هذا الملف - يُنصح بمراجعته"
-```
+\`\`\`
 
 ## نصائح للمطورين
 
@@ -107,7 +107,7 @@ const results = await octokit.rest.search.code({
 ## API Endpoints
 
 ### تحليل الأخطاء
-```typescript
+\`\`\`typescript
 POST /api/ai-agents/analyze-errors
 Body: {
   ticketIds?: string[], // اختياري
@@ -116,15 +116,15 @@ Body: {
     repo: string
   }
 }
-```
+\`\`\`
 
 ### الدردشة مع الوكيل
-```typescript
+\`\`\`typescript
 POST /api/ai-agents/chat
 Body: {
   message: string
 }
-```
+\`\`\`
 
 ## الأمان
 

@@ -47,7 +47,7 @@
 
 ### Environment Variables
 
-```env
+\`\`\`env
 # Groq
 GROQ_API_KEY=your_groq_api_key  # مجاني من https://console.groq.com
 
@@ -60,7 +60,7 @@ GITHUB_WEBHOOK_SECRET=your_webhook_secret
 # Supabase (موجودة بالفعل)
 SUPABASE_URL=...
 SUPABASE_SERVICE_ROLE_KEY=...
-```
+\`\`\`
 
 ## الأدوات المتاحة للوكيل
 
@@ -126,7 +126,7 @@ SUPABASE_SERVICE_ROLE_KEY=...
 
 ## الملفات الرئيسية
 
-```
+\`\`\`
 lib/ai-agents/
 ├── types.ts                    ✅ تعريفات الأنواع
 ├── config.ts                   ✅ الإعدادات (HF_TOKEN1/2/3 rotation + GitHub)
@@ -149,7 +149,7 @@ lib/ai-agents/
 ├── github-agent.ts             ✅ وكيل GitHub
 ├── github-analyzer.ts          ✅ محلل GitHub
 └── undo-system.ts              ✅ نظام التراجع
-```
+\`\`\`
 
 ## حالة المراحل
 
@@ -193,7 +193,7 @@ lib/ai-agents/
 
 ## الاستخدام
 
-```typescript
+\`\`\`typescript
 import { ChiefAgent } from "@/lib/ai-agents/chief-agent"
 
 const agent = new ChiefAgent()
@@ -206,13 +206,13 @@ const analysis = await agent.analyzeAndFixError(error, context)
 
 // مراقبة محتوى
 const moderation = await agent.moderateContent(messageId)
-```
+\`\`\`
 
 ## الإحصائيات
 
 يمكن الحصول على إحصائيات الوكيل:
 
-```typescript
+\`\`\`typescript
 import { AgentMonitoring } from "@/lib/ai-agents/monitoring"
 
 const monitoring = new AgentMonitoring()
@@ -224,4 +224,4 @@ console.log({
   avg_execution_time: stats.avg_execution_time_ms,
   most_used_tools: stats.most_used_tools
 })
-```
+\`\`\`
