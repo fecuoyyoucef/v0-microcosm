@@ -187,7 +187,6 @@ export const MessageList = React.memo(function MessageList({
   onMessageDeleted,
   setMessages,
 }: MessageListProps) {
-  const router = useRouter()
   const supabase = createClient()
 
   const [showActionSheet, setShowActionSheet] = useState(false)
