@@ -9,9 +9,14 @@ import { TablePage } from "./pages/table-page"
 import { LinksPage } from "./pages/links-page"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { ChevronLeft, Hash, FileText, Menu } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { ChevronLeft, Hash, FileText, Menu, Clock, Lock } from "lucide-react"
 import Link from "next/link"
+import { format } from "date-fns"
+import { ar } from "date-fns/locale"
 import type { Group, NotebookPage, GroupMember } from "@/lib/types"
+import { PAGE_TYPE_META } from "./page-types"
+import { cn } from "@/lib/utils"
 
 interface NotebookContainerProps {
   groupId: string
@@ -34,6 +39,9 @@ export function NotebookContainer({
   const supabase = createClient()
 
   const selectedPage = pages.find((p) => p.id === selectedPageId)
+  const pageTypeMeta = selectedPage
+    ? PAGE_TYPE_META[selectedPage.page_type as keyof typeof PAGE_TYPE_META] ?? PAGE_TYPE_META.text
+    : null
 
   useEffect(() => {
     const channel = supabase
@@ -85,10 +93,15 @@ export function NotebookContainer({
   const renderPageContent = () => {
     if (!selectedPage) {
       return (
-        <div className="flex-1 flex items-center justify-center text-muted-foreground p-4">
-          <div className="text-center">
-            <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>اختر صفحة من القائمة أو أنشئ صفحة جديدة</p>
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center max-w-sm">
+            <div className="w-20 h-20 rounded-2xl bg-muted/40 flex items-center justify-center mx-auto mb-6">
+              <FileText className="w-10 h-10 text-muted-foreground/40" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">لم يتم اختيار صفحة</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              اختر صفحة من القائمة على اليمين أو أنشئ صفحة جديدة لبدء العمل
+            </p>
           </div>
         </div>
       )
@@ -110,45 +123,68 @@ export function NotebookContainer({
 
   return (
     <div className="flex flex-col h-[100dvh] bg-background">
-      {/* Header */}
-      <div className="h-14 border-b border-border px-3 md:px-4 flex items-center justify-between bg-card/50 shrink-0">
-        <div className="flex items-center gap-2 md:gap-3 min-w-0">
+      {/* Enhanced Header */}
+      <div className="h-16 border-b border-border px-4 md:px-6 flex items-center justify-between bg-card/30 backdrop-blur-sm shrink-0">
+        <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
           <Link href={`/chat/${groupId}`}>
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+            <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" aria-label="العودة للمجموعة">
               <ChevronLeft className="h-4 w-4" />
             </Button>
           </Link>
-          <div className="flex items-center gap-2 min-w-0">
-            <Hash className="w-4 h-4 text-primary shrink-0" />
-            <span className="font-medium truncate">{group.name}</span>
-            <span className="text-muted-foreground hidden sm:inline">/</span>
-            <span className="text-muted-foreground hidden sm:inline">المفكرة الجماعية</span>
+
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Hash className="w-4 h-4 text-primary shrink-0" aria-hidden="true" />
+            <span className="font-semibold truncate">{group.name}</span>
+            <span className="text-muted-foreground hidden sm:inline" aria-hidden="true">/</span>
+            <span className="text-sm text-muted-foreground hidden sm:inline">المفكرة</span>
           </div>
+
+          {selectedPage && pageTypeMeta && (
+            <>
+              <span className="text-muted-foreground hidden lg:inline" aria-hidden="true">/</span>
+              <Badge
+                variant="secondary"
+                className={cn(
+                  "hidden lg:inline-flex gap-1.5 px-2.5 py-1 font-medium",
+                  pageTypeMeta.bgClass,
+                  pageTypeMeta.fgClass,
+                  "border-0",
+                )}
+              >
+                {pageTypeMeta.label}
+              </Badge>
+            </>
+          )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3 shrink-0">
           {selectedPage && (
-            <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
-              <span>آخر تحديث:</span>
-              <span>
-                {new Date(selectedPage.updated_at).toLocaleDateString("ar", {
-                  day: "numeric",
-                  month: "short",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </span>
+            <div className="hidden md:flex items-center gap-4 text-xs text-muted-foreground">
+              {selectedPage.is_locked && (
+                <div className="flex items-center gap-1.5">
+                  <Lock className="w-3 h-3" />
+                  <span>مقفلة</span>
+                </div>
+              )}
+              <div className="flex items-center gap-1.5">
+                <Clock className="w-3 h-3" />
+                <span>
+                  {format(new Date(selectedPage.updated_at), "d MMM yyyy - p", {
+                    locale: ar,
+                  })}
+                </span>
+              </div>
             </div>
           )}
 
           {/* Mobile sidebar trigger */}
           <Sheet open={isMobileSidebarOpen} onOpenChange={setIsMobileSidebarOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 md:hidden">
+              <Button variant="outline" size="icon" className="h-9 w-9 md:hidden" aria-label="القائمة">
                 <Menu className="h-4 w-4" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-72 p-0">
+            <SheetContent side="right" className="w-80 p-0">
               <NotebookSidebar
                 pages={pages}
                 selectedPageId={selectedPageId}
@@ -163,10 +199,10 @@ export function NotebookContainer({
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* Main Content Layout */}
       <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Desktop Sidebar */}
-        <div className="hidden md:block w-64 border-l border-border shrink-0">
+        <div className="hidden md:block w-72 border-l border-border shrink-0 overflow-hidden">
           <NotebookSidebar
             pages={pages}
             selectedPageId={selectedPageId}
@@ -178,8 +214,8 @@ export function NotebookContainer({
           />
         </div>
 
-        {/* Page Content */}
-        <div className="flex-1 flex flex-col overflow-hidden min-h-0">{renderPageContent()}</div>
+        {/* Page Content Area */}
+        <div className="flex-1 flex flex-col overflow-hidden min-h-0 bg-background">{renderPageContent()}</div>
       </div>
     </div>
   )
