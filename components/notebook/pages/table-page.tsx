@@ -173,8 +173,8 @@ export function TablePage({ page, members: _members, currentUserId: _currentUser
 
           {/* Table */}
           <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
+            <div className="overflow-auto max-h-[60vh]">
+              <table className="w-full border-collapse min-w-max">
                 <thead>
                   <tr>
                     {content.columns.map((column, index) => (
