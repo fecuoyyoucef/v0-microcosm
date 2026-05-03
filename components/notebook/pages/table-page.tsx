@@ -173,7 +173,17 @@ export function TablePage({ page, members: _members, currentUserId: _currentUser
 
           {/* Table */}
           <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
-            <div className="overflow-auto max-h-[60vh]">
+            <div 
+              className="overflow-auto max-h-[60vh]"
+              style={{ 
+                touchAction: 'pan-x pan-y',
+                overscrollBehaviorX: 'contain',
+                WebkitOverflowScrolling: 'touch'
+              }}
+              onTouchStart={(e) => e.stopPropagation()}
+              onTouchMove={(e) => e.stopPropagation()}
+            >
+              <div className="min-w-fit pl-4">
               <table className="w-full border-collapse min-w-max">
                 <thead>
                   <tr>
@@ -253,6 +263,7 @@ export function TablePage({ page, members: _members, currentUserId: _currentUser
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
 
             {content.rows.length === 0 && (
