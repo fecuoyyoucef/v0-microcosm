@@ -35,7 +35,7 @@
 - ✅ Audit trail كامل
 
 #### 6. API Routes الجديدة (Kimi Routes)
-```
+\`\`\`
 /api/ai-agents/kimi/
 ├── chat              ✅ المحادثة
 ├── decide            ✅ اتخاذ القرار
@@ -43,7 +43,7 @@
 ├── moderate          ✅ الإشراف على المحتوى
 ├── approvals         ✅ إدارة الموافقات
 └── token-health      ✅ صحة الـ tokens
-```
+\`\`\`
 
 #### 7. نظام المراقبة (Monitoring)
 - ✅ `/lib/ai-agents/monitoring-kimi.ts`
@@ -59,17 +59,17 @@
 النظام يحتوي على **مسارات قديمة وجديدة**:
 
 **مسارات قديمة** (Grok/Claude):
-```
+\`\`\`
 /api/ai-agents/
 ├── chat              (Grok model)
 ├── decide            (Claude)
 ├── analyze-errors    (Claude)
 ├── github/*          (متنوع)
 └── monitor           (Claude)
-```
+\`\`\`
 
 **مسارات جديدة** (Kimi-K2):
-```
+\`\`\`
 /api/ai-agents/kimi/
 ├── chat              (Kimi-K2)
 ├── decide            (Kimi-K2)
@@ -77,7 +77,7 @@
 ├── moderate          (Kimi-K2)
 ├── approvals         (Kimi-K2)
 └── token-health      (Kimi-K2)
-```
+\`\`\`
 
 ---
 
@@ -85,11 +85,11 @@
 
 #### الخيار 1: استبدال كامل (Recommended)
 استبدال جميع المسارات القديمة بـ Kimi-K2:
-```
+\`\`\`
 /api/ai-agents/chat          → يستخدم KimiAgentClient
 /api/ai-agents/decide        → يستخدم KimiAgentClient
 /api/ai-agents/analyze-errors → يستخدم KimiAgentClient
-```
+\`\`\`
 
 **المميزات:**
 - توحيد الواجهة
@@ -102,10 +102,10 @@
 
 #### الخيار 2: مسارات منفصلة (Current State)
 الاحتفاظ بالمسارات القديمة والجديدة معاً:
-```
+\`\`\`
 /api/ai-agents/          (النظام القديم)
 /api/ai-agents/kimi/     (نظام Kimi الجديد)
-```
+\`\`\`
 
 **المميزات:**
 - لا توجد مخاطر
@@ -118,10 +118,10 @@
 
 #### الخيار 3: Proxy Pattern
 جعل المسارات القديمة تستدعي المسارات الجديدة:
-```
+\`\`\`
 /api/ai-agents/chat → يستدعي /api/ai-agents/kimi/chat
 /api/ai-agents/decide → يستدعي /api/ai-agents/kimi/decide
-```
+\`\`\`
 
 **المميزات:**
 - توافقية عكسية كاملة

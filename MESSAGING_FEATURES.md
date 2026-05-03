@@ -43,17 +43,17 @@
 - تمييز بصري للرسائل التي تحتوي إشارة لك
 
 **كيفية الاستخدام:**
-```
+\`\`\`
 اكتب @ ثم ابدأ بكتابة اسم المستخدم
 استخدم الأسهم لاختيار الشخص
 اضغط Enter أو Tab لتأكيد الاختيار
-```
+\`\`\`
 
 **مثال:**
-```
+\`\`\`
 @ahmad هل يمكنك مراجعة هذا؟
 مرحباً @sara و @mohamed
-```
+\`\`\`
 
 ---
 
@@ -149,17 +149,17 @@
 ## API المستخدمة
 
 ### إرسال رسالة مع إشارات:
-```typescript
+\`\`\`typescript
 POST /api/messages/send-with-mentions
 Body: {
   groupId: string
   content: string
   mentionedUsers: string[] // user IDs
 }
-```
+\`\`\`
 
 ### إرسال push notification:
-```typescript
+\`\`\`typescript
 POST /api/push/send
 Body: {
   userIds: string[] // multiple users
@@ -172,7 +172,7 @@ Body: {
     priority: "high" | "normal"
   }
 }
-```
+\`\`\`
 
 ---
 

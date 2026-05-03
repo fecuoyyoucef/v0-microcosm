@@ -30,7 +30,7 @@
 
 أضف المتغيرات البيئية التالية:
 
-```bash
+\`\`\`bash
 # Hugging Face Tokens (متوفرة بالفعل)
 HF_TOKEN1=your_token_1
 HF_TOKEN2=your_token_2
@@ -41,11 +41,11 @@ OPENDEVIN_API_URL=http://localhost:8080
 
 # Optional: Custom HF API Base
 HF_API_BASE=https://api-inference.huggingface.co/models
-```
+\`\`\`
 
 ### 2. تشغيل OpenDevin عبر Docker
 
-```bash
+\`\`\`bash
 # الانتقال إلى مجلد Docker
 cd docker/opendevin
 
@@ -57,31 +57,31 @@ docker-compose logs -f
 
 # إيقاف الخدمة
 docker-compose down
-```
+\`\`\`
 
 ### 3. إعداد قاعدة البيانات
 
-```bash
+\`\`\`bash
 # تشغيل SQL script
 # في v0، استخدم SystemAction لتنفيذ:
 scripts/create-opendevin-tables.sql
-```
+\`\`\`
 
 ### 4. التحقق من التشغيل
 
-```bash
+\`\`\`bash
 # اختبار API
 curl http://localhost:8080/health
 
 # اختبار Kimi-K2 connection
 curl -X POST http://localhost:8080/api/llm/test
-```
+\`\`\`
 
 ## الاستخدام
 
 ### من Next.js API
 
-```typescript
+\`\`\`typescript
 // إنشاء مهمة جديدة
 const response = await fetch('/api/opendevin/tasks', {
   method: 'POST',
@@ -102,11 +102,11 @@ const status = await statusResponse.json()
 console.log(`Status: ${status.status}`)
 console.log(`Progress: ${status.progress}%`)
 console.log(`Logs:`, status.logs)
-```
+\`\`\`
 
 ### مباشرة إلى OpenDevin API
 
-```bash
+\`\`\`bash
 # إنشاء مهمة
 curl -X POST http://localhost:8080/api/tasks \
   -H "Content-Type: application/json" \
@@ -118,45 +118,45 @@ curl -X POST http://localhost:8080/api/tasks \
 
 # الحصول على حالة المهمة
 curl http://localhost:8080/api/tasks/{task_id}
-```
+\`\`\`
 
 ## أمثلة على المهام
 
 ### 1. إنشاء مكون React
 
-```json
+\`\`\`json
 {
   "instruction": "أنشئ مكون React يعرض جدول بيانات المستخدمين مع إمكانية البحث والتصفية. استخدم TypeScript و Tailwind CSS."
 }
-```
+\`\`\`
 
 ### 2. إصلاح خطأ
 
-```json
+\`\`\`json
 {
   "instruction": "هناك خطأ في ملف /workspace/lib/utils.ts في الدالة formatDate. قم بإصلاحه وإضافة unit tests."
 }
-```
+\`\`\`
 
 ### 3. إضافة ميزة جديدة
 
-```json
+\`\`\`json
 {
   "instruction": "أضف ميزة تصدير البيانات إلى CSV في صفحة /app/users/page.tsx. استخدم مكتبة papaparse."
 }
-```
+\`\`\`
 
 ### 4. مراجعة الكود
 
-```json
+\`\`\`json
 {
   "instruction": "راجع ملفات المكونات في /components/chat/ وقدم اقتراحات للتحسين من ناحية الأداء والأمان."
 }
-```
+\`\`\`
 
 ## البنية المعمارية
 
-```
+\`\`\`
 ┌─────────────────────────────────────────────┐
 │         Microcosm Next.js App               │
 │  /api/opendevin/tasks/*                     │
@@ -186,23 +186,23 @@ curl http://localhost:8080/api/tasks/{task_id}
 │   moonshotai/Kimi-K2-Instruct-0905          │
 │   Token Rotation: HF_TOKEN1→2→3             │
 └─────────────────────────────────────────────┘
-```
+\`\`\`
 
 ## مراقبة وتسجيل
 
 ### السجلات
 
-```bash
+\`\`\`bash
 # سجلات OpenDevin
 docker-compose logs opendevin
 
 # سجلات مباشرة
 docker-compose logs -f opendevin
-```
+\`\`\`
 
 ### قاعدة البيانات
 
-```sql
+\`\`\`sql
 -- عرض جميع المهام
 SELECT * FROM opendevin_tasks ORDER BY created_at DESC;
 
@@ -216,13 +216,13 @@ SELECT
   AVG(progress) as avg_progress
 FROM opendevin_tasks
 GROUP BY status;
-```
+\`\`\`
 
 ## استكشاف الأخطاء
 
 ### المشكلة: OpenDevin لا يستجيب
 
-```bash
+\`\`\`bash
 # التحقق من حالة الحاوية
 docker ps | grep opendevin
 
@@ -231,28 +231,28 @@ docker-compose restart
 
 # فحص السجلات
 docker-compose logs --tail=100 opendevin
-```
+\`\`\`
 
 ### المشكلة: Kimi-K2 يفشل
 
-```bash
+\`\`\`bash
 # اختبار الاتصال
 curl -X POST http://localhost:8080/api/llm/test
 
 # التحقق من Token
 echo $HF_TOKEN1
-```
+\`\`\`
 
 ### المشكلة: المهمة عالقة
 
-```sql
+\`\`\`sql
 -- إعادة تعيين المهام العالقة
 UPDATE opendevin_tasks 
 SET status = 'failed', 
     error = 'Task timeout'
 WHERE status = 'running' 
 AND updated_at < NOW() - INTERVAL '1 hour';
-```
+\`\`\`
 
 ## الأمان
 

@@ -41,9 +41,9 @@
 - يساعد في تشخيص المشاكل
 
 **الاستخدام:**
-```bash
+\`\`\`bash
 curl http://localhost:3000/api/debug/chat-page
-```
+\`\`\`
 
 ### 5. إضافة دليل استكشاف الأخطاء
 **الملف:** `/docs/CHAT_PAGE_TROUBLESHOOTING.md`
@@ -63,13 +63,13 @@ curl http://localhost:3000/api/debug/chat-page
 3. ابحث عن رسائل تبدأ بـ `[v0]`
 
 ### مثال على الرسائل التي ستراها
-```
+\`\`\`
 [v0] ChatPage error: Connection failed
 [v0] HomePageContent mounted with initialGroups: 5
 [v0] Profile loaded: أحمد
 [v0] Fetching suggested cells for user: user-123
 [v0] Loaded suggested cells: 3
-```
+\`\`\`
 
 ### التشخيص السريع
 1. زر `/api/debug/chat-page` لمعرفة حالة البيانات

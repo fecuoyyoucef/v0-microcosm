@@ -21,9 +21,11 @@ interface ChatContainerProps {
   currentUserRole: "admin" | "member"
 }
 
-// Supabase PostgREST default limit is 1000 rows.
-// We use explicit pagination to bypass this and load all messages.
+// Number of messages fetched per Supabase query page
 const PAGE_SIZE = 100
+// How many messages to show in the initial load and each "load more" batch
+const INITIAL_WINDOW = 500
+const LOAD_MORE_WINDOW = 500
 
 // Splits an array into chunks to avoid hitting query limits on .in() calls
 function chunkArray<T>(arr: T[], size: number): T[][] {
@@ -197,35 +199,35 @@ export function ChatContainer({
   const fetchMessages = useCallback(async () => {
     setIsLoading(true)
 
-    // Page through ALL messages to get the true count and latest batch
-    let allMessages: Record<string, unknown>[] = []
-    let from = 0
-    let keepPaging = true
+    // Fetch the total count first to know if there are older messages
+    const { count: totalCount } = await supabase
+      .from("messages")
+      .select("*", { count: "exact", head: true })
+      .eq("group_id", groupId)
 
-    while (keepPaging) {
-      const { data, error } = await supabase
-        .from("messages")
-        .select("*")
-        .eq("group_id", groupId)
-        .order("created_at", { ascending: true })
-        .range(from, from + PAGE_SIZE - 1)
+    if (!isMounted.current) return
 
-      if (error) {
-        console.error("Error fetching messages page:", error)
-        break
-      }
+    const total = totalCount ?? 0
+    const hasMore = total > INITIAL_WINDOW
 
-      if (data && data.length > 0) {
-        allMessages = [...allMessages, ...data]
-        from += PAGE_SIZE
-        // Continue until we get a partial page (means we've reached the end)
-        if (data.length < PAGE_SIZE) keepPaging = false
-      } else {
-        keepPaging = false
-      }
+    // Fetch only the latest INITIAL_WINDOW messages (ordered ascending for display)
+    const skip = hasMore ? total - INITIAL_WINDOW : 0
+    const { data: rawMessages, error } = await supabase
+      .from("messages")
+      .select("*")
+      .eq("group_id", groupId)
+      .order("created_at", { ascending: true })
+      .range(skip, skip + INITIAL_WINDOW - 1)
+
+    if (error) {
+      console.error("Error fetching messages:", error)
+      setIsLoading(false)
+      return
     }
 
     if (!isMounted.current) return
+
+    const allMessages = rawMessages ?? []
 
     if (allMessages.length === 0) {
       setMessages([])
@@ -235,18 +237,12 @@ export function ChatContainer({
       return
     }
 
-    // For very large histories (>500), keep only the latest 500 in memory initially
-    // and allow loading older ones on demand via "load more"
-    const INITIAL_WINDOW = 500
-    const hasMore = allMessages.length > INITIAL_WINDOW
-    const visibleMessages = hasMore ? allMessages.slice(-INITIAL_WINDOW) : allMessages
-
-    const enriched = await enrichMessages(visibleMessages)
+    const enriched = await enrichMessages(allMessages)
     if (!isMounted.current) return
 
     setMessages(enriched)
     setHasMoreMessages(hasMore)
-    setOldestMessageDate(hasMore ? (visibleMessages[0]?.created_at as string) ?? null : null)
+    setOldestMessageDate(hasMore ? (allMessages[0]?.created_at as string) ?? null : null)
 
     // Mark unread in chunks to stay within API limits
     const unreadIds = visibleMessages.filter((m) => m.sender_id !== currentUserId).map((m) => m.id as string)
@@ -265,12 +261,15 @@ export function ChatContainer({
     setTimeout(scrollToBottom, 100)
   }, [groupId, supabase, currentUserId, enrichMessages])
 
-  // Loads older messages when user scrolls to the top
+  // Loads older messages when user scrolls to the top.
+  // Fetches up to LOAD_MORE_WINDOW messages before oldestMessageDate,
+  // then checks if there are even older ones to determine hasMore.
   const loadMoreMessages = useCallback(async () => {
     if (!oldestMessageDate || isLoadingMore) return
     setIsLoadingMore(true)
 
-    let olderMessages: Record<string, unknown>[] = []
+    // Fetch one extra beyond the window so we know if there are more
+    let allOlderMessages: Record<string, unknown>[] = []
     let from = 0
     let keepPaging = true
 
@@ -284,18 +283,23 @@ export function ChatContainer({
         .range(from, from + PAGE_SIZE - 1)
 
       if (error || !data || data.length === 0) { keepPaging = false; break }
-      olderMessages = [...olderMessages, ...data]
+      allOlderMessages = [...allOlderMessages, ...data]
       from += PAGE_SIZE
-      if (data.length < PAGE_SIZE) keepPaging = false
+      // Stop once we have enough for one window (+ 1 to detect more)
+      if (data.length < PAGE_SIZE || allOlderMessages.length >= LOAD_MORE_WINDOW + 1) keepPaging = false
     }
 
     if (!isMounted.current) { setIsLoadingMore(false); return }
 
-    if (olderMessages.length === 0) {
+    if (allOlderMessages.length === 0) {
       setHasMoreMessages(false)
       setIsLoadingMore(false)
       return
     }
+
+    // If we got more than the window, there are still older messages to load
+    const stillHasMore = allOlderMessages.length > LOAD_MORE_WINDOW
+    const olderMessages = stillHasMore ? allOlderMessages.slice(-LOAD_MORE_WINDOW) : allOlderMessages
 
     const enriched = await enrichMessages(olderMessages)
     if (!isMounted.current) { setIsLoadingMore(false); return }
@@ -307,7 +311,7 @@ export function ChatContainer({
     const scrollTopBefore = container?.scrollTop ?? 0
 
     setMessages((prev) => [...enriched, ...prev])
-    setHasMoreMessages(olderMessages.length >= PAGE_SIZE)
+    setHasMoreMessages(stillHasMore)
     setOldestMessageDate(enriched[0]?.created_at ?? null)
     setIsLoadingMore(false)
 

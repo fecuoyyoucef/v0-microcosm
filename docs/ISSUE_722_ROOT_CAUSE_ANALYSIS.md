@@ -32,7 +32,7 @@
 ## المقارنة التفصيلية
 
 ### v698 - TutorialShell (صحيح)
-```typescript
+\`\`\`typescript
 "use client"
 import { TutorialOverlay } from "./tutorial-overlay"
 import { TutorialTooltip } from "./tutorial-tooltip"
@@ -51,15 +51,15 @@ export function TutorialShell({ children }: TutorialShellProps) {
     </>
   )
 }
-```
+\`\`\`
 
 ### v711 (بعد الإرجاع - صحيح)
-```typescript
+\`\`\`typescript
 // نفس الكود أعلاه - صحيح تماماً
-```
+\`\`\`
 
 ### v699-v710 (خلال المشكلة - خاطئ)
-```typescript
+\`\`\`typescript
 "use client"
 import { TutorialOverlay } from "./tutorial-overlay"
 import { TutorialTooltip } from "./tutorial-tooltip"
@@ -73,10 +73,10 @@ export function TutorialShell() {  // ❌ لا يستقبل children
     </>
   )
 }
-```
+\`\`\`
 
 ### الحالي (بعد الإصلاح الحالي)
-```typescript
+\`\`\`typescript
 "use client"
 import { TutorialOverlay } from "./tutorial-overlay"
 import React from "react"
@@ -96,29 +96,29 @@ export function TutorialShell({ children }: TutorialShellProps) {
     </>
   )
 }
-```
+\`\`\`
 
 ---
 
 ## كيفية تأثير هذا على البنية
 
 ### البنية الهرمية:
-```
+\`\`\`
 app/chat/layout.tsx
   └─> <AppShell>
        └─> <TutorialShell>  // ❌ هنا يحدث القطع
             └─> {children}  // ❌ children لم يكن معروضاً!
                  └─> <HomePageContent>  // ❌ لا يظهر أبداً
-```
+\`\`\`
 
 ### عندما يكون صحيح:
-```
+\`\`\`
 app/chat/layout.tsx
   └─> <AppShell>
        └─> <TutorialShell>  // ✅ يستقبل children
             └─> {children}  // ✅ يعيده
                  └─> <HomePageContent>  // ✅ يظهر بشكل طبيعي
-```
+\`\`\`
 
 ---
 
@@ -139,7 +139,7 @@ app/chat/layout.tsx
 ## الإصلاح المطبق
 
 ### التغييرات:
-```typescript
+\`\`\`typescript
 // BEFORE (خاطئ)
 export function TutorialShell() {
   return (...)
@@ -159,7 +159,7 @@ export function TutorialShell({ children }: TutorialShellProps) {
     </>
   )
 }
-```
+\`\`\`
 
 ### التأثير:
 - صفحة `/chat` تعود للعمل
@@ -180,7 +180,7 @@ export function TutorialShell({ children }: TutorialShellProps) {
 ## الوقاية المستقبلية
 
 ### 1. TypeScript Strict Config
-```json
+\`\`\`json
 {
   "compilerOptions": {
     "strict": true,
@@ -188,10 +188,10 @@ export function TutorialShell({ children }: TutorialShellProps) {
     "strictPropertyInitialization": true
   }
 }
-```
+\`\`\`
 
 ### 2. Component Props Template
-```typescript
+\`\`\`typescript
 interface WrapperProps {
   children: React.ReactNode
   // Other props...
@@ -200,10 +200,10 @@ interface WrapperProps {
 export function Wrapper({ children, ...props }: WrapperProps) {
   return <div {...props}>{children}</div>
 }
-```
+\`\`\`
 
 ### 3. ESLint Rules
-```js
+\`\`\`js
 // .eslintrc.js
 {
   rules: {
@@ -211,10 +211,10 @@ export function Wrapper({ children, ...props }: WrapperProps) {
     "react/require-default-props": "warn"
   }
 }
-```
+\`\`\`
 
 ### 4. Testing
-```typescript
+\`\`\`typescript
 // Ensure children render
 test("TutorialShell renders children", () => {
   render(
@@ -224,7 +224,7 @@ test("TutorialShell renders children", () => {
   )
   expect(screen.getByText("Test Content")).toBeInTheDocument()
 })
-```
+\`\`\`
 
 ---
 

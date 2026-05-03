@@ -8,10 +8,10 @@
 
 ### 1. إضافة المتغير البيئي
 
-```bash
+\`\`\`bash
 # في ملف Vercel Environment Variables
 ADMIN_SECRET_KEY=your-super-secret-key-here-make-it-strong
-```
+\`\`\`
 
 **نصائح الأمان:**
 - استخدم كلمة سر قوية وعشوائية (أطول من 32 حرف)
@@ -25,17 +25,17 @@ ADMIN_SECRET_KEY=your-super-secret-key-here-make-it-strong
 
 #### الطريقة 1: عبر الـ Header (موصى بها - أكثر أماناً)
 
-```bash
+\`\`\`bash
 curl -X POST \
   http://localhost:3000/api/ai-agents/kimi/token-health \
   -H "x-admin-secret: your-admin-secret-key" \
   -H "Content-Type: application/json" \
   -d '{"action": "reset"}'
-```
+\`\`\`
 
 #### الطريقة 2: عبر الـ Body (للمتوافقية)
 
-```bash
+\`\`\`bash
 curl -X POST \
   http://localhost:3000/api/ai-agents/kimi/token-health \
   -H "Content-Type: application/json" \
@@ -43,18 +43,18 @@ curl -X POST \
     "action": "reset",
     "adminKey": "your-admin-secret-key"
   }'
-```
+\`\`\`
 
 ## الـ Endpoints
 
 ### GET - فحص صحة الـ Tokens
 
-```bash
+\`\`\`bash
 GET /api/ai-agents/kimi/token-health
-```
+\`\`\`
 
 **الرد:**
-```json
+\`\`\`json
 {
   "success": true,
   "health": {
@@ -84,38 +84,38 @@ GET /api/ai-agents/kimi/token-health
     }
   ]
 }
-```
+\`\`\`
 
 ### POST - إعادة تعيين جميع الـ Tokens
 
-```bash
+\`\`\`bash
 POST /api/ai-agents/kimi/token-health
-```
+\`\`\`
 
 **مطلوب Admin Key:**
-```json
+\`\`\`json
 {
   "action": "reset",
   "adminKey": "your-admin-secret-key"
 }
-```
+\`\`\`
 
 **الرد الناجح:**
-```json
+\`\`\`json
 {
   "success": true,
   "message": "All HF tokens reset successfully",
   "timestamp": "2026-01-20T12:34:56.000Z"
 }
-```
+\`\`\`
 
 **الرد الخاطئ:**
-```json
+\`\`\`json
 {
   "success": false,
   "error": "Unauthorized - Invalid admin key"
 }
-```
+\`\`\`
 
 ## كيفية الحصول على Admin Key
 
@@ -140,9 +140,9 @@ POST /api/ai-agents/kimi/token-health
 السبب: لم يتم تعيين `ADMIN_SECRET_KEY` كمتغير بيئي
 
 **الحل:**
-```bash
+\`\`\`bash
 ADMIN_SECRET_KEY=your-secret-key
-```
+\`\`\`
 
 ### خطأ: "Unauthorized - Invalid admin key"
 السبب: المفتاح المرسل غير صحيح
@@ -156,7 +156,7 @@ ADMIN_SECRET_KEY=your-secret-key
 
 ### Node.js / JavaScript
 
-```typescript
+\`\`\`typescript
 async function resetTokens(adminKey: string) {
   const response = await fetch(
     '/api/ai-agents/kimi/token-health',
@@ -176,11 +176,11 @@ async function resetTokens(adminKey: string) {
 // الاستخدام
 const result = await resetTokens(process.env.ADMIN_SECRET_KEY!)
 console.log(result)
-```
+\`\`\`
 
 ### Python
 
-```python
+\`\`\`python
 import requests
 
 ADMIN_KEY = "your-admin-secret-key"
@@ -192,11 +192,11 @@ response = requests.post(
 )
 
 print(response.json())
-```
+\`\`\`
 
 ### cURL
 
-```bash
+\`\`\`bash
 # فحص الصحة
 curl http://localhost:3000/api/ai-agents/kimi/token-health
 
@@ -206,7 +206,7 @@ curl -X POST \
   -H "x-admin-secret: $ADMIN_SECRET_KEY" \
   -H "Content-Type: application/json" \
   -d '{"action": "reset"}'
-```
+\`\`\`
 
 ## ملاحظات إضافية
 
