@@ -22,10 +22,10 @@ interface ChatContainerProps {
 }
 
 // Number of messages fetched per Supabase query page
-const PAGE_SIZE = 100
+const PAGE_SIZE = 50
 // How many messages to show in the initial load and each "load more" batch
-const INITIAL_WINDOW = 500
-const LOAD_MORE_WINDOW = 500
+const INITIAL_WINDOW = 50
+const LOAD_MORE_WINDOW = 30
 
 // Splits an array into chunks to avoid hitting query limits on .in() calls
 function chunkArray<T>(arr: T[], size: number): T[][] {
@@ -122,71 +122,47 @@ export function ChatContainer({
     }
   }, [groupId, supabase])
 
-  // Enriches a batch of raw messages with sender profiles, reactions, reads, and reply previews.
-  // Uses chunked .in() queries to stay within PostgREST's 1000-row limit per request.
+  // Enriches a batch of raw messages with sender profiles and reply previews.
+  // Optimized: skips read counts and reactions on initial load for performance.
+  // Reactions are handled via realtime subscriptions and local state.
   const enrichMessages = useCallback(
     async (messagesData: Record<string, unknown>[]) => {
       if (!messagesData.length) return []
 
       const senderIds = [...new Set(messagesData.map((m) => m.sender_id as string))]
 
-      // Fetch profiles for all unique senders
+      // Fetch profiles for all unique senders in a single query (max ~50 senders)
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, display_name, avatar_url")
+        .in("id", senderIds)
+      
       const profileMap = new Map<string, { id: string; display_name: string; avatar_url: string | null }>()
-      const profileChunks = chunkArray(senderIds, 200)
-      await Promise.all(
-        profileChunks.map(async (chunk) => {
-          const { data } = await supabase.from("profiles").select("id, display_name, avatar_url").in("id", chunk)
-          data?.forEach((p) => profileMap.set(p.id, p))
-        }),
-      )
+      profiles?.forEach((p) => profileMap.set(p.id, p))
 
-      const messageIds = messagesData.map((m) => m.id as string)
-
-      // Fetch reads and reactions in parallel, chunked
-      const readCountMap: Record<string, number> = {}
-      const reactionsMap: Record<string, Array<{ id: string; user_id: string; reaction: string }>> = {}
-
-      await Promise.all([
-        // Read counts — chunked
-        ...chunkArray(messageIds, 500).map(async (chunk) => {
-          const { data } = await supabase.from("message_reads").select("message_id").in("message_id", chunk)
-          data?.forEach((r) => {
-            readCountMap[r.message_id] = (readCountMap[r.message_id] || 0) + 1
-          })
-        }),
-        // Reactions — chunked
-        ...chunkArray(messageIds, 500).map(async (chunk) => {
-          const { data } = await supabase.from("message_reactions").select("*").in("message_id", chunk)
-          data?.forEach((r) => {
-            if (!reactionsMap[r.message_id]) reactionsMap[r.message_id] = []
-            reactionsMap[r.message_id].push({ id: r.id, user_id: r.user_id, reaction: r.reaction })
-          })
-        }),
-      ])
-
-      // Fetch reply-to previews — only unique IDs, chunked
+      // Fetch reply-to previews — only unique IDs
       const replyMessagesMap: Record<string, { content: string; sender?: { display_name: string } }> = {}
       const replyToIds = [...new Set(messagesData.filter((m) => m.reply_to).map((m) => m.reply_to as string))]
       if (replyToIds.length > 0) {
-        await Promise.all(
-          chunkArray(replyToIds, 200).map(async (chunk) => {
-            const { data } = await supabase.from("messages").select("id, content, sender_id").in("id", chunk)
-            data?.forEach((rm) => {
-              const senderProfile = profileMap.get(rm.sender_id)
-              replyMessagesMap[rm.id] = {
-                content: rm.content,
-                sender: senderProfile ? { display_name: senderProfile.display_name } : undefined,
-              }
-            })
-          }),
-        )
+        const { data: replyMsgs } = await supabase
+          .from("messages")
+          .select("id, content, sender_id")
+          .in("id", replyToIds)
+        
+        replyMsgs?.forEach((rm) => {
+          const senderProfile = profileMap.get(rm.sender_id)
+          replyMessagesMap[rm.id] = {
+            content: rm.content,
+            sender: senderProfile ? { display_name: senderProfile.display_name } : undefined,
+          }
+        })
       }
 
       return messagesData.map((m) => ({
         ...m,
         sender: profileMap.get(m.sender_id as string) || null,
-        read_count: readCountMap[m.id as string] || 0,
-        reactions: reactionsMap[m.id as string] || [],
+        read_count: 0,
+        reactions: [],
         reply_to_message: m.reply_to ? replyMessagesMap[m.reply_to as string] ?? null : null,
       })) as Message[]
     },
@@ -245,16 +221,14 @@ export function ChatContainer({
     setOldestMessageDate(hasMore ? (allMessages[0]?.created_at as string) ?? null : null)
 
     // Mark unread in chunks to stay within API limits
-    const unreadIds = visibleMessages.filter((m) => m.sender_id !== currentUserId).map((m) => m.id as string)
+    const unreadIds = enriched.filter((m) => m.sender_id !== currentUserId).map((m) => m.id as string)
     if (unreadIds.length > 0) {
-      const batches = chunkArray(unreadIds, 200)
-      batches.forEach((batch) => {
-        fetch("/api/messages/mark-read-bulk", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messageIds: batch }),
-        }).catch((err) => console.error("Failed to mark messages as read:", err))
-      })
+      // Use a single batch request instead of multiple to avoid overwhelming the API
+      fetch("/api/messages/mark-read-bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageIds: unreadIds.slice(0, 100) }),
+      }).catch((err) => console.error("Failed to mark messages as read:", err))
     }
 
     setIsLoading(false)
@@ -262,50 +236,37 @@ export function ChatContainer({
   }, [groupId, supabase, currentUserId, enrichMessages])
 
   // Loads older messages when user scrolls to the top.
-  // Fetches up to LOAD_MORE_WINDOW messages before oldestMessageDate,
-  // then checks if there are even older ones to determine hasMore.
+  // Fetches LOAD_MORE_WINDOW messages before oldestMessageDate in a single query.
   const loadMoreMessages = useCallback(async () => {
     if (!oldestMessageDate || isLoadingMore) return
     setIsLoadingMore(true)
 
-    // Fetch one extra beyond the window so we know if there are more
-    let allOlderMessages: Record<string, unknown>[] = []
-    let from = 0
-    let keepPaging = true
-
-    while (keepPaging) {
-      const { data, error } = await supabase
-        .from("messages")
-        .select("*")
-        .eq("group_id", groupId)
-        .lt("created_at", oldestMessageDate)
-        .order("created_at", { ascending: true })
-        .range(from, from + PAGE_SIZE - 1)
-
-      if (error || !data || data.length === 0) { keepPaging = false; break }
-      allOlderMessages = [...allOlderMessages, ...data]
-      from += PAGE_SIZE
-      // Stop once we have enough for one window (+ 1 to detect more)
-      if (data.length < PAGE_SIZE || allOlderMessages.length >= LOAD_MORE_WINDOW + 1) keepPaging = false
-    }
+    // Single query - fetch LOAD_MORE_WINDOW + 1 to check if there are more
+    const { data, error } = await supabase
+      .from("messages")
+      .select("*")
+      .eq("group_id", groupId)
+      .lt("created_at", oldestMessageDate)
+      .order("created_at", { ascending: false })
+      .limit(LOAD_MORE_WINDOW + 1)
 
     if (!isMounted.current) { setIsLoadingMore(false); return }
 
-    if (allOlderMessages.length === 0) {
+    if (error || !data || data.length === 0) {
       setHasMoreMessages(false)
       setIsLoadingMore(false)
       return
     }
 
     // If we got more than the window, there are still older messages to load
-    const stillHasMore = allOlderMessages.length > LOAD_MORE_WINDOW
-    const olderMessages = stillHasMore ? allOlderMessages.slice(-LOAD_MORE_WINDOW) : allOlderMessages
+    const stillHasMore = data.length > LOAD_MORE_WINDOW
+    // Reverse to get ascending order and trim to window size
+    const olderMessages = (stillHasMore ? data.slice(0, LOAD_MORE_WINDOW) : data).reverse()
 
     const enriched = await enrichMessages(olderMessages)
     if (!isMounted.current) { setIsLoadingMore(false); return }
 
-    // Capture scroll position BEFORE prepending so we can restore it after React re-renders,
-    // preventing the viewport from jumping to the top when new messages are inserted above.
+    // Capture scroll position BEFORE prepending
     const container = scrollContainerRef.current
     const scrollHeightBefore = container?.scrollHeight ?? 0
     const scrollTopBefore = container?.scrollTop ?? 0
@@ -315,8 +276,7 @@ export function ChatContainer({
     setOldestMessageDate(enriched[0]?.created_at ?? null)
     setIsLoadingMore(false)
 
-    // After state flush, restore the relative scroll position so the user
-    // stays exactly where they were before the prepend.
+    // Restore scroll position after React re-renders
     requestAnimationFrame(() => {
       if (!container) return
       const added = container.scrollHeight - scrollHeightBefore
