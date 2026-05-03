@@ -430,15 +430,15 @@ export function MessageInput({
       )}
 
       {showCorrectionHint && !isCorrectingText && (
-        <div className="px-3 py-1 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 flex items-center justify-between animate-in slide-in-from-top-2 duration-200">
-          <p className="text-[11px] text-amber-700 dark:text-amber-300 flex items-center gap-1">
+        <div className="px-3 py-1 bg-accent/10 border-b border-accent/30 flex items-center justify-between animate-in slide-in-from-top-2 duration-200">
+          <p className="text-[11px] text-accent-foreground flex items-center gap-1">
             <SparklesIcon className="w-3 h-3" />
             <span>هل تريد تصحيح النص بالذكاء الاصطناعي؟</span>
           </p>
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 text-[11px] text-amber-700 hover:text-amber-900 dark:text-amber-300"
+            className="h-6 text-[11px] text-accent-foreground hover:bg-accent/20"
             onClick={handleCorrectArabic}
           >
             تصحيح
@@ -447,9 +447,9 @@ export function MessageInput({
       )}
 
       {hasMentions && (
-        <div className="px-3 py-1 bg-violet-50 dark:bg-violet-900/20 border-b border-violet-200 dark:border-violet-800 flex items-center gap-2 animate-in slide-in-from-top-2 duration-200">
-          <AtSignIcon className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400 shrink-0" />
-          <p className="text-[11px] text-violet-700 dark:text-violet-300 flex-1">
+        <div className="px-3 py-1 bg-primary/5 border-b border-primary/20 flex items-center gap-2 animate-in slide-in-from-top-2 duration-200">
+          <AtSignIcon className="w-3.5 h-3.5 text-primary shrink-0" />
+          <p className="text-[11px] text-primary/80 flex-1">
             ذكرت {mentionedUsers.length} {mentionedUsers.length === 1 ? "شخص" : "أشخاص"}
           </p>
         </div>
@@ -488,13 +488,13 @@ export function MessageInput({
           </div>
         )}
 
-        {/* Input row - redesigned to prevent overflow */}
+        {/* Input row */}
         <div className="flex items-center gap-2 w-full max-w-full">
-          {/* Camera button */}
+          {/* Attach button - subtle, secondary action */}
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon"
-            className="h-10 w-10 shrink-0 rounded-full border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-colors bg-transparent"
+            className="h-10 w-10 shrink-0 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploadingFiles}
             title="إرفاق ملفات"
@@ -510,8 +510,8 @@ export function MessageInput({
             className="hidden"
           />
 
-          {/* Text input container */}
-          <div className="flex-1 min-w-0 flex items-center gap-1 border border-border/80 bg-muted/30 rounded-full px-3 py-1 relative">
+          {/* Text input container - cleaner pill */}
+          <div className="flex-1 min-w-0 flex items-center gap-1 border border-border/60 bg-muted/40 rounded-full px-3 py-1 relative focus-within:border-primary/40 focus-within:bg-background transition-colors">
             {/* Layer picker */}
             <Popover open={isLayerOpen} onOpenChange={setIsLayerOpen}>
               <PopoverTrigger asChild>
@@ -610,18 +610,22 @@ export function MessageInput({
                 </Popover>
               )}
 
-              {/* Send button */}
+              {/* Send button - becomes solid primary when there's content */}
               <Button
                 onClick={handleSend}
                 disabled={(!content.trim() && selectedFiles.length === 0) || isSending || isCorrectingText}
-                variant="ghost"
                 size="icon"
-                className="h-7 w-7 rounded-full p-0 text-primary hover:text-primary"
+                className={cn(
+                  "h-8 w-8 rounded-full p-0 transition-all shrink-0",
+                  content.trim() || selectedFiles.length > 0
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+                    : "bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
               >
                 {isSending || isCorrectingText ? (
                   <Loader2Icon className="w-4 h-4 animate-spin" />
                 ) : (
-                  <SendIcon className="w-4 h-4" />
+                  <SendIcon className="w-4 h-4 rtl:-scale-x-100" />
                 )}
               </Button>
             </div>

@@ -160,10 +160,10 @@ body {
   --sidebar-ring: oklch(0.7 0.14 195);
 }
 
-/* Arabic-first font configuration with display heading variant */
+/* Single clean Arabic-first font system - no decorative fonts */
 @theme inline {
-  --font-sans: var(--font-arabic), "IBM Plex Sans Arabic", "Inter", system-ui, sans-serif;
-  --font-heading: var(--font-display), "Reem Kufi", var(--font-arabic), system-ui, sans-serif;
+  --font-sans: var(--font-arabic), "IBM Plex Sans Arabic", system-ui, sans-serif;
+  --font-heading: var(--font-arabic), "IBM Plex Sans Arabic", system-ui, sans-serif;
   --font-mono: "Geist Mono", "Geist Mono Fallback", monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);

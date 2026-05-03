@@ -1,6 +1,6 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
-import { IBM_Plex_Sans_Arabic, Geist_Mono, Reem_Kufi } from "next/font/google"
+import { IBM_Plex_Sans_Arabic, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/theme-provider"
 import { SettingsProvider } from "@/components/settings-provider"
@@ -14,14 +14,6 @@ const ibmPlexArabic = IBM_Plex_Sans_Arabic({
   subsets: ["arabic", "latin"],
   weight: ["300", "400", "500", "600", "700"],
   variable: "--font-arabic",
-  display: "swap",
-})
-
-// Display font for headings - distinctive Arabic identity
-const reemKufi = Reem_Kufi({
-  subsets: ["arabic", "latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-display",
   display: "swap",
 })
 
@@ -89,7 +81,7 @@ export default function RootLayout({
       lang="ar"
       dir="rtl"
       suppressHydrationWarning
-      className={`${ibmPlexArabic.variable} ${reemKufi.variable} ${geistMono.variable} bg-background`}
+      className={`${ibmPlexArabic.variable} ${geistMono.variable} bg-background`}
     >
       <head>
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />

@@ -378,7 +378,15 @@ export function GroupsListPage({ groups: initialGroups, userId, profile, hasComp
   }
 
   const getGroupColor = (name: string) => {
-    const colors = ["bg-blue-500", "bg-emerald-500", "bg-violet-500", "bg-amber-500", "bg-rose-500", "bg-cyan-500"]
+    // Aligned with brand palette across the app for visual consistency
+    const colors = [
+      "bg-gradient-to-br from-[oklch(0.55_0.13_195)] to-[oklch(0.62_0.15_165)]",
+      "bg-gradient-to-br from-[oklch(0.78_0.16_70)] to-[oklch(0.68_0.18_35)]",
+      "bg-gradient-to-br from-[oklch(0.62_0.15_165)] to-[oklch(0.55_0.13_195)]",
+      "bg-gradient-to-br from-[oklch(0.5_0.12_240)] to-[oklch(0.55_0.13_195)]",
+      "bg-gradient-to-br from-[oklch(0.68_0.18_35)] to-[oklch(0.78_0.16_70)]",
+      "bg-gradient-to-br from-[oklch(0.55_0.13_195)] to-[oklch(0.5_0.12_240)]",
+    ]
     return colors[name.charCodeAt(0) % colors.length]
   }
 
@@ -408,41 +416,42 @@ export function GroupsListPage({ groups: initialGroups, userId, profile, hasComp
 
   return (
     <div className="flex flex-col h-full max-h-[100dvh] overflow-hidden relative bg-background">
-      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border/50">
+      <header className="sticky top-0 z-10 glass border-b border-border/40">
         <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <Button
               variant="ghost"
               size="icon"
               className="rounded-full hover:bg-primary/10"
               onClick={() => setIsSidebarOpen(true)}
             >
-              <div className="w-8 h-8 relative">
-                <Avatar className="w-8 h-8">
-                  <AvatarImage src={profile?.avatar_url || undefined} className="object-cover" />
-                  <AvatarFallback className="bg-primary/10 text-primary">
-                    {profile?.full_name?.charAt(0) || <User className="w-4 h-4" />}
-                  </AvatarFallback>
-                </Avatar>
-              </div>
+              <Avatar className="w-8 h-8">
+                <AvatarImage src={profile?.avatar_url || undefined} className="object-cover" />
+                <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                  {profile?.full_name?.charAt(0) || <User className="w-4 h-4" />}
+                </AvatarFallback>
+              </Avatar>
             </Button>
-            <h1 className="text-lg font-semibold">{t.chats}</h1>
+            <h1 className="text-lg font-semibold truncate">{t.chats}</h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 shrink-0">
             <Link href="/chat/notifications">
-              <Button variant="ghost" size="icon" className="rounded-full hover:bg-primary/10 relative">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full hover:bg-primary/10 hover:text-primary relative h-10 w-10"
+              >
                 <Bell className="w-5 h-5" />
                 {unreadNotifications > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center">
+                  <span className="absolute top-0.5 right-0.5 min-w-[18px] h-[18px] px-1 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full flex items-center justify-center tabular-nums">
                     {unreadNotifications > 9 ? "9+" : unreadNotifications}
                   </span>
                 )}
               </Button>
             </Link>
             <Button
-              variant="ghost"
               size="icon"
-              className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
+              className="rounded-full h-10 w-10 shadow-synaptic-glow"
               onClick={handleOpenCreateDialog}
             >
               <Plus className="w-5 h-5" />
@@ -451,12 +460,12 @@ export function GroupsListPage({ groups: initialGroups, userId, profile, hasComp
         </div>
         <div className="px-4 pb-3">
           <div className="relative">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Search className="absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t.search}
-              className="pr-10 bg-secondary/50 border-0 rounded-xl h-10"
+              className="pe-10 bg-muted/40 border-border/50 rounded-xl h-10"
             />
           </div>
         </div>
@@ -481,35 +490,61 @@ export function GroupsListPage({ groups: initialGroups, userId, profile, hasComp
             )}
           </div>
         ) : (
-          <div className="divide-y divide-border">
-            {filteredGroups.map((group) => (
-              <Link key={group.id} href={`/chat/${group.id}`}>
-                <div className="flex items-center gap-3 p-4 hover:bg-secondary/50 transition-colors">
-                  <Avatar className={cn("h-12 w-12", getGroupColor(group.name))}>
-                    {group.avatar_url ? (
-                      <AvatarImage src={group.avatar_url || "/placeholder.svg"} className="object-cover" />
-                    ) : (
-                      <AvatarFallback className="bg-transparent text-white font-bold">
-                        {group.name.substring(0, 2)}
-                      </AvatarFallback>
+          <div className="px-2 py-1 space-y-0.5">
+            {filteredGroups.map((group) => {
+              const hasUnread = unreadCounts[group.id] > 0
+              return (
+                <Link key={group.id} href={`/chat/${group.id}`} className="block">
+                  <div
+                    className={cn(
+                      "flex items-center gap-3 p-3 rounded-2xl transition-all",
+                      "hover:bg-muted/60 active:scale-[0.99]",
+                      hasUnread && "bg-primary/[0.04]",
                     )}
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold truncate">{group.name}</h3>
-                      {unreadCounts[group.id] > 0 && (
-                        <span className="h-5 min-w-5 px-1.5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center font-medium">
-                          {unreadCounts[group.id] > 99 ? "99+" : unreadCounts[group.id]}
-                        </span>
+                  >
+                    <Avatar
+                      className={cn(
+                        "h-12 w-12 rounded-2xl shrink-0 ring-2 ring-background shadow-sm",
+                        !group.avatar_url && getGroupColor(group.name),
                       )}
+                    >
+                      {group.avatar_url ? (
+                        <AvatarImage src={group.avatar_url || "/placeholder.svg"} className="object-cover" />
+                      ) : (
+                        <AvatarFallback className="bg-transparent text-white font-bold text-base rounded-2xl">
+                          {group.name.substring(0, 2)}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-0.5">
+                        <h3
+                          className={cn(
+                            "truncate text-[15px]",
+                            hasUnread ? "font-bold text-foreground" : "font-semibold text-foreground/90",
+                          )}
+                        >
+                          {group.name}
+                        </h3>
+                        {hasUnread && (
+                          <span className="h-5 min-w-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[11px] flex items-center justify-center font-bold shrink-0 tabular-nums">
+                            {unreadCounts[group.id] > 99 ? "99+" : unreadCounts[group.id]}
+                          </span>
+                        )}
+                      </div>
+                      <p
+                        className={cn(
+                          "text-sm truncate",
+                          hasUnread ? "text-foreground/70" : "text-muted-foreground",
+                        )}
+                      >
+                        {group.description || `${memberCounts[group.id] || 1} ${t.members}`}
+                      </p>
                     </div>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {group.description || `${memberCounts[group.id] || 1} ${t.members}`}
-                    </p>
                   </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              )
+            })}
           </div>
         )}
       </ScrollArea>
