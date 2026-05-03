@@ -649,6 +649,8 @@ export function ChatContainer({
               type: "new_message",
               title: `${currentProfile?.display_name || "مستخدم"} في ${group.name}`,
               body: content.substring(0, 150),
+              groupId,
+              senderId: currentUserId,
               data: {
                 url: `/chat/${groupId}`,
                 groupId,

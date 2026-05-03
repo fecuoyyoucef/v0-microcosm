@@ -115,7 +115,7 @@ export function PushNotificationManager({ userId }: PushNotificationManagerProps
 
           // Don't show notification if user is currently in that cell
           const isInActiveCell = activeCellIdRef.current && notif.group_id === activeCellIdRef.current
-          
+
           if (isInActiveCell) {
             // Auto-mark as read since user is already in the cell
             supabase
@@ -126,22 +126,12 @@ export function PushNotificationManager({ userId }: PushNotificationManagerProps
             return
           }
 
-          if (Notification.permission === "granted" && document.visibilityState === "visible") {
-            const iconMap: Record<string, string> = {
-              new_message: "💬",
-              mention: "@",
-              reaction: "❤️",
-              group_invite: "👥",
-              group_join: "✅",
-              group_leave: "👋",
-              decision_created: "🗳️",
-              decision_closed: "✅",
-              memory_generated: "🧠",
-              system: "📢",
-            }
-
+          // Only show browser notification when the tab is hidden (backgrounded).
+          // When visible, FCM / service-worker already delivered the push notification,
+          // so showing another one here would duplicate it.
+          if (Notification.permission === "granted" && document.visibilityState === "hidden") {
             const notification = new Notification(notif.title || "Synaptic Space", {
-              body: `${iconMap[notif.type] || "🔔"} ${notif.body || "لديك إشعار جديد"}`,
+              body: notif.body || "لديك إشعار جديد",
               icon: "/icons/icon-192x192.png",
               tag: `notif-${notif.id}`,
               data: {

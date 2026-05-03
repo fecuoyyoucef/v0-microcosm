@@ -4,13 +4,22 @@ import { sendPushNotificationToMany } from "@/lib/firebase-admin-server"
 
 export async function POST(request: Request) {
   try {
-    const { userIds, type, title, body, data } = await request.json()
+    const { userIds: rawUserIds, type, title, body, data, groupId, senderId } = await request.json()
 
-    if (!userIds || userIds.length === 0 || !type || !title) {
+    if (!rawUserIds || rawUserIds.length === 0 || !type || !title) {
       return NextResponse.json({ error: "بيانات مفقودة" }, { status: 400 })
     }
 
     const supabase = await createClient()
+
+    // Exclude the sender from receiving a notification
+    const userIds: string[] = senderId
+      ? rawUserIds.filter((id: string) => id !== senderId)
+      : rawUserIds
+
+    if (userIds.length === 0) {
+      return NextResponse.json({ success: true, notificationsCreated: 0, pushSentCount: 0, pushFailedCount: 0 })
+    }
 
     const notifications = userIds.map((userId: string) => ({
       user_id: userId,
@@ -19,6 +28,8 @@ export async function POST(request: Request) {
       body: body || "",
       is_read: false,
       data: data || {},
+      group_id: groupId || null,
+      sender_id: senderId || null,
     }))
 
     const { error: notifError } = await supabase.from("notifications").insert(notifications)
