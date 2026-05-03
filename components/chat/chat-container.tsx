@@ -103,27 +103,28 @@ export function ChatContainer({
       .order("sort_order", { ascending: true })
 
     if (data && isMounted.current) {
-      const nodeIds = data.map((n) => n.id)
-      const { data: messageCounts } = await supabase.from("messages").select("node_id").in("node_id", nodeIds)
-
-      const countMap: Record<string, number> = {}
-      messageCounts?.forEach((m) => {
-        if (m.node_id) {
-          countMap[m.node_id] = (countMap[m.node_id] || 0) + 1
-        }
+      setNodes((prevNodes) => {
+        const nodesWithCounts = data.map((node) => ({
+          ...node,
+          // Preserve existing count so we don't need an extra DB round-trip
+          messages_count: prevNodes.find((n) => n.id === node.id)?.messages_count ?? 0,
+        }))
+        return nodesWithCounts
       })
-
-      const nodesWithCounts = data.map((node) => ({
-        ...node,
-        messages_count: countMap[node.id] || 0,
-      }))
-
-      setNodes(nodesWithCounts)
     }
   }, [groupId, supabase])
 
-  // Enriches a batch of raw messages with sender profiles, reactions, reads, and reply previews.
-  // Uses chunked .in() queries to stay within PostgREST's 1000-row limit per request.
+  // Recompute node message counts from the already-loaded messages array (no extra DB query)
+  const updateNodeCountsFromMessages = useCallback((loadedMessages: Message[]) => {
+    const countMap: Record<string, number> = {}
+    loadedMessages.forEach((m) => {
+      if (m.node_id) countMap[m.node_id] = (countMap[m.node_id] || 0) + 1
+    })
+    setNodes((prev) => prev.map((n) => ({ ...n, messages_count: countMap[n.id] ?? n.messages_count })))
+  }, [])
+
+  // Enriches a batch of raw messages with sender profiles and reply previews only.
+  // Reads and reactions are loaded lazily after messages are rendered.
   const enrichMessages = useCallback(
     async (messagesData: Record<string, unknown>[]) => {
       if (!messagesData.length) return []
@@ -139,30 +140,6 @@ export function ChatContainer({
           data?.forEach((p) => profileMap.set(p.id, p))
         }),
       )
-
-      const messageIds = messagesData.map((m) => m.id as string)
-
-      // Fetch reads and reactions in parallel, chunked
-      const readCountMap: Record<string, number> = {}
-      const reactionsMap: Record<string, Array<{ id: string; user_id: string; reaction: string }>> = {}
-
-      await Promise.all([
-        // Read counts — chunked
-        ...chunkArray(messageIds, 500).map(async (chunk) => {
-          const { data } = await supabase.from("message_reads").select("message_id").in("message_id", chunk)
-          data?.forEach((r) => {
-            readCountMap[r.message_id] = (readCountMap[r.message_id] || 0) + 1
-          })
-        }),
-        // Reactions — chunked
-        ...chunkArray(messageIds, 500).map(async (chunk) => {
-          const { data } = await supabase.from("message_reactions").select("*").in("message_id", chunk)
-          data?.forEach((r) => {
-            if (!reactionsMap[r.message_id]) reactionsMap[r.message_id] = []
-            reactionsMap[r.message_id].push({ id: r.id, user_id: r.user_id, reaction: r.reaction })
-          })
-        }),
-      ])
 
       // Fetch reply-to previews — only unique IDs, chunked
       const replyMessagesMap: Record<string, { content: string; sender?: { display_name: string } }> = {}
@@ -185,10 +162,34 @@ export function ChatContainer({
       return messagesData.map((m) => ({
         ...m,
         sender: profileMap.get(m.sender_id as string) || null,
-        read_count: readCountMap[m.id as string] || 0,
-        reactions: reactionsMap[m.id as string] || [],
+        read_count: 0,
+        reactions: [],
         reply_to_message: m.reply_to ? replyMessagesMap[m.reply_to as string] ?? null : null,
       })) as Message[]
+    },
+    [supabase],
+  )
+
+  // Loads reactions for the current visible messages in the background after initial render.
+  const loadReactionsInBackground = useCallback(
+    async (messageIds: string[]) => {
+      if (!messageIds.length) return
+      const reactionsMap: Record<string, Array<{ id: string; user_id: string; reaction: string }>> = {}
+      await Promise.all(
+        chunkArray(messageIds, 500).map(async (chunk) => {
+          const { data } = await supabase.from("message_reactions").select("*").in("message_id", chunk)
+          data?.forEach((r) => {
+            if (!reactionsMap[r.message_id]) reactionsMap[r.message_id] = []
+            reactionsMap[r.message_id].push({ id: r.id, user_id: r.user_id, reaction: r.reaction })
+          })
+        }),
+      )
+      if (!isMounted.current) return
+      setMessages((prev) =>
+        prev.map((m) =>
+          reactionsMap[m.id] ? { ...m, reactions: reactionsMap[m.id] } : m,
+        ),
+      )
     },
     [supabase],
   )
@@ -243,9 +244,18 @@ export function ChatContainer({
     setMessages(enriched)
     setHasMoreMessages(hasMore)
     setOldestMessageDate(hasMore ? (allMessages[0]?.created_at as string) ?? null : null)
+    setIsLoading(false)
+    setTimeout(scrollToBottom, 100)
 
-    // Mark unread in chunks to stay within API limits
-    const unreadIds = visibleMessages.filter((m) => m.sender_id !== currentUserId).map((m) => m.id as string)
+    // Update node counts from loaded messages (no extra DB query)
+    updateNodeCountsFromMessages(enriched)
+
+    // Load reactions in background after messages are visible
+    const messageIds = enriched.map((m) => m.id as string)
+    loadReactionsInBackground(messageIds)
+
+    // Mark messages as read in background (fire and forget)
+    const unreadIds = enriched.filter((m) => m.sender_id !== currentUserId).map((m) => m.id as string)
     if (unreadIds.length > 0) {
       const batches = chunkArray(unreadIds, 200)
       batches.forEach((batch) => {
@@ -256,10 +266,7 @@ export function ChatContainer({
         }).catch((err) => console.error("Failed to mark messages as read:", err))
       })
     }
-
-    setIsLoading(false)
-    setTimeout(scrollToBottom, 100)
-  }, [groupId, supabase, currentUserId, enrichMessages])
+  }, [groupId, supabase, currentUserId, enrichMessages, loadReactionsInBackground, updateNodeCountsFromMessages])
 
   // Loads older messages when user scrolls to the top.
   // Fetches up to LOAD_MORE_WINDOW messages before oldestMessageDate,
@@ -315,6 +322,9 @@ export function ChatContainer({
     setOldestMessageDate(enriched[0]?.created_at ?? null)
     setIsLoadingMore(false)
 
+    // Load reactions for the newly prepended messages in background
+    loadReactionsInBackground(enriched.map((m) => m.id as string))
+
     // After state flush, restore the relative scroll position so the user
     // stays exactly where they were before the prepend.
     requestAnimationFrame(() => {
@@ -322,7 +332,7 @@ export function ChatContainer({
       const added = container.scrollHeight - scrollHeightBefore
       container.scrollTop = scrollTopBefore + added
     })
-  }, [oldestMessageDate, isLoadingMore, groupId, supabase, enrichMessages])
+  }, [oldestMessageDate, isLoadingMore, groupId, supabase, enrichMessages, loadReactionsInBackground])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
