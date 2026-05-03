@@ -193,6 +193,7 @@ export const MessageList = React.memo(function MessageList({
   onEditSelect,
   onMessageDeleted,
   setMessages,
+  scrollContainerRef,
 }: MessageListProps) {
   const supabase = createClient()
 
