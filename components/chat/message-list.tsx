@@ -562,13 +562,13 @@ export const MessageList = React.memo(function MessageList({
               <button
                 type="button"
                 className={cn(
-                  "block w-full text-start px-2.5 pt-2 pb-0",
+                  "block w-full text-start px-2.5 pt-2 pb-0 overflow-hidden min-w-0",
                   "first:rounded-t-2xl",
                 )}
               >
                 <div
                   className={cn(
-                    "flex flex-col gap-0.5 px-2.5 py-1.5 rounded-lg",
+                    "flex flex-col gap-0.5 px-2.5 py-1.5 rounded-lg overflow-hidden min-w-0",
                     "border-s-[3px]",
                     isOwn
                       ? "bg-black/10 dark:bg-white/10 border-s-primary-foreground/60"
@@ -577,7 +577,7 @@ export const MessageList = React.memo(function MessageList({
                 >
                   <span
                     className={cn(
-                      "text-[11px] font-semibold leading-tight",
+                      "text-[11px] font-semibold leading-tight truncate",
                       isOwn ? "text-primary-foreground/90" : "text-primary",
                     )}
                   >
@@ -585,7 +585,7 @@ export const MessageList = React.memo(function MessageList({
                   </span>
                   <span
                     className={cn(
-                      "text-xs truncate leading-tight",
+                      "text-xs leading-tight line-clamp-2",
                       isOwn ? "text-primary-foreground/75" : "text-muted-foreground",
                     )}
                   >
