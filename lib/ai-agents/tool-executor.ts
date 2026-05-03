@@ -67,25 +67,6 @@ export async function executeToolCall(
     }
   }
 }
-    }
-
-    // Route to appropriate tool handler
-    const result = await routeToolCall(name, args)
-
-    // Log execution to database
-    await logToolExecution(toolCall, result)
-
-    console.log("[v0] Tool execution result:", result)
-
-    return result
-  } catch (error: any) {
-    console.error("[v0] Tool execution error:", error)
-    return {
-      success: false,
-      error: `Tool execution failed: ${error.message}`,
-    }
-  }
-}
 
 /**
  * Execute multiple tool calls in sequence
