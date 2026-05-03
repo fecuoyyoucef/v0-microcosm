@@ -212,27 +212,33 @@ export const MessageList = React.memo(function MessageList({
   const longPressTimer = useRef<NodeJS.Timeout | null>(null)
   const touchStartPos = useRef<{ x: number; y: number } | null>(null)
   const isTouchMoving = useRef(false)
-  const topSentinelRef = useRef<HTMLDivElement | null>(null)
-
-  // Trigger loadMoreMessages automatically when user scrolls to the top sentinel
+  // Stable ref so the scroll handler always reads the latest values without
+  // being re-registered on every render.
+  const loadMoreRef = useRef({ hasMoreMessages, isLoadingMore, onLoadMore })
   React.useEffect(() => {
-    if (!hasMoreMessages || !onLoadMore) return
-    const sentinel = topSentinelRef.current
-    if (!sentinel) return
+    loadMoreRef.current = { hasMoreMessages, isLoadingMore, onLoadMore }
+  })
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && !isLoadingMore) {
-          onLoadMore()
-        }
-      },
-      // root is the scrollable container; trigger when sentinel is fully visible
-      { root: scrollContainerRef?.current ?? null, threshold: 1.0 },
-    )
+  // Attach a scroll listener to the container once. Fires loadMore when the
+  // user scrolls within 120 px of the top edge (oldest messages direction).
+  React.useEffect(() => {
+    const container = scrollContainerRef?.current
+    if (!container) return
 
-    observer.observe(sentinel)
-    return () => observer.disconnect()
-  }, [hasMoreMessages, isLoadingMore, onLoadMore, scrollContainerRef])
+    const handleScroll = () => {
+      const { hasMoreMessages, isLoadingMore, onLoadMore } = loadMoreRef.current
+      if (!hasMoreMessages || isLoadingMore || !onLoadMore) return
+      // scrollTop ≈ 0 means we are at the very top; 120 px threshold gives
+      // a comfortable early trigger before the user bounces off the edge.
+      if (container.scrollTop <= 120) {
+        onLoadMore()
+      }
+    }
+
+    container.addEventListener("scroll", handleScroll, { passive: true })
+    return () => container.removeEventListener("scroll", handleScroll)
+    // Only re-attach when the container itself changes, not on every render.
+  }, [scrollContainerRef])
 
   /* Split & enrich */
   const { pinnedMessages, regularEnriched, latestPinned } = useMemo(() => {
@@ -739,10 +745,7 @@ export const MessageList = React.memo(function MessageList({
       )}
 
       <div className="flex-1 px-3 pt-3 space-y-0">
-        {/* Invisible sentinel at the top — IntersectionObserver watches this to auto-load older messages */}
-        <div ref={topSentinelRef} className="h-px w-full" aria-hidden />
-
-        {/* Subtle loading indicator while fetching older messages — no button needed */}
+        {/* Subtle loading indicator while fetching older messages — triggered by scroll to top */}
         {isLoadingMore && (
           <div className="flex justify-center items-center py-3">
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground/60" />

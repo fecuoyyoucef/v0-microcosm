@@ -300,10 +300,24 @@ export function ChatContainer({
     const enriched = await enrichMessages(olderMessages)
     if (!isMounted.current) { setIsLoadingMore(false); return }
 
+    // Capture scroll position BEFORE prepending so we can restore it after React re-renders,
+    // preventing the viewport from jumping to the top when new messages are inserted above.
+    const container = scrollContainerRef.current
+    const scrollHeightBefore = container?.scrollHeight ?? 0
+    const scrollTopBefore = container?.scrollTop ?? 0
+
     setMessages((prev) => [...enriched, ...prev])
     setHasMoreMessages(olderMessages.length >= PAGE_SIZE)
     setOldestMessageDate(enriched[0]?.created_at ?? null)
     setIsLoadingMore(false)
+
+    // After state flush, restore the relative scroll position so the user
+    // stays exactly where they were before the prepend.
+    requestAnimationFrame(() => {
+      if (!container) return
+      const added = container.scrollHeight - scrollHeightBefore
+      container.scrollTop = scrollTopBefore + added
+    })
   }, [oldestMessageDate, isLoadingMore, groupId, supabase, enrichMessages])
 
   const scrollToBottom = () => {
