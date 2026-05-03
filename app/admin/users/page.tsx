@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Search, MoreVertical, Mail, Calendar, RefreshCw } from "lucide-react"
 
@@ -157,21 +156,21 @@ export default function UsersPage() {
       {/* Users List */}
       <Card className="bg-slate-900/50 border-slate-800">
         <CardContent className="p-0">
-          <ScrollArea className="h-[calc(100vh-280px)]">
-            <div className="divide-y divide-slate-800">
+          <div className="overflow-y-auto overflow-x-auto h-[calc(100vh-280px)]">
+            <div className="min-w-[600px] divide-y divide-slate-800">
               {filteredUsers.map((user) => (
                 <div
                   key={user.id}
                   className="flex items-center justify-between p-4 hover:bg-slate-800/30 transition-colors"
                 >
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-12 w-12">
+                  <div className="flex items-center gap-4 min-w-0 flex-1">
+                    <Avatar className="h-12 w-12 flex-shrink-0">
                       <AvatarImage src={user.avatar_url || undefined} />
                       <AvatarFallback className="bg-blue-500/20 text-blue-400">
                         {user.display_name?.charAt(0) || "U"}
                       </AvatarFallback>
                     </Avatar>
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <h3 className="font-medium text-white">{user.display_name || "مستخدم"}</h3>
                         {user.username && <span className="text-sm text-slate-400">@{user.username}</span>}
@@ -188,12 +187,12 @@ export default function UsersPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 flex-shrink-0 pl-4">
                     <div className="flex items-center gap-3 text-sm">
-                      <Badge variant="outline" className="border-emerald-500/50 text-emerald-400">
+                      <Badge variant="outline" className="border-emerald-500/50 text-emerald-400 whitespace-nowrap">
                         {user.total_points || 0} نقطة
                       </Badge>
-                      <Badge variant="outline" className="border-blue-500/50 text-blue-400">
+                      <Badge variant="outline" className="border-blue-500/50 text-blue-400 whitespace-nowrap">
                         {user.responsibility_score || 0}% مسؤولية
                       </Badge>
                     </div>
@@ -213,7 +212,7 @@ export default function UsersPage() {
                 </div>
               ))}
             </div>
-          </ScrollArea>
+          </div>
         </CardContent>
       </Card>
     </div>
