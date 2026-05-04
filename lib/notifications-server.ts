@@ -2,6 +2,14 @@ import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import type { NotificationType } from "@/lib/types"
 import { sendPushNotificationToMany } from "@/lib/firebase-admin-server"
+import {
+  type NotificationPreferences,
+  type CellNotificationSetting,
+  shouldSendInApp,
+  shouldSendPush,
+  isCellMuted,
+  channelForType,
+} from "@/lib/notifications/preferences"
 
 interface SendNotificationParams {
   userIds: string[]
@@ -14,6 +22,44 @@ interface SendNotificationParams {
   messageId?: string
 }
 
+/**
+ * Bulk-load preferences and per-cell settings for the given users.
+ * Uses the service client (RLS bypass) so server can read other users' rows.
+ */
+async function loadPreferencesForUsers(
+  userIds: string[],
+  groupId?: string,
+): Promise<{
+  prefs: Map<string, NotificationPreferences>
+  cellSettings: Map<string, CellNotificationSetting>
+}> {
+  const service = createServiceClient()
+  const prefs = new Map<string, NotificationPreferences>()
+  const cellSettings = new Map<string, CellNotificationSetting>()
+
+  if (userIds.length === 0) return { prefs, cellSettings }
+
+  const [prefsRes, cellRes] = await Promise.all([
+    service.from("notification_preferences").select("*").in("user_id", userIds),
+    groupId
+      ? service.from("cell_notification_settings").select("*").in("user_id", userIds).eq("group_id", groupId)
+      : Promise.resolve({ data: [] as CellNotificationSetting[], error: null }),
+  ])
+
+  if (prefsRes.data) {
+    for (const row of prefsRes.data as NotificationPreferences[]) {
+      prefs.set(row.user_id, row)
+    }
+  }
+  if (cellRes && "data" in cellRes && cellRes.data) {
+    for (const row of cellRes.data as CellNotificationSetting[]) {
+      cellSettings.set(row.user_id, row)
+    }
+  }
+
+  return { prefs, cellSettings }
+}
+
 export async function sendNotification(params: SendNotificationParams) {
   const supabase = await createClient()
 
@@ -21,7 +67,36 @@ export async function sendNotification(params: SendNotificationParams) {
 
   if (recipients.length === 0) return { success: true, count: 0 }
 
-  const notifications = recipients.map((userId) => ({
+  // Load preferences + per-cell settings for all recipients
+  const { prefs, cellSettings } = await loadPreferencesForUsers(recipients, params.groupId)
+
+  // Filter recipients into in-app and push lists, applying preferences and per-cell mute
+  const inAppRecipients: string[] = []
+  const pushRecipients: string[] = []
+
+  for (const userId of recipients) {
+    const userPrefs = prefs.get(userId) ?? null
+    const cellSetting = cellSettings.get(userId) ?? null
+
+    // Per-cell mute / mentions-only takes precedence
+    if (isCellMuted(cellSetting, params.type)) {
+      continue
+    }
+
+    const inAppChannel = shouldSendInApp(userPrefs, params.type)
+    if (inAppChannel) {
+      inAppRecipients.push(userId)
+      if (shouldSendPush(userPrefs, params.type)) {
+        pushRecipients.push(userId)
+      }
+    }
+  }
+
+  if (inAppRecipients.length === 0) {
+    return { success: true, count: 0, filtered: recipients.length }
+  }
+
+  const notifications = inAppRecipients.map((userId) => ({
     user_id: userId,
     type: params.type,
     title: params.title,
@@ -39,47 +114,61 @@ export async function sendNotification(params: SendNotificationParams) {
     return { success: false, error: error.message }
   }
 
-  try {
-    const serviceSupabase = createServiceClient()
-    const { data: tokens } = await serviceSupabase.from("fcm_tokens").select("token, user_id").in("user_id", recipients)
+  // Send push only to recipients who allow push (subset of inAppRecipients)
+  if (pushRecipients.length > 0) {
+    try {
+      const serviceSupabase = createServiceClient()
+      const { data: tokens } = await serviceSupabase
+        .from("fcm_tokens")
+        .select("token, user_id")
+        .in("user_id", pushRecipients)
 
-    if (tokens && tokens.length > 0) {
-      const tokenStrings = tokens.map((t) => t.token)
+      if (tokens && tokens.length > 0) {
+        const tokenStrings = tokens.map((t) => t.token)
 
-      console.log(`[Notifications] Sending push to ${tokenStrings.length} tokens for ${recipients.length} users`)
+        const channel = channelForType(params.type)
+        const isImportant = channel === "mention" || channel === "decision" || channel === "message"
 
-      const pushData: Record<string, string> = {
-        type: params.type,
-        notification_id: data?.[0]?.id || "",
-        priority: params.type === "mention" || params.type === "new_message" ? "high" : "normal",
+        const pushData: Record<string, string> = {
+          type: params.type,
+          notification_id: data?.[0]?.id || "",
+          channel,
+          priority: isImportant ? "high" : "normal",
+        }
+
+        if (params.groupId) pushData.group_id = params.groupId
+        if (params.messageId) pushData.message_id = params.messageId
+        if (params.data) {
+          Object.entries(params.data).forEach(([key, value]) => {
+            pushData[key] = String(value)
+          })
+        }
+
+        const result = await sendPushNotificationToMany(
+          tokenStrings,
+          params.title,
+          params.body || params.title,
+          pushData,
+        )
+
+        if (result.invalidTokens && result.invalidTokens.length > 0) {
+          await supabase.from("fcm_tokens").delete().in("token", result.invalidTokens)
+        }
+
+        console.log(
+          `[Notifications] Push results: ${result.success} success, ${result.failure} failed of ${tokenStrings.length} tokens (${pushRecipients.length} push-eligible recipients)`,
+        )
       }
-
-      if (params.groupId) pushData.group_id = params.groupId
-      if (params.messageId) pushData.message_id = params.messageId
-      if (params.data) {
-        Object.entries(params.data).forEach(([key, value]) => {
-          pushData[key] = String(value)
-        })
-      }
-
-      const result = await sendPushNotificationToMany(tokenStrings, params.title, params.body || params.title, pushData)
-
-      if (result.invalidTokens && result.invalidTokens.length > 0) {
-        console.log(`[Notifications] Removing ${result.invalidTokens.length} invalid tokens`)
-        await supabase.from("fcm_tokens").delete().in("token", result.invalidTokens)
-      }
-
-      console.log(
-        `[Notifications] Push results: ${result.success} success, ${result.failure} failed out of ${tokenStrings.length} total`,
-      )
-    } else {
-      console.log("[Notifications] No FCM tokens found for recipients")
+    } catch (error) {
+      console.error("[Notifications] Push error:", error)
     }
-  } catch (error) {
-    console.error("[Notifications] Push error:", error)
   }
 
-  return { success: true, count: data.length }
+  return {
+    success: true,
+    count: data.length,
+    filtered: recipients.length - inAppRecipients.length,
+  }
 }
 
 export async function notifyGroupMembers(
