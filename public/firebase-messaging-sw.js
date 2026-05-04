@@ -78,6 +78,7 @@ async function showNotificationFromPayload(payload) {
   const groupId = payload.data?.group_id
   const senderName = payload.data?.senderName || ""
   const senderAvatar = payload.data?.senderAvatar || ""
+  const cellAvatar = payload.data?.cellAvatar || ""
 
   // Check if user is currently viewing this cell - skip notification if so
   const activeCellId = await getActiveCellId()
@@ -126,10 +127,8 @@ async function showNotificationFromPayload(payload) {
     }).join("\n")
   }
 
-  // Use sender avatar for single message, user-provided notification icon for multiple
-  const notificationIcon = (totalCount === 1 && senderAvatar) 
-    ? senderAvatar 
-    : "/icons/notification-icon.png"
+  // Use cell avatar (the group/cell image) as the large icon; fall back to notification icon
+  const notificationIcon = cellAvatar || "/icons/notification-icon.png"
 
   const notificationOptions = {
     body: aggregatedBody,
