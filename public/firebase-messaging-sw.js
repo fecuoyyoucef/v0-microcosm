@@ -134,6 +134,7 @@ async function showNotificationFromPayload(payload) {
   const notificationOptions = {
     body: aggregatedBody,
     icon: notificationIcon,
+    badge: "/icons/icon-96x96.png",
     image: payload.data?.image || undefined,
     vibrate: [200, 100, 200],
     data: {
