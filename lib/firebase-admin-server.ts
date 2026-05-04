@@ -176,6 +176,7 @@ export async function sendPushNotificationToMany(
             tag: stableTag,
             senderName: data?.senderName || "",
             senderAvatar: data?.senderAvatar || "",
+            cellAvatar: data?.cellAvatar || "",
           },
           // High priority on Android wakes the device from Doze mode and bypasses background throttling.
           // Without this, data-only messages are delayed (or dropped) when the device is idle / app is backgrounded.

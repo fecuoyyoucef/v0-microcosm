@@ -97,6 +97,7 @@ self.addEventListener("push", (event) => {
   const groupId = data.groupId || data.group_id
   const senderName = data.senderName || ""
   const senderAvatar = data.senderAvatar || ""
+  const cellAvatar = data.cellAvatar || ""
   
   // Build body with sender name
   let bodyContent = data.body || "لديك إشعار جديد"
@@ -104,8 +105,8 @@ self.addEventListener("push", (event) => {
     bodyContent = senderName + ":\n" + bodyContent
   }
 
-  // Use sender avatar if available; fall back to the user-provided notification icon (large icon, right side)
-  const iconUrl = senderAvatar || data.icon || "/icons/notification-icon.png"
+  // Use cell avatar (the group/cell image) as the large icon; fall back to notification icon
+  const iconUrl = cellAvatar || data.icon || "/icons/notification-icon.png"
 
   const options = {
     body: bodyContent,
