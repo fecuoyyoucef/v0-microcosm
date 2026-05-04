@@ -120,6 +120,7 @@ export async function sendPushNotificationToMany(
       title,
       body,
       icon: "/icons/icon-192x192.png",
+      badge: "/icons/icon-96x96.png",
       vibrate: [200, 100, 200],
       requireInteraction: data?.priority === "high" || false,
       tag: stableTag,
