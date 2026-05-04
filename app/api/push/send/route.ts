@@ -77,7 +77,7 @@ export async function POST(request: Request) {
     const payload = JSON.stringify({
       title: title || "Synaptic Space",
       body: messageBody || "لديك إشعار جديد",
-      icon: "/icons/icon-192x192.png",
+      icon: "/icons/notification-icon.png",
       // Badge = small status-bar icon. MUST be white-on-transparent — Android renders alpha only.
       badge: "/icons/badge-monochrome.svg",
       url: url || "/chat/notifications",

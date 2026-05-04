@@ -126,10 +126,10 @@ async function showNotificationFromPayload(payload) {
     }).join("\n")
   }
 
-  // Use sender avatar for single message, app icon for multiple
+  // Use sender avatar for single message, user-provided notification icon for multiple
   const notificationIcon = (totalCount === 1 && senderAvatar) 
     ? senderAvatar 
-    : "/icons/icon-192x192.png"
+    : "/icons/notification-icon.png"
 
   const notificationOptions = {
     body: aggregatedBody,
