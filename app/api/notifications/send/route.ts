@@ -65,7 +65,6 @@ export async function POST(request: Request) {
           message_id: data?.messageId || "",
           senderName: data?.senderName || "",
           senderAvatar: data?.senderAvatar || "",
-          cellAvatar: data?.cellAvatar || "",
         })
 
         pushSentCount = result.success
