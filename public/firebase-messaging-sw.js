@@ -42,22 +42,48 @@ async function initializeFirebase() {
   }
 }
 
+// Helper to get active cell ID from IndexedDB
+async function getActiveCellId() {
+  return new Promise((resolve) => {
+    try {
+      const dbRequest = indexedDB.open('synaptic-app', 1)
+      dbRequest.onerror = () => resolve(null)
+      dbRequest.onsuccess = (event) => {
+        try {
+          const db = event.target.result
+          if (!db.objectStoreNames.contains('state')) {
+            resolve(null)
+            return
+          }
+          const tx = db.transaction('state', 'readonly')
+          const store = tx.objectStore('state')
+          const request = store.get('activeCellId')
+          request.onsuccess = () => resolve(request.result || null)
+          request.onerror = () => resolve(null)
+        } catch (e) {
+          resolve(null)
+        }
+      }
+    } catch (e) {
+      resolve(null)
+    }
+  })
+}
+
 // دالة لعرض الإشعار من payload مع تجميع الرسائل من نفس المجموعة
 async function showNotificationFromPayload(payload) {
   const notificationTitle = payload.notification?.title || payload.data?.title || "إشعار جديد"
   const notificationBody = payload.notification?.body || payload.data?.body || ""
   const notificationType = payload.data?.type || "system"
   const groupId = payload.data?.group_id
+  const senderName = payload.data?.senderName || ""
+  const senderAvatar = payload.data?.senderAvatar || ""
 
-  const iconMap = {
-    new_message: "💬",
-    mention: "@",
-    reaction: "❤️",
-    group_invite: "👥",
-    group_join: "✅",
-    decision_created: "🗳️",
-    memory_generated: "🧠",
-    system: "📢",
+  // Check if user is currently viewing this cell - skip notification if so
+  const activeCellId = await getActiveCellId()
+  if (activeCellId && groupId && activeCellId === groupId) {
+    console.log("[SW] Skipping notification - user is viewing this cell:", groupId)
+    return
   }
 
   // Use a stable tag per group so notifications replace (not stack)
@@ -75,27 +101,39 @@ async function showNotificationFromPayload(payload) {
     messages = (existing.data && existing.data.messages) || []
   }
 
-  // Add the new message
-  const icon = iconMap[notificationType] || "🔔"
-  messages.push(icon + " " + notificationBody)
+  // Add the new message with sender name
+  const messageEntry = {
+    senderName: senderName,
+    senderAvatar: senderAvatar,
+    body: notificationBody
+  }
+  messages.push(messageEntry)
 
   // Keep only the last 5 messages
   if (messages.length > 5) {
     messages = messages.slice(-5)
   }
 
-  // Build the aggregated body
+  // Build the aggregated body with sender names
   const totalCount = messages.length
   let aggregatedBody
   if (totalCount === 1) {
-    aggregatedBody = messages[0]
+    const msg = messages[0]
+    aggregatedBody = (msg.senderName ? msg.senderName + ":\n" : "") + msg.body
   } else {
-    aggregatedBody = messages.join("\n")
+    aggregatedBody = messages.map(function(msg) {
+      return (msg.senderName ? msg.senderName + ": " : "") + msg.body
+    }).join("\n")
   }
+
+  // Use sender avatar for single message, app icon for multiple
+  const notificationIcon = (totalCount === 1 && senderAvatar) 
+    ? senderAvatar 
+    : "/icons/icon-192x192.png"
 
   const notificationOptions = {
     body: aggregatedBody,
-    icon: "/icons/icon-192x192.png",
+    icon: notificationIcon,
     image: payload.data?.image || undefined,
     vibrate: [200, 100, 200],
     data: {

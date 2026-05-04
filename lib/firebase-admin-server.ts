@@ -64,6 +64,8 @@ export async function sendPushNotification(
         url: data?.action_url || data?.url || "/",
         priority: data?.priority || "normal",
         tag: stableTag,
+        senderName: data?.senderName || "",
+        senderAvatar: data?.senderAvatar || "",
       },
       webpush: {
         fcmOptions: {
@@ -149,6 +151,8 @@ export async function sendPushNotificationToMany(
             url: data?.action_url || data?.url || "/",
             priority: data?.priority || "normal",
             tag: stableTag,
+            senderName: data?.senderName || "",
+            senderAvatar: data?.senderAvatar || "",
           },
           webpush: {
             fcmOptions: {

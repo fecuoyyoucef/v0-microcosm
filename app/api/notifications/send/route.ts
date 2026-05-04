@@ -63,6 +63,8 @@ export async function POST(request: Request) {
           type,
           group_id: groupId || "",
           message_id: data?.messageId || "",
+          senderName: data?.senderName || "",
+          senderAvatar: data?.senderAvatar || "",
         })
 
         pushSentCount = result.success
