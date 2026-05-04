@@ -139,7 +139,7 @@ export async function sendPushNotificationToMany(
     const webpushNotification: any = {
       title,
       body,
-      icon: "/icons/icon-192x192.png",
+      icon: "/icons/notification-icon.png",
       // Badge = small status-bar icon. MUST be white-on-transparent — Android renders alpha only.
       badge: "/icons/badge-monochrome.svg",
       vibrate: [200, 100, 200],

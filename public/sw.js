@@ -104,8 +104,8 @@ self.addEventListener("push", (event) => {
     bodyContent = senderName + ":\n" + bodyContent
   }
 
-  // Use sender avatar if available; fall back to the colored app icon (large icon, right side)
-  const iconUrl = senderAvatar || data.icon || "/icons/icon-192x192.png"
+  // Use sender avatar if available; fall back to the user-provided notification icon (large icon, right side)
+  const iconUrl = senderAvatar || data.icon || "/icons/notification-icon.png"
 
   const options = {
     body: bodyContent,
