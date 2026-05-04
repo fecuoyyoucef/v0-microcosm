@@ -177,8 +177,14 @@ export function NotificationBell({ userId }: NotificationBellProps) {
   useEffect(() => {
     fetchNotifications()
 
+    // Use a unique channel name per effect run so React Strict Mode (or rapid
+    // re-renders) can't pick up a previously-subscribed channel that hasn't
+    // finished cleanup yet — which would cause `.on()` to be called after
+    // `.subscribe()` and throw.
+    const channelName = `notifications-bell-${userId}-${Math.random().toString(36).slice(2)}`
+
     const channel = supabase
-      .channel(`notifications-bell-${userId}`)
+      .channel(channelName)
       .on(
         "postgres_changes",
         {
