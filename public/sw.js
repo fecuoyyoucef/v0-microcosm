@@ -1,4 +1,4 @@
-const CACHE_NAME = "synaptic-space-v3"
+const CACHE_NAME = "synaptic-space-v4"
 const OFFLINE_URL = "/offline"
 
 const STATIC_ASSETS = ["/", "/offline", "/icons/icon-192x192.png", "/icons/icon-512x512.png", "/icons/icon-72x72.png"]
@@ -104,12 +104,14 @@ self.addEventListener("push", (event) => {
     bodyContent = senderName + ":\n" + bodyContent
   }
 
-  // Use sender avatar if available
-  const iconUrl = senderAvatar || data.icon || "/icons/notification-icon.svg"
+  // Use sender avatar if available; fall back to the colored app icon (large icon, right side)
+  const iconUrl = senderAvatar || data.icon || "/icons/icon-192x192.png"
 
   const options = {
     body: bodyContent,
     icon: iconUrl,
+    // Badge = the SMALL status-bar icon. MUST be white-on-transparent — Android masks alpha only.
+    badge: "/icons/badge-monochrome.svg",
     image: data.image,
     vibrate: data.vibrate || [200, 100, 200],
     tag: data.tag || `notification-${Date.now()}`,
