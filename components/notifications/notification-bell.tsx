@@ -41,6 +41,60 @@ const translations = {
   },
 }
 
+interface EnrichedRow {
+  id: string
+  user_id: string
+  type: Notification["type"]
+  title: string
+  body: string | null
+  data: Record<string, unknown> | null
+  is_read: boolean
+  read_at: string | null
+  created_at: string
+  group_id: string | null
+  sender_id: string | null
+  message_id: string | null
+  sender_display_name: string | null
+  sender_avatar_url: string | null
+  group_name: string | null
+  group_avatar_url: string | null
+}
+
+function rowToNotification(row: EnrichedRow): Notification {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    type: row.type,
+    title: row.title,
+    body: row.body,
+    data: (row.data as Record<string, unknown>) ?? {},
+    group_id: row.group_id,
+    sender_id: row.sender_id,
+    message_id: row.message_id,
+    is_read: row.is_read,
+    read_at: row.read_at,
+    created_at: row.created_at,
+    sender: row.sender_id
+      ? {
+          id: row.sender_id,
+          display_name: row.sender_display_name ?? "",
+          avatar_url: row.sender_avatar_url,
+          username: null,
+          bio: null,
+          created_at: "",
+          updated_at: "",
+        }
+      : null,
+    group: row.group_id
+      ? ({
+          id: row.group_id,
+          name: row.group_name ?? "Unknown",
+          avatar_url: row.group_avatar_url,
+        } as Notification["group"])
+      : null,
+  }
+}
+
 export function NotificationBell({ userId }: NotificationBellProps) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -59,7 +113,10 @@ export function NotificationBell({ userId }: NotificationBellProps) {
 
   // Group notifications by cell
   const { groupedNotifications, systemNotifications } = useMemo(() => {
-    const grouped: Record<string, { groupInfo: { name: string; avatar: string | null }; notifications: Notification[] }> = {}
+    const grouped: Record<
+      string,
+      { groupInfo: { name: string; avatar: string | null }; notifications: Notification[] }
+    > = {}
     const system: Notification[] = []
 
     notifications.forEach((notif) => {
@@ -79,7 +136,6 @@ export function NotificationBell({ userId }: NotificationBellProps) {
       }
     })
 
-    // Sort each group's notifications by created_at descending
     Object.values(grouped).forEach((group) => {
       group.notifications.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     })
@@ -87,58 +143,40 @@ export function NotificationBell({ userId }: NotificationBellProps) {
     return { groupedNotifications: grouped, systemNotifications: system }
   }, [notifications])
 
+  // Single query against the enriched view (no N+1)
   const fetchNotifications = useCallback(async () => {
     const { data, error } = await supabase
-      .from("notifications")
+      .from("notifications_enriched")
       .select("*")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(50)
 
     if (error) {
-      console.error("Error fetching notifications:", error)
+      console.error("[Bell] Error fetching notifications:", error)
       return
     }
 
     if (data) {
-      // Fetch related data separately to handle nulls
-      const notificationsWithRelations = await Promise.all(
-        data.map(async (notif) => {
-          let sender = null
-          let group = null
-
-          if (notif.sender_id) {
-            const { data: senderData } = await supabase
-              .from("profiles")
-              .select("id, display_name, avatar_url")
-              .eq("id", notif.sender_id)
-              .single()
-            sender = senderData
-          }
-
-          if (notif.group_id) {
-            const { data: groupData } = await supabase
-              .from("groups")
-              .select("id, name, avatar_url")
-              .eq("id", notif.group_id)
-              .single()
-            group = groupData
-          }
-
-          return { ...notif, sender, group }
-        }),
-      )
-
-      setNotifications(notificationsWithRelations)
-      const unread = notificationsWithRelations.filter((n) => !n.is_read).length
-      setUnreadCount(unread)
+      const mapped = (data as EnrichedRow[]).map(rowToNotification)
+      setNotifications(mapped)
+      setUnreadCount(mapped.filter((n) => !n.is_read).length)
     }
   }, [supabase, userId])
+
+  // Fetch a single enriched row by id (used for realtime INSERT enrichment)
+  const fetchEnrichedById = useCallback(
+    async (id: string): Promise<Notification | null> => {
+      const { data, error } = await supabase.from("notifications_enriched").select("*").eq("id", id).single()
+      if (error || !data) return null
+      return rowToNotification(data as EnrichedRow)
+    },
+    [supabase],
+  )
 
   useEffect(() => {
     fetchNotifications()
 
-    // Subscribe to realtime notifications
     const channel = supabase
       .channel(`notifications-bell-${userId}`)
       .on(
@@ -150,46 +188,26 @@ export function NotificationBell({ userId }: NotificationBellProps) {
           filter: `user_id=eq.${userId}`,
         },
         async (payload) => {
-          const newNotification = payload.new as Notification
+          const raw = payload.new as Notification
+          const isInActiveCell = activeCellIdRef.current && raw.group_id === activeCellIdRef.current
 
-          // Don't show notification if user is currently in that cell
-          const isInActiveCell = activeCellIdRef.current && newNotification.group_id === activeCellIdRef.current
-          
-          // Fetch related data for the new notification
-          let sender = null
-          let group = null
-
-          if (newNotification.sender_id) {
-            const { data: senderData } = await supabase
-              .from("profiles")
-              .select("id, display_name, avatar_url")
-              .eq("id", newNotification.sender_id)
-              .single()
-            sender = senderData
+          // Auto-mark as read if user is already in that cell
+          if (isInActiveCell) {
+            await supabase
+              .from("notifications")
+              .update({ is_read: true, read_at: new Date().toISOString() })
+              .eq("id", raw.id)
+            return
           }
 
-          if (newNotification.group_id) {
-            const { data: groupData } = await supabase
-              .from("groups")
-              .select("id, name, avatar_url")
-              .eq("id", newNotification.group_id)
-              .single()
-            group = groupData
-          }
+          const enriched = await fetchEnrichedById(raw.id)
+          if (!enriched) return
 
-          const enrichedNotification = { ...newNotification, sender, group }
-          
-          setNotifications((prev) => [enrichedNotification, ...prev])
-          
-          // Only increment unread count if not in the active cell
-          if (!isInActiveCell) {
-            setUnreadCount((prev) => prev + 1)
-            // Show browser notification only if not in active cell
-            showBrowserNotification(enrichedNotification)
-          } else {
-            // Auto-mark as read if in active cell
-            markAsReadSilent(newNotification.id)
-          }
+          setNotifications((prev) => {
+            if (prev.some((n) => n.id === enriched.id)) return prev
+            return [enriched, ...prev].slice(0, 50)
+          })
+          setUnreadCount((prev) => prev + 1)
         },
       )
       .on(
@@ -202,7 +220,9 @@ export function NotificationBell({ userId }: NotificationBellProps) {
         },
         (payload) => {
           const updated = payload.new as Notification
-          setNotifications((prev) => prev.map((n) => (n.id === updated.id ? { ...n, ...updated } : n)))
+          setNotifications((prev) =>
+            prev.map((n) => (n.id === updated.id ? { ...n, ...updated } : n)),
+          )
           if (updated.is_read) {
             setUnreadCount((prev) => Math.max(0, prev - 1))
           }
@@ -210,54 +230,21 @@ export function NotificationBell({ userId }: NotificationBellProps) {
       )
       .subscribe()
 
-    // Request notification permission on mount
-    requestNotificationPermission()
-
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [userId, supabase, fetchNotifications])
-
-  const requestNotificationPermission = async () => {
-    if ("Notification" in window && Notification.permission === "default") {
-      await Notification.requestPermission()
-    }
-  }
-
-  const showBrowserNotification = (notification: Notification) => {
-    if ("Notification" in window && Notification.permission === "granted") {
-      const browserNotif = new Notification(notification.title || "Synaptic Space", {
-        body: notification.body || "لديك إشعار جديد",
-        icon: "/icons/icon-192x192.png",
-        tag: notification.group_id || notification.id, // Group by cell
-        requireInteraction: notification.data?.priority === "high",
-        renotify: true, // Allow updating the same tag
-      })
-
-      browserNotif.onclick = () => {
-        window.focus()
-        const url = notification.data?.action_url || (notification.group_id ? `/chat/${notification.group_id}` : "/chat/notifications")
-        window.location.href = url as string
-        browserNotif.close()
-      }
-    }
-  }
+  }, [userId, supabase, fetchNotifications, fetchEnrichedById])
 
   const markAsRead = async (notificationId: string) => {
     await supabase
       .from("notifications")
       .update({ is_read: true, read_at: new Date().toISOString() })
       .eq("id", notificationId)
-      
-    setNotifications((prev) => prev.map((n) => (n.id === notificationId ? { ...n, is_read: true, read_at: new Date().toISOString() } : n)))
-    setUnreadCount((prev) => Math.max(0, prev - 1))
-  }
 
-  const markAsReadSilent = async (notificationId: string) => {
-    await supabase
-      .from("notifications")
-      .update({ is_read: true, read_at: new Date().toISOString() })
-      .eq("id", notificationId)
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === notificationId ? { ...n, is_read: true, read_at: new Date().toISOString() } : n)),
+    )
+    setUnreadCount((prev) => Math.max(0, prev - 1))
   }
 
   const markMultipleAsRead = async (notificationIds: string[]) => {
@@ -265,10 +252,12 @@ export function NotificationBell({ userId }: NotificationBellProps) {
       .from("notifications")
       .update({ is_read: true, read_at: new Date().toISOString() })
       .in("id", notificationIds)
-      
-    setNotifications((prev) => prev.map((n) => 
-      notificationIds.includes(n.id) ? { ...n, is_read: true, read_at: new Date().toISOString() } : n
-    ))
+
+    setNotifications((prev) =>
+      prev.map((n) =>
+        notificationIds.includes(n.id) ? { ...n, is_read: true, read_at: new Date().toISOString() } : n,
+      ),
+    )
     setUnreadCount((prev) => Math.max(0, prev - notificationIds.length))
   }
 
@@ -279,11 +268,12 @@ export function NotificationBell({ userId }: NotificationBellProps) {
       .eq("user_id", userId)
       .eq("is_read", false)
 
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true, read_at: new Date().toISOString() })))
+    setNotifications((prev) =>
+      prev.map((n) => ({ ...n, is_read: true, read_at: new Date().toISOString() })),
+    )
     setUnreadCount(0)
   }
 
-  // Sort grouped notifications by latest message time
   const sortedGroupIds = useMemo(() => {
     return Object.entries(groupedNotifications)
       .filter(([, data]) => data.notifications.some((n) => !n.is_read))
@@ -300,10 +290,15 @@ export function NotificationBell({ userId }: NotificationBellProps) {
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={t.notifications}
+          className="relative text-foreground hover:text-foreground hover:bg-accent"
+        >
+          <Bell className="h-5 w-5" strokeWidth={2} aria-hidden="true" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center font-medium animate-pulse">
+            <span className="absolute -top-1 -right-1 h-5 min-w-[1.25rem] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] flex items-center justify-center font-semibold leading-none ring-2 ring-background">
               {unreadCount > 99 ? "99+" : unreadCount}
             </span>
           )}
@@ -327,7 +322,6 @@ export function NotificationBell({ userId }: NotificationBellProps) {
             </div>
           ) : (
             <div>
-              {/* Grouped notifications by cell (Telegram-style) */}
               {sortedGroupIds.map((groupId) => {
                 const data = groupedNotifications[groupId]
                 return (
@@ -343,7 +337,6 @@ export function NotificationBell({ userId }: NotificationBellProps) {
                 )
               })}
 
-              {/* System notifications */}
               {unreadSystemNotifications.length > 0 && (
                 <div>
                   <div className="px-3 py-2 text-xs font-medium text-muted-foreground bg-muted/50">

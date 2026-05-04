@@ -12,6 +12,10 @@ interface FirebasePushProviderProps {
   children: React.ReactNode
 }
 
+// FCM tokens are valid for months. Refresh at most once per 24h instead of every 30 min.
+const TOKEN_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000
+const TOKEN_REFRESH_KEY = "fcm_last_refresh_at"
+
 export function FirebasePushProvider({ userId, children }: FirebasePushProviderProps) {
   const [isSupported, setIsSupported] = useState(false)
   const [permissionState, setPermissionState] = useState<NotificationPermission | null>(null)
@@ -20,7 +24,7 @@ export function FirebasePushProvider({ userId, children }: FirebasePushProviderP
   const router = useRouter()
   const pathname = usePathname()
 
-  // Track which cell user is currently viewing
+  // Track which cell user is currently viewing (used to suppress in-app toast)
   useEffect(() => {
     const match = pathname.match(/\/chat\/([a-f0-9-]+)/)
     activeCellIdRef.current = match ? match[1] : null
@@ -38,11 +42,14 @@ export function FirebasePushProvider({ userId, children }: FirebasePushProviderP
       if (!isSupported || !userId) return
 
       try {
-        console.log("[FirebasePush] Registering with forceRefresh:", forceRefresh)
         const token = await requestNotificationPermission(userId, forceRefresh)
         if (token) {
           setPermissionState("granted")
-          console.log("[FirebasePush] Registration successful, token:", token.substring(0, 20) + "...")
+          try {
+            localStorage.setItem(TOKEN_REFRESH_KEY, String(Date.now()))
+          } catch {
+            // ignore storage errors (private mode etc.)
+          }
         }
       } catch (error) {
         console.error("[FirebasePush] Registration error:", error)
@@ -51,56 +58,60 @@ export function FirebasePushProvider({ userId, children }: FirebasePushProviderP
     [isSupported, userId],
   )
 
+  // One-time registration on mount when permission is already granted or default.
+  // Uses force=false unless we've never registered before.
   useEffect(() => {
-    if (isSupported && !isRegisteredRef.current && permissionState !== "denied" && userId) {
-      console.log("[FirebasePush] Initial registration with force refresh...")
-      isRegisteredRef.current = true
-      // Force refresh on first load to ensure fresh token
-      registerForPush(true).catch((err) => console.error("[FirebasePush] Auto-registration failed:", err))
+    if (!isSupported || isRegisteredRef.current || permissionState === "denied" || !userId) return
+
+    isRegisteredRef.current = true
+    let needsForce = false
+    try {
+      const last = localStorage.getItem(TOKEN_REFRESH_KEY)
+      needsForce = !last
+    } catch {
+      needsForce = true
     }
+
+    registerForPush(needsForce).catch((err) => console.error("[FirebasePush] Initial registration failed:", err))
   }, [isSupported, permissionState, userId, registerForPush])
 
+  // Daily soft refresh (24h) — only when tab becomes visible and last refresh was long ago.
+  // Removes the previous 30-min interval and the per-visibility refresh storm.
   useEffect(() => {
-    if (!isSupported || !userId) return
+    if (!isSupported || !userId || permissionState !== "granted") return
 
-    const intervalId = setInterval(
-      () => {
-        if (permissionState === "granted") {
-          console.log("[FirebasePush] Periodic token refresh...")
-          registerForPush(false).catch((err) => console.error("[FirebasePush] Token refresh failed:", err))
-        }
-      },
-      30 * 60 * 1000, // كل 30 دقيقة بدلاً من ساعة
-    )
-
-    return () => clearInterval(intervalId)
-  }, [isSupported, permissionState, userId, registerForPush])
-
-  useEffect(() => {
-    if (!isSupported || !userId) return
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible" && permissionState === "granted") {
-        console.log("[FirebasePush] Page visible, refreshing token...")
-        registerForPush(false).catch((err) => console.error("[FirebasePush] Visibility refresh failed:", err))
+    const maybeRefresh = () => {
+      try {
+        const last = parseInt(localStorage.getItem(TOKEN_REFRESH_KEY) || "0", 10)
+        if (Date.now() - last < TOKEN_REFRESH_INTERVAL_MS) return
+      } catch {
+        // proceed with refresh on storage failure
       }
+      registerForPush(false).catch((err) => console.error("[FirebasePush] Periodic refresh failed:", err))
     }
 
-    document.addEventListener("visibilitychange", handleVisibilityChange)
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange)
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") maybeRefresh()
+    }
+
+    document.addEventListener("visibilitychange", handleVisibility)
+    return () => document.removeEventListener("visibilitychange", handleVisibility)
   }, [isSupported, permissionState, userId, registerForPush])
 
+  // Foreground push handler: show toast unless the user is in the relevant cell.
+  // The Realtime subscription in NotificationBell handles the in-app badge/list,
+  // so we only render a transient toast here for cross-page awareness.
   useEffect(() => {
     if (!isSupported || permissionState !== "granted") return
 
     onForegroundMessage((payload) => {
       const { notification, data, fcmOptions } = payload
       const notificationUrl = fcmOptions?.link || data?.action_url || data?.url || "/chat/notifications"
-      
-      // Don't show notification if user is currently in that cell
+
       const groupId = data?.group_id || data?.groupId
       if (groupId && activeCellIdRef.current === groupId) {
-        console.log("[FirebasePush] Suppressing notification - user is in active cell:", groupId)
+        // User is already in the cell — DB trigger will mark notification read,
+        // and the bell's Realtime listener handles state. No toast needed.
         return
       }
 
@@ -112,8 +123,6 @@ export function FirebasePushProvider({ userId, children }: FirebasePushProviderP
           onClick: () => router.push(notificationUrl),
         },
       })
-
-      console.log("[FirebasePush] Foreground notification:", notification?.title)
     })
   }, [isSupported, permissionState, router])
 
