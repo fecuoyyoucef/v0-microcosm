@@ -61,6 +61,8 @@ export async function POST(request: Request) {
           url: data?.url || "/chat/notifications",
           priority: data?.priority || "normal",
           type,
+          group_id: groupId || "",
+          message_id: data?.messageId || "",
         })
 
         pushSentCount = result.success

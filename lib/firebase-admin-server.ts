@@ -49,34 +49,23 @@ export async function sendPushNotification(
       return { success: false }
     }
 
-    const webpushNotification: any = {
-      title,
-      body,
-      icon: "/icons/icon-192x192.png",
-      vibrate: [200, 100, 200],
-      requireInteraction: data?.priority === "high" || false,
-      tag: data?.tag || `notification-${Date.now()}`,
-    }
-
-    if (data?.image) {
-      webpushNotification.image = data.image
-    }
-
-    webpushNotification.actions = [
-      {
-        action: "open",
-        title: "فتح",
-      },
-    ]
+    const stableTag = data?.group_id
+      ? `notif-group-${data.group_id}`
+      : data?.tag || `notif-${data?.type || "default"}`
 
     const message = {
       token,
-      notification: {
+      data: {
         title,
         body,
+        type: data?.type || "default",
+        group_id: data?.group_id || "",
+        message_id: data?.message_id || "",
+        url: data?.action_url || data?.url || "/",
+        priority: data?.priority || "normal",
+        tag: stableTag,
       },
       webpush: {
-        notification: webpushNotification,
         fcmOptions: {
           link: data?.action_url || data?.url || "/",
         },
@@ -119,13 +108,20 @@ export async function sendPushNotificationToMany(
       return { success: 0, failure: uniqueTokens.length, invalidTokens: [] }
     }
 
+    // Use a stable tag based on group_id so notifications from the same group
+    // replace each other instead of stacking as separate notifications
+    const stableTag = data?.group_id
+      ? `notif-group-${data.group_id}`
+      : data?.tag || `notif-${data?.type || "default"}`
+
     const webpushNotification: any = {
       title,
       body,
       icon: "/icons/icon-192x192.png",
       vibrate: [200, 100, 200],
       requireInteraction: data?.priority === "high" || false,
-      tag: data?.tag || `notification-${Date.now()}`,
+      tag: stableTag,
+      renotify: true,
     }
 
     if (data?.image) {
@@ -143,12 +139,18 @@ export async function sendPushNotificationToMany(
       try {
         const message = {
           token,
-          notification: {
+          data: {
+            // Send as data-only message so the SW has full control
             title,
             body,
+            type: data?.type || "default",
+            group_id: data?.group_id || "",
+            message_id: data?.message_id || "",
+            url: data?.action_url || data?.url || "/",
+            priority: data?.priority || "normal",
+            tag: stableTag,
           },
           webpush: {
-            notification: webpushNotification,
             fcmOptions: {
               link: data?.action_url || data?.url || "/",
             },

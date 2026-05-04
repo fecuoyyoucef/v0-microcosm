@@ -130,16 +130,22 @@ export function PushNotificationManager({ userId }: PushNotificationManagerProps
           // When visible, FCM / service-worker already delivered the push notification,
           // so showing another one here would duplicate it.
           if (Notification.permission === "granted" && document.visibilityState === "hidden") {
+            // Use a stable tag per group so new notifications replace old ones
+            const stableTag = notif.group_id
+              ? `notif-group-${notif.group_id}`
+              : `notif-${notif.type || "default"}`
+
             const notification = new Notification(notif.title || "Synaptic Space", {
               body: notif.body || "لديك إشعار جديد",
               icon: "/icons/icon-192x192.png",
-              tag: `notif-${notif.id}`,
+              tag: stableTag,
+              renotify: true,
               data: {
                 url: notif.data?.action_url || (notif.group_id ? `/chat/${notif.group_id}` : "/chat/notifications"),
                 notificationId: notif.id,
                 type: notif.type,
               },
-            })
+            } as NotificationOptions)
 
             notification.onclick = () => {
               window.focus()
