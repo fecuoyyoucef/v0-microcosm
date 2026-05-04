@@ -140,8 +140,8 @@ export async function sendPushNotificationToMany(
       title,
       body,
       icon: "/icons/notification-icon.png",
-      // Badge = small status-bar icon. MUST be white-on-transparent — Android renders alpha only.
-      badge: "/icons/badge-monochrome.svg",
+      // Badge = small status-bar icon. Using the app icon as requested by the user.
+      badge: "/icons/icon-96x96.png",
       vibrate: [200, 100, 200],
       requireInteraction: data?.priority === "high" || false,
       tag: stableTag,
