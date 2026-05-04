@@ -67,9 +67,29 @@ export async function sendPushNotification(
         senderName: data?.senderName || "",
         senderAvatar: data?.senderAvatar || "",
       },
+      // High priority on Android wakes the device from Doze mode and bypasses background throttling
+      android: {
+        priority: "high" as const,
+      },
+      // Urgency: high tells the push service to deliver immediately even when the SW is idle
       webpush: {
+        headers: {
+          Urgency: "high",
+          TTL: "86400",
+        },
         fcmOptions: {
           link: data?.action_url || data?.url || "/",
+        },
+      },
+      apns: {
+        headers: {
+          "apns-priority": "10",
+          "apns-push-type": "alert",
+        },
+        payload: {
+          aps: {
+            "content-available": 1,
+          },
         },
       },
     }
@@ -155,9 +175,31 @@ export async function sendPushNotificationToMany(
             senderName: data?.senderName || "",
             senderAvatar: data?.senderAvatar || "",
           },
+          // High priority on Android wakes the device from Doze mode and bypasses background throttling.
+          // Without this, data-only messages are delayed (or dropped) when the device is idle / app is backgrounded.
+          android: {
+            priority: "high" as const,
+          },
+          // Urgency: high tells the WebPush service to deliver immediately even when the SW is idle.
+          // TTL: 86400 keeps the message buffered for up to 24h if the device is offline.
           webpush: {
+            headers: {
+              Urgency: "high",
+              TTL: "86400",
+            },
             fcmOptions: {
               link: data?.action_url || data?.url || "/",
+            },
+          },
+          apns: {
+            headers: {
+              "apns-priority": "10",
+              "apns-push-type": "alert",
+            },
+            payload: {
+              aps: {
+                "content-available": 1,
+              },
             },
           },
         }
