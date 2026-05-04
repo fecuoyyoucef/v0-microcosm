@@ -64,11 +64,12 @@ export async function sendPushNotification(
         url: data?.action_url || data?.url || "/",
         priority: data?.priority || "normal",
         tag: stableTag,
-        senderName: data?.senderName || "",
-        senderAvatar: data?.senderAvatar || "",
-      },
-      // High priority on Android wakes the device from Doze mode and bypasses background throttling
-      android: {
+            senderName: data?.senderName || "",
+            senderAvatar: data?.senderAvatar || "",
+            cellAvatar: data?.cellAvatar || "",
+          },
+          // High priority on Android wakes the device from Doze mode and bypasses background throttling
+          android: {
         priority: "high" as const,
       },
       // Urgency: high tells the push service to deliver immediately even when the SW is idle
