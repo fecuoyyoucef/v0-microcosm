@@ -67,15 +67,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, sent: 0, message: "No subscriptions found" })
     }
 
+    // Use a stable tag per group so notifications replace each other
+    const stableTag = data?.groupId
+      ? `notif-group-${data.groupId}`
+      : data?.group_id
+        ? `notif-group-${data.group_id}`
+        : `notif-${data?.type || "default"}`
+
     const payload = JSON.stringify({
       title: title || "Synaptic Space",
       body: messageBody || "لديك إشعار جديد",
       icon: "/icons/icon-192x192.png",
       badge: "/icons/icon-72x72.png",
       url: url || "/chat/notifications",
-      tag: data?.type || "default",
+      tag: stableTag,
+      renotify: true,
       requireInteraction: data?.priority === "high",
       ...data,
+      tag: stableTag,
     })
 
     let sentCount = 0
