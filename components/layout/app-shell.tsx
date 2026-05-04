@@ -31,7 +31,6 @@ import type { Group, Profile } from "@/lib/types"
 import { useTheme } from "next-themes"
 import { useSettings } from "@/components/settings-provider"
 import { FirebasePushProvider } from "@/components/notifications/firebase-push-provider"
-import { NotificationBell } from "@/components/notifications/notification-bell"
 import { ScrollProvider } from "@/lib/contexts/scroll-context"
 import { TutorialShell } from "@/components/tutorial/tutorial-shell"
 
@@ -302,24 +301,20 @@ function AppShellContent({ children, userId, profile, groups }: AppShellProps) {
             </Button>
           </Link>
 
-          <div className="flex items-center gap-1">
-            <Link
-              href="/chat/notifications"
-              onClick={() => isMobile && setMobileMenuOpen(false)}
-              className="flex-1"
-            >
-              <Button variant="ghost" className="w-full justify-start gap-3 h-10 relative text-foreground">
-                <BellIcon className="w-4 h-4" />
-                {t.notifications}
-                {unreadNotifications > 0 && (
-                  <Badge className="mr-auto h-5 px-1.5 bg-destructive text-destructive-foreground">
-                    {unreadNotifications > 99 ? "99+" : unreadNotifications}
-                  </Badge>
-                )}
-              </Button>
-            </Link>
-            <NotificationBell userId={userId} />
-          </div>
+          <Link
+            href="/chat/notifications"
+            onClick={() => isMobile && setMobileMenuOpen(false)}
+          >
+            <Button variant="ghost" className="w-full justify-start gap-3 h-10 relative text-foreground">
+              <BellIcon className="w-4 h-4" />
+              {t.notifications}
+              {unreadNotifications > 0 && (
+                <Badge className="mr-auto h-5 px-1.5 bg-destructive text-destructive-foreground">
+                  {unreadNotifications > 99 ? "99+" : unreadNotifications}
+                </Badge>
+              )}
+            </Button>
+          </Link>
 
           <Link href="/chat/assistant" onClick={() => isMobile && setMobileMenuOpen(false)}>
             <Button variant="ghost" className="w-full justify-start gap-3 h-10">

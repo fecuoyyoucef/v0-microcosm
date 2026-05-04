@@ -78,8 +78,8 @@ export async function POST(request: Request) {
       title: title || "Synaptic Space",
       body: messageBody || "لديك إشعار جديد",
       icon: "/icons/notification-icon.png",
-      // Badge = small status-bar icon. MUST be white-on-transparent — Android renders alpha only.
-      badge: "/icons/badge-monochrome.svg",
+      // Badge = small status-bar icon. Using the app icon as requested by the user.
+      badge: "/icons/icon-96x96.png",
       url: url || "/chat/notifications",
       tag: stableTag,
       renotify: true,

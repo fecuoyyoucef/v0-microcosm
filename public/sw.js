@@ -110,8 +110,8 @@ self.addEventListener("push", (event) => {
   const options = {
     body: bodyContent,
     icon: iconUrl,
-    // Badge = the SMALL status-bar icon. MUST be white-on-transparent — Android masks alpha only.
-    badge: "/icons/badge-monochrome.svg",
+    // Badge = the SMALL status-bar icon. Using the app icon as requested by the user.
+    badge: "/icons/icon-96x96.png",
     image: data.image,
     vibrate: data.vibrate || [200, 100, 200],
     tag: data.tag || `notification-${Date.now()}`,

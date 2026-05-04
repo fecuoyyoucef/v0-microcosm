@@ -134,9 +134,9 @@ async function showNotificationFromPayload(payload) {
   const notificationOptions = {
     body: aggregatedBody,
     icon: notificationIcon,
-    // Badge = the SMALL status-bar icon. MUST be white-on-transparent — Android only uses alpha.
-    // Using a colored app icon here causes the white-square bug.
-    badge: "/icons/badge-monochrome.svg",
+    // Badge = the SMALL status-bar icon. Using the app icon as requested by the user.
+    // Note: Android renders only the alpha channel, so a colored icon may appear as a silhouette.
+    badge: "/icons/icon-96x96.png",
     image: payload.data?.image || undefined,
     vibrate: [200, 100, 200],
     data: {
