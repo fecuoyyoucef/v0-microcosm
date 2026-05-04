@@ -54,6 +54,34 @@ self.addEventListener("fetch", (event) => {
   )
 })
 
+// Helper to get active cell ID from IndexedDB
+async function getActiveCellId() {
+  return new Promise((resolve) => {
+    try {
+      const dbRequest = indexedDB.open('synaptic-app', 1)
+      dbRequest.onerror = () => resolve(null)
+      dbRequest.onsuccess = (event) => {
+        try {
+          const db = event.target.result
+          if (!db.objectStoreNames.contains('state')) {
+            resolve(null)
+            return
+          }
+          const tx = db.transaction('state', 'readonly')
+          const store = tx.objectStore('state')
+          const request = store.get('activeCellId')
+          request.onsuccess = () => resolve(request.result || null)
+          request.onerror = () => resolve(null)
+        } catch (e) {
+          resolve(null)
+        }
+      }
+    } catch (e) {
+      resolve(null)
+    }
+  })
+}
+
 // Push notification event
 self.addEventListener("push", (event) => {
   console.log("[SW] Push received:", event.data?.text())
@@ -66,9 +94,22 @@ self.addEventListener("push", (event) => {
   }
 
   const title = data.title || "Synaptic Space"
+  const groupId = data.groupId || data.group_id
+  const senderName = data.senderName || ""
+  const senderAvatar = data.senderAvatar || ""
+  
+  // Build body with sender name
+  let bodyContent = data.body || "لديك إشعار جديد"
+  if (senderName && data.type === "new_message") {
+    bodyContent = senderName + ":\n" + bodyContent
+  }
+
+  // Use sender avatar if available
+  const iconUrl = senderAvatar || data.icon || "/icons/notification-icon.svg"
+
   const options = {
-    body: data.body || "لديك إشعار جديد",
-    icon: data.icon || "/icons/notification-icon.svg",
+    body: bodyContent,
+    icon: iconUrl,
     image: data.image,
     vibrate: data.vibrate || [200, 100, 200],
     tag: data.tag || `notification-${Date.now()}`,
@@ -79,7 +120,7 @@ self.addEventListener("push", (event) => {
     data: {
       url: data.url || data.action_url || "/chat",
       notificationId: data.id || data.notificationId,
-      groupId: data.groupId,
+      groupId: groupId,
       messageId: data.messageId,
       type: data.type,
       ...data.data,
@@ -92,11 +133,19 @@ self.addEventListener("push", (event) => {
   }
 
   event.waitUntil(
-    self.registration.showNotification(title, options).then(() => {
+    (async () => {
+      // Check if user is currently viewing this cell - skip notification if so
+      const activeCellId = await getActiveCellId()
+      if (activeCellId && groupId && activeCellId === groupId) {
+        console.log("[SW] Skipping notification - user is viewing this cell:", groupId)
+        return
+      }
+
+      await self.registration.showNotification(title, options)
       if (self.registration.setAppBadge) {
         self.registration.setAppBadge(1)
       }
-    }),
+    })()
   )
 })
 

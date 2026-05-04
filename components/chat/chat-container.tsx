@@ -314,6 +314,49 @@ export function ChatContainer({
     return member?.profile?.display_name || "مستخدم"
   })
 
+  // Store active cell ID in IndexedDB for service worker to check
+  useEffect(() => {
+    const setActiveCell = async () => {
+      try {
+        if ('indexedDB' in window) {
+          const dbRequest = indexedDB.open('synaptic-app', 1)
+          dbRequest.onupgradeneeded = (event) => {
+            const db = (event.target as IDBOpenDBRequest).result
+            if (!db.objectStoreNames.contains('state')) {
+              db.createObjectStore('state')
+            }
+          }
+          dbRequest.onsuccess = (event) => {
+            const db = (event.target as IDBOpenDBRequest).result
+            const tx = db.transaction('state', 'readwrite')
+            const store = tx.objectStore('state')
+            store.put(groupId, 'activeCellId')
+          }
+        }
+      } catch (e) {
+        console.error('Failed to set active cell:', e)
+      }
+    }
+    setActiveCell()
+
+    return () => {
+      // Clear active cell when leaving
+      try {
+        if ('indexedDB' in window) {
+          const dbRequest = indexedDB.open('synaptic-app', 1)
+          dbRequest.onsuccess = (event) => {
+            const db = (event.target as IDBOpenDBRequest).result
+            const tx = db.transaction('state', 'readwrite')
+            const store = tx.objectStore('state')
+            store.delete('activeCellId')
+          }
+        }
+      } catch (e) {
+        console.error('Failed to clear active cell:', e)
+      }
+    }
+  }, [groupId])
+
   useEffect(() => {
     isMounted.current = true
     fetchMessages()
@@ -657,6 +700,7 @@ export function ChatContainer({
                 groupName: group.name,
                 senderId: currentUserId,
                 senderName: currentProfile?.display_name || "مستخدم",
+                senderAvatar: currentProfile?.avatar_url || "",
                 messageId: data.id,
               },
             }),
