@@ -701,6 +701,7 @@ export function ChatContainer({
                 senderId: currentUserId,
                 senderName: currentProfile?.display_name || "مستخدم",
                 senderAvatar: currentProfile?.avatar_url || "",
+                cellAvatar: group.avatar_url || "",
                 messageId: data.id,
               },
             }),
