@@ -1,20 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { cookies } from "next/headers"
-
-async function verifyAdmin() {
-  const cookieStore = await cookies()
-  const token = cookieStore.get("admin_session")?.value
-  if (!token) return null
-
-  try {
-    const decoded = JSON.parse(Buffer.from(token, "base64").toString())
-    if (decoded.exp < Date.now()) return null
-    return decoded
-  } catch {
-    return null
-  }
-}
+import { verifyAdmin } from "@/lib/admin-auth"
 
 export async function GET(request: NextRequest) {
   try {
