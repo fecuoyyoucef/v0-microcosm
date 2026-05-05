@@ -530,6 +530,33 @@ export function ChatContainer({
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible" && isMounted.current) {
         resetUnreadCount()
+        // Restore active cell when app comes back to foreground
+        try {
+          if ('indexedDB' in window) {
+            const dbRequest = indexedDB.open('synaptic-app', 1)
+            dbRequest.onsuccess = (event) => {
+              const db = (event.target as IDBOpenDBRequest).result
+              const tx = db.transaction('state', 'readwrite')
+              tx.objectStore('state').put(groupId, 'activeCellId')
+            }
+          }
+        } catch (e) {
+          console.error('Failed to restore active cell:', e)
+        }
+      } else if (document.visibilityState === "hidden") {
+        // Clear active cell when app goes to background so notifications can be shown
+        try {
+          if ('indexedDB' in window) {
+            const dbRequest = indexedDB.open('synaptic-app', 1)
+            dbRequest.onsuccess = (event) => {
+              const db = (event.target as IDBOpenDBRequest).result
+              const tx = db.transaction('state', 'readwrite')
+              tx.objectStore('state').delete('activeCellId')
+            }
+          }
+        } catch (e) {
+          console.error('Failed to clear active cell:', e)
+        }
       }
     }
     document.addEventListener("visibilitychange", handleVisibilityChange)
