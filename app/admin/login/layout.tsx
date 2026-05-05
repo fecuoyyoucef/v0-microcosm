@@ -1,15 +1,7 @@
 import type React from "react"
-import { redirect } from "next/navigation"
-import { getAdminSession } from "@/lib/admin-auth"
 
-export default async function AdminLoginLayout({ children }: { children: React.ReactNode }) {
-  // إذا كان المستخدم مسجل دخول بالفعل، وجهه إلى لوحة التحكم
-  const session = await getAdminSession()
-
-  if (session) {
-    redirect("/admin")
-  }
-
-  // عرض صفحة تسجيل الدخول مباشرة بدون layout الأدمن
+// صفحة تسجيل الدخول بدون تحقق من المصادقة
+// الـ proxy.ts يتعامل مع إعادة التوجيه إذا كان المستخدم مسجل دخوله
+export default function AdminLoginLayout({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
