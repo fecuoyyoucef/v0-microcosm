@@ -111,8 +111,8 @@ self.addEventListener("push", (event) => {
   const options = {
     body: bodyContent,
     icon: iconUrl,
-    // Badge = the SMALL status-bar icon. Using the app icon as requested by the user.
-    badge: "/icons/icon-96x96.png",
+    // Badge = the SMALL status-bar icon (monochrome with transparency for Android)
+    badge: "/notification-icon.png",
     image: data.image,
     vibrate: data.vibrate || [200, 100, 200],
     tag: data.tag || `notification-${Date.now()}`,
