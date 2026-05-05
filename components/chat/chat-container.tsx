@@ -606,12 +606,10 @@ export function ChatContainer({
     setReplyingTo(null)
   }
 
-  const handleDeleteMessage = async (messageId: string) => {
-    const { error } = await supabase.from("messages").delete().eq("id", messageId)
-    if (error) {
-      console.error("Error deleting message:", error)
-      alert("حدث خطأ في حذف الرسالة")
-    }
+  const handleDeleteMessage = (_messageId: string) => {
+    // MessageList performs the delete itself (optimistic + Supabase delete).
+    // Realtime DELETE subscription syncs other clients. This callback is a hook
+    // for any post-delete side effects we want to add later.
   }
 
   const sendMessage = async (
@@ -745,6 +743,7 @@ export function ChatContainer({
     allow_notebook: true,
     allow_mindmap: true,
     allow_smart_summary: true,
+    translation_language: "auto",
   }
 
   const removeImportantToast = (messageId: string) => {
@@ -805,9 +804,11 @@ export function ChatContainer({
           onReplySelect={handleReply}
           onEditSelect={handleEditMessage}
           onMessageDeleted={handleDeleteMessage}
+          setMessages={setMessages}
           scrollContainerRef={scrollContainerRef}
           messagesEndRef={messagesEndRef}
           groupId={groupId}
+          translationLanguage={groupSettings.translation_language || "auto"}
         />
           <TypingIndicator userNames={typingUserNames} />
         </div>

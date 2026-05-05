@@ -178,6 +178,7 @@ interface MessageListProps {
   onMessageDeleted?: (messageId: string) => void
   setMessages?: React.Dispatch<React.SetStateAction<Message[]>>
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>
+  translationLanguage?: "ar" | "en" | "fr" | "es" | "de" | "tr" | "auto"
 }
 
 export const MessageList = React.memo(function MessageList({
@@ -194,6 +195,7 @@ export const MessageList = React.memo(function MessageList({
   onMessageDeleted,
   setMessages,
   scrollContainerRef,
+  translationLanguage = "auto",
 }: MessageListProps) {
   const supabase = createClient()
 
@@ -349,12 +351,19 @@ export const MessageList = React.memo(function MessageList({
     setTranslatingId(selectedMessage.id)
     setShowActionSheet(false)
     try {
+      const isArabic = /[\u0600-\u06FF]/.test(selectedMessage.content)
+      const targetLang =
+        translationLanguage && translationLanguage !== "auto"
+          ? translationLanguage
+          : isArabic
+            ? "en"
+            : "ar"
       const response = await fetch("/api/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text: selectedMessage.content,
-          targetLang: /[\u0600-\u06FF]/.test(selectedMessage.content) ? "en" : "ar",
+          targetLang,
         }),
       })
       if (response.ok) {
@@ -581,13 +590,26 @@ export const MessageList = React.memo(function MessageList({
                   "first:rounded-t-2xl",
                 )}
                 onClick={() => {
-                  const targetId = replyPreview?.message_id || replyToMessage?.id
+                  // The actual replied-to message id lives in `message.reply_to`.
+                  // `replyPreview` may also carry an `id` field, fall back to it.
+                  const targetId =
+                    (message as any).reply_to ||
+                    replyPreview?.id ||
+                    (replyPreview as any)?.message_id
                   if (targetId) {
                     const el = document.getElementById(`message-${targetId}`)
                     if (el) {
                       el.scrollIntoView({ behavior: "smooth", block: "center" })
                       el.classList.add("ring-2", "ring-primary", "ring-offset-2")
-                      setTimeout(() => el.classList.remove("ring-2", "ring-primary", "ring-offset-2"), 1500)
+                      setTimeout(
+                        () => el.classList.remove("ring-2", "ring-primary", "ring-offset-2"),
+                        1500,
+                      )
+                    } else {
+                      toast({
+                        title: "الرسالة غير محمّلة",
+                        description: "اسحب للأعلى لتحميل الرسائل الأقدم.",
+                      })
                     }
                   }
                 }}

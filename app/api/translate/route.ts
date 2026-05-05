@@ -9,11 +9,36 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Text required" }, { status: 400 })
   }
 
+  const langNames: Record<string, string> = {
+    ar: "Arabic",
+    en: "English",
+    fr: "French",
+    es: "Spanish",
+    de: "German",
+    tr: "Turkish",
+  }
+  const targetLangName = langNames[targetLang] || targetLang
+
   try {
-    const { text: translated } = await generateText({
+    const { text: raw } = await generateText({
       model: getAIModel(),
-      prompt: `Translate the following text to ${targetLang}. Only return the translated text, nothing else.\n\nText: ${text}`,
+      prompt: `You are a translation engine. Translate the user text to ${targetLangName}.
+Rules:
+- Output ONLY the translated text.
+- Do not add explanations, notes, quotes, prefixes, or any reasoning.
+- Do not include any tags like <think> or </think>.
+- Preserve emoji and line breaks.
+
+User text:
+${text}`,
     })
+
+    // Strip any <think>...</think> blocks (some reasoning models leak them)
+    let translated = raw.replace(/<think>[\s\S]*?<\/think>/gi, "")
+    // Strip stray opening/closing think tags if the close tag was cut off
+    translated = translated.replace(/<\/?think>/gi, "")
+    // Strip surrounding quotes/whitespace
+    translated = translated.trim().replace(/^["“”'`]+|["“”'`]+$/g, "").trim()
 
     return NextResponse.json({ translated, success: true })
   } catch (error) {
