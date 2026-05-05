@@ -248,12 +248,6 @@ export function CellManagementPanel({ group, members, currentUserId, isAdmin }: 
     setIsProcessing(null)
   }
 
-  console.log("[v0] CellManagementPanel - group.group_type:", group.group_type)
-  console.log("[v0] CellManagementPanel - isPrimary:", isPrimary)
-  console.log("[v0] CellManagementPanel - isAdmin:", isAdmin)
-  console.log("[v0] CellManagementPanel - maxMembers:", maxMembers)
-  console.log("[v0] CellManagementPanel - members.length:", members.length)
-
   if (!isAdmin) return null
 
   return (

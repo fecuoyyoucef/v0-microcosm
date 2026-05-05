@@ -20,8 +20,19 @@ export async function POST(request: Request) {
 
   const { data: group } = await supabase.from("groups").select("owner_id").eq("id", groupId).single()
 
-  if (!group || group.owner_id !== userId) {
-    return NextResponse.json({ error: "Only group owner can pin messages" }, { status: 403 })
+  // Check if user is owner or admin
+  const { data: member } = await supabase
+    .from("group_members")
+    .select("role")
+    .eq("group_id", groupId)
+    .eq("user_id", userId)
+    .single()
+
+  const isOwner = group?.owner_id === userId
+  const isAdmin = member?.role === "admin" || member?.role === "moderator"
+
+  if (!group || (!isOwner && !isAdmin)) {
+    return NextResponse.json({ error: "فقط مالك الخلية أو المشرفين يمكنهم تثبيت الرسائل" }, { status: 403 })
   }
 
   const { data: currentMessage } = await supabase.from("messages").select("is_pinned").eq("id", messageId).single()

@@ -281,19 +281,32 @@ export const MessageList = React.memo(function MessageList({
   const handleDelete = async () => {
     if (!selectedMessage) return
     setIsDeleting(true)
+    
+    // Optimistic delete - remove message immediately from UI
+    const messageToDelete = selectedMessage
+    setMessages?.((prev) => prev.filter((m) => m.id !== messageToDelete.id))
+    
     try {
       const { error } = await supabase
         .from("messages")
         .delete()
-        .eq("id", selectedMessage.id)
+        .eq("id", messageToDelete.id)
         .eq("sender_id", currentUserId)
       if (!error) {
         toast({ title: "تم حذف الرسالة" })
-        onMessageDeleted?.(selectedMessage.id)
+        onMessageDeleted?.(messageToDelete.id)
       } else {
+        // Restore message on error
+        setMessages?.((prev) => [...prev, messageToDelete].sort((a, b) => 
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        ))
         toast({ title: "فشل الحذف", variant: "destructive" })
       }
     } catch {
+      // Restore message on error
+      setMessages?.((prev) => [...prev, messageToDelete].sort((a, b) => 
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      ))
       toast({ title: "فشل الحذف", variant: "destructive" })
     } finally {
       setIsDeleting(false)
@@ -500,8 +513,9 @@ export const MessageList = React.memo(function MessageList({
     return (
       <div
         key={message.id}
+        id={`message-${message.id}`}
         className={cn(
-          "flex gap-2 group/msg",
+          "flex gap-2 group/msg transition-all duration-300",
           isOwn ? "flex-row-reverse" : "flex-row",
           message._isLastInGroup ? "mb-2" : "mb-0.5",
         )}
@@ -548,7 +562,7 @@ export const MessageList = React.memo(function MessageList({
 
           <div
             className={cn(
-              "relative break-words shadow-sm transition-all",
+              "relative break-words shadow-sm transition-all overflow-hidden",
               bubbleCorners,
               isOwn ? style.ownBg : style.otherBg,
               /* Layer accent bar (left side / start side) */
@@ -556,6 +570,7 @@ export const MessageList = React.memo(function MessageList({
                 "before:content-[''] before:absolute before:top-2 before:bottom-2 before:w-[3px] before:rounded-full before:start-1.5",
               style.accent,
             )}
+            style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}
           >
             {/* Reply preview — Telegram-style: solid start-side accent + sender + snippet */}
             {(replyPreview || replyToMessage) && (
@@ -565,6 +580,17 @@ export const MessageList = React.memo(function MessageList({
                   "block w-full text-start px-2.5 pt-2 pb-0 overflow-hidden min-w-0",
                   "first:rounded-t-2xl",
                 )}
+                onClick={() => {
+                  const targetId = replyPreview?.message_id || replyToMessage?.id
+                  if (targetId) {
+                    const el = document.getElementById(`message-${targetId}`)
+                    if (el) {
+                      el.scrollIntoView({ behavior: "smooth", block: "center" })
+                      el.classList.add("ring-2", "ring-primary", "ring-offset-2")
+                      setTimeout(() => el.classList.remove("ring-2", "ring-primary", "ring-offset-2"), 1500)
+                    }
+                  }
+                }}
               >
                 <div
                   className={cn(
