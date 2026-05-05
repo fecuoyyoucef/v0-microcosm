@@ -8,12 +8,18 @@ export type BackgroundStyle = "neural_mesh" | "neural_network" | "matrix_code" |
 
 export type CellCategory = "project" | "discussion"
 
+export type TranslationLanguage = "ar" | "en" | "fr" | "es" | "de" | "tr" | "auto"
+
 export interface GroupSettings {
   upper_layer_permission: UpperLayerPermission
   upper_layer_members?: string[]
   allow_notebook: boolean
   allow_mindmap: boolean
   allow_smart_summary: boolean
+  privacy_type?: "open" | "private"
+  show_in_recommendations?: boolean
+  /** Default target language for the in-cell "ترجمة" action. "auto" = detect (Arabic→English, otherwise→Arabic) */
+  translation_language?: TranslationLanguage
 }
 
 export interface SupervisorPermissions {
