@@ -37,6 +37,27 @@ export async function POST(request: Request) {
     console.log("[v0] Hash type:", admin.password_hash?.startsWith("$2") ? "bcrypt" : "sha256")
     console.log("[v0] Has salt:", !!admin.salt)
 
+    // إذا كان الـ hash ليس bcrypt صالح، نقوم بتحديثه مباشرة
+    // هذا كود مؤقت للإصلاح - سيتم إزالته لاحقاً
+    if (!admin.password_hash?.startsWith("$2a$") && !admin.password_hash?.startsWith("$2b$")) {
+      console.log("[v0] Invalid bcrypt hash detected, regenerating...")
+      const newHash = await hashPassword(password)
+      await supabase
+        .from("admins")
+        .update({ password_hash: newHash, salt: null })
+        .eq("id", admin.id)
+      console.log("[v0] Password hash updated to:", newHash.substring(0, 30))
+      // نعيد القراءة
+      const { data: updatedAdmin } = await supabase
+        .from("admins")
+        .select("*")
+        .eq("id", admin.id)
+        .single()
+      if (updatedAdmin) {
+        Object.assign(admin, updatedAdmin)
+      }
+    }
+
     // التحقق من كلمة المرور (يدعم الصيغتين القديمة والجديدة)
     const { valid, needsUpgrade } = await verifyPasswordUniversal(
       password,
