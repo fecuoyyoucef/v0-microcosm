@@ -1,29 +1,11 @@
 import { createClient } from "@/lib/supabase/server"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
-import { createHash } from "crypto"
-
-// دالة مقارنة كلمة المرور بشكل آمن (مقاوم لـ timing attacks)
-function verifyPassword(input: string, stored: string, salt?: string): boolean {
-  // دعم كلمات المرور القديمة (نص عادي - للانتقال فقط)
-  if (!salt) {
-    // مقارنة بطيئة لمنع timing attacks
-    const inputBuf = Buffer.from(input)
-    const storedBuf = Buffer.from(stored)
-    if (inputBuf.length !== storedBuf.length) return false
-    let diff = 0
-    for (let i = 0; i < inputBuf.length; i++) diff |= inputBuf[i] ^ storedBuf[i]
-    return diff === 0
-  }
-  // مقارنة مشفرة
-  const inputHash = createHash("sha256").update(salt + input).digest("hex")
-  const inputBuf = Buffer.from(inputHash)
-  const storedBuf = Buffer.from(stored)
-  if (inputBuf.length !== storedBuf.length) return false
-  let diff = 0
-  for (let i = 0; i < inputBuf.length; i++) diff |= inputBuf[i] ^ storedBuf[i]
-  return diff === 0
-}
+import {
+  verifyPasswordUniversal,
+  hashPassword,
+  createAdminToken,
+} from "@/lib/admin-auth"
 
 export async function POST(request: Request) {
   try {
@@ -50,10 +32,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "بيانات الدخول غير صحيحة" }, { status: 401 })
     }
 
-    const isValidPassword = verifyPassword(password, admin.password_hash, admin.salt ?? undefined)
+    // التحقق من كلمة المرور (يدعم الصيغتين القديمة والجديدة)
+    const { valid, needsUpgrade } = await verifyPasswordUniversal(
+      password,
+      admin.password_hash,
+      admin.salt
+    )
 
-    if (!isValidPassword) {
+    if (!valid) {
       return NextResponse.json({ error: "بيانات الدخول غير صحيحة" }, { status: 401 })
+    }
+
+    // ترقية كلمة المرور إلى bcrypt إذا كانت قديمة
+    if (needsUpgrade) {
+      const newHash = await hashPassword(password)
+      await supabase
+        .from("admins")
+        .update({
+          password_hash: newHash,
+          salt: null, // إزالة الـ salt القديم
+        })
+        .eq("id", admin.id)
+      console.log("Password upgraded to bcrypt for admin:", admin.email)
     }
 
     // تحديث آخر تسجيل دخول
@@ -66,22 +66,19 @@ export async function POST(request: Request) {
       description: "تسجيل دخول ناجح",
     })
 
-    // إنشاء token بسيط
-    const token = Buffer.from(
-      JSON.stringify({
-        id: admin.id,
-        email: admin.email,
-        role: admin.role,
-        exp: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 أيام
-      }),
-    ).toString("base64")
+    // إنشاء token موقّع وآمن
+    const token = createAdminToken({
+      id: admin.id,
+      email: admin.email,
+      role: admin.role,
+    })
 
     // حفظ الجلسة في Cookie
     const cookieStore = await cookies()
     cookieStore.set("admin_session", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      sameSite: "strict", // أكثر أماناً
       maxAge: 7 * 24 * 60 * 60, // 7 أيام
       path: "/",
     })

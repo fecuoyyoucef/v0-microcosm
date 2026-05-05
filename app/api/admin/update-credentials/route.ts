@@ -1,73 +1,51 @@
-import { cookies } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
-import { createHash, randomBytes } from "crypto"
-
-function hashPassword(password: string): { hash: string; salt: string } {
-  const salt = randomBytes(16).toString("hex") + "_synaptic_admin"
-  const hash = createHash("sha256").update(salt + password).digest("hex")
-  return { hash, salt }
-}
+import { verifySuperAdmin, hashPassword } from "@/lib/admin-auth"
 
 export async function POST(request: Request) {
   try {
-    // Verify admin session
-    const cookieStore = await cookies()
-    const adminSession = cookieStore.get("admin_session")
+    // التحقق من أن المستخدم super_admin
+    const session = await verifySuperAdmin()
 
-    if (!adminSession?.value) {
-      return NextResponse.json({ error: "غير مصرح" }, { status: 401 })
-    }
-
-    let sessionData
-    try {
-      sessionData = JSON.parse(adminSession.value)
-    } catch {
-      return NextResponse.json({ error: "جلسة غير صالحة" }, { status: 401 })
+    if (!session) {
+      return NextResponse.json({ error: "غير مصرح - يجب أن تكون super_admin" }, { status: 403 })
     }
 
     const supabase = await createClient()
-
-    // Get current admin
-    const { data: currentAdmin } = await supabase
-      .from("admins")
-      .select("*")
-      .eq("id", sessionData.adminId)
-      .eq("is_active", true)
-      .single()
-
-    if (!currentAdmin || currentAdmin.role !== "super_admin") {
-      return NextResponse.json({ error: "غير مصرح" }, { status: 403 })
-    }
-
     const { email, password } = await request.json()
 
     if (!email) {
       return NextResponse.json({ error: "البريد الإلكتروني مطلوب" }, { status: 400 })
     }
 
-    // Update admin credentials - تشفير كلمة المرور دائماً
-    const updates: { email: string; password_hash?: string; salt?: string } = { email }
+    // تحديث بيانات الأدمن - استخدام bcrypt للتشفير
+    const updates: { email: string; password_hash?: string; salt?: null } = { email }
     if (password) {
-      const { hash, salt } = hashPassword(password)
-      updates.password_hash = hash
-      updates.salt = salt
+      // التحقق من قوة كلمة المرور
+      if (password.length < 12) {
+        return NextResponse.json({ error: "كلمة المرور يجب أن تكون 12 حرف على الأقل" }, { status: 400 })
+      }
+      updates.password_hash = await hashPassword(password)
+      updates.salt = null // إزالة الـ salt القديم
     }
 
-    const { error } = await supabase.from("admins").update(updates).eq("id", currentAdmin.id)
+    const { error } = await supabase
+      .from("admins")
+      .update(updates)
+      .eq("id", session.id) // استخدام session.id الصحيح
 
     if (error) {
       console.error("Update error:", error)
       return NextResponse.json({ error: "فشل التحديث" }, { status: 500 })
     }
 
-    // Log activity
+    // تسجيل النشاط
     await supabase.from("admin_activity_log").insert({
-      admin_id: currentAdmin.id,
+      admin_id: session.id,
       action_type: "update_credentials",
-      description: `تم تحديث بيانات الأدمن${email !== currentAdmin.email ? " (بريد جديد)" : ""}`,
+      description: `تم تحديث بيانات الأدمن${email !== session.email ? " (بريد جديد)" : ""}`,
       metadata: {
-        old_email: currentAdmin.email,
+        old_email: session.email,
         new_email: email,
         password_changed: !!password,
       },

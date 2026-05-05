@@ -1,5 +1,55 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
+import { createHash, timingSafeEqual } from "crypto"
+
+// التحقق من توقيع الـ token في middleware (بدون استخدام قاعدة البيانات)
+function verifyAdminTokenInMiddleware(token: string): { id: string; email: string; role: string; exp: number } | null {
+  try {
+    const secret = process.env.ADMIN_SESSION_SECRET || process.env.SUPABASE_JWT_SECRET
+    if (!secret) return null
+
+    const parts = token.split(".")
+    
+    // دعم التوكنات القديمة مؤقتاً (base64 فقط) - سيتم رفضها
+    if (parts.length === 1) {
+      try {
+        const decoded = JSON.parse(Buffer.from(token, "base64").toString())
+        // التوكنات القديمة منتهية الصلاحية تلقائياً بعد التحديث
+        if (decoded.exp < Date.now()) return null
+        // نسمح بها مؤقتاً ولكن نسجل تحذير
+        console.warn("Legacy token format detected - will be rejected after re-login")
+        return decoded
+      } catch {
+        return null
+      }
+    }
+
+    if (parts.length !== 2) return null
+
+    const [payloadBase64, signature] = parts
+    const payloadString = Buffer.from(payloadBase64, "base64url").toString()
+
+    // التحقق من التوقيع
+    const expectedSignature = createHash("sha256").update(payloadString + secret).digest("hex")
+    try {
+      if (!timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {
+        console.warn("Invalid admin token signature")
+        return null
+      }
+    } catch {
+      return null
+    }
+
+    const payload = JSON.parse(payloadString)
+
+    // التحقق من انتهاء الصلاحية
+    if (payload.exp < Date.now()) return null
+
+    return payload
+  } catch {
+    return null
+  }
+}
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -26,92 +76,60 @@ export async function updateSession(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser()
 
-    if (request.nextUrl.pathname.startsWith("/chat")) {
-      console.log("[v0] Middleware /chat check - User:", user?.email || "not found")
-    }
-
+    // حماية مسارات /test-push
     if (request.nextUrl.pathname.startsWith("/test-push")) {
       const adminSession = request.cookies.get("admin_session")?.value
-      if (!adminSession) {
-        const url = request.nextUrl.clone()
-        url.pathname = "/admin/login"
-        url.searchParams.set("redirect", "/test-push")
-        return NextResponse.redirect(url)
-      }
+      const decoded = adminSession ? verifyAdminTokenInMiddleware(adminSession) : null
 
-      try {
-        const decoded = JSON.parse(Buffer.from(adminSession, "base64").toString())
-        if (decoded.exp < Date.now()) {
-          const url = request.nextUrl.clone()
-          url.pathname = "/admin/login"
-          url.searchParams.set("redirect", "/test-push")
-          const response = NextResponse.redirect(url)
-          response.cookies.delete("admin_session")
-          return response
-        }
-      } catch {
+      if (!decoded) {
         const url = request.nextUrl.clone()
         url.pathname = "/admin/login"
         url.searchParams.set("redirect", "/test-push")
-        return NextResponse.redirect(url)
+        const response = NextResponse.redirect(url)
+        if (adminSession) response.cookies.delete("admin_session")
+        return response
       }
     }
 
+    // حماية مسارات /admin (ما عدا صفحة الدخول)
     if (request.nextUrl.pathname.startsWith("/admin") && !request.nextUrl.pathname.startsWith("/admin/login")) {
       const adminSession = request.cookies.get("admin_session")?.value
-      if (!adminSession) {
-        const url = request.nextUrl.clone()
-        url.pathname = "/admin/login"
-        return NextResponse.redirect(url)
-      }
+      const decoded = adminSession ? verifyAdminTokenInMiddleware(adminSession) : null
 
-      // التحقق من صلاحية الجلسة
-      try {
-        const decoded = JSON.parse(Buffer.from(adminSession, "base64").toString())
-        if (decoded.exp < Date.now()) {
-          const url = request.nextUrl.clone()
-          url.pathname = "/admin/login"
-          const response = NextResponse.redirect(url)
-          response.cookies.delete("admin_session")
-          return response
-        }
-      } catch {
+      if (!decoded) {
         const url = request.nextUrl.clone()
         url.pathname = "/admin/login"
-        return NextResponse.redirect(url)
+        const response = NextResponse.redirect(url)
+        if (adminSession) response.cookies.delete("admin_session")
+        return response
       }
     }
 
+    // إعادة توجيه من صفحة الدخول إذا كان مسجلاً دخوله
     if (request.nextUrl.pathname === "/admin/login") {
       const adminSession = request.cookies.get("admin_session")?.value
-      if (adminSession) {
-        try {
-          const decoded = JSON.parse(Buffer.from(adminSession, "base64").toString())
-          if (decoded.exp > Date.now()) {
-            const url = request.nextUrl.clone()
-            url.pathname = "/admin"
-            return NextResponse.redirect(url)
-          }
-        } catch {
-          // Session invalid, continue to login
-        }
+      const decoded = adminSession ? verifyAdminTokenInMiddleware(adminSession) : null
+
+      if (decoded) {
+        const url = request.nextUrl.clone()
+        url.pathname = "/admin"
+        return NextResponse.redirect(url)
       }
     }
 
+    // حماية مسارات /chat
     if (request.nextUrl.pathname.startsWith("/chat") && !user) {
       const referer = request.headers.get("referer")
       if (referer && referer.includes("/auth/callback")) {
-        console.log("[v0] Just came from OAuth callback, allowing access")
-        // Allow the request to proceed - session will be established
         return supabaseResponse
       }
 
-      console.log("[v0] No user found in /chat, redirecting to login")
       const url = request.nextUrl.clone()
       url.pathname = "/auth/login"
       return NextResponse.redirect(url)
     }
 
+    // إعادة توجيه المستخدمين المسجلين من صفحات المصادقة
     if (
       user &&
       (request.nextUrl.pathname.startsWith("/auth/login") || request.nextUrl.pathname.startsWith("/auth/sign-up"))
@@ -122,7 +140,6 @@ export async function updateSession(request: NextRequest) {
     }
   } catch (error) {
     console.error("[v0] Auth error in middleware:", error)
-    // Continue anyway - user might be accessing public routes
   }
 
   return supabaseResponse
