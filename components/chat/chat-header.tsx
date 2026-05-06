@@ -63,6 +63,7 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [canInstall, setCanInstall] = useState(false)
   const [selectedMetric, setSelectedMetric] = useState<"responsibility" | "progress" | null>(null)
+  const [metricsDialogOpen, setMetricsDialogOpen] = useState(false)
   const router = useRouter()
   const supabase = createClient()
   const [metricsEnabled, setMetricsEnabled] = useState(false)
@@ -227,21 +228,38 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
 
           {/* Group Info */}
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="font-bold text-sm md:text-base truncate">{group.name}</h1>
+            <h1 className="font-bold text-sm md:text-base truncate">{group.name}</h1>
+            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
               {classificationEnabled && group.cell_category && (
-                <span
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (metricsEnabled) setMetricsDialogOpen(true)
+                  }}
+                  disabled={!metricsEnabled}
                   className={cn(
-                    "text-[9px] md:text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0",
+                    "text-[9px] md:text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 transition-all",
                     group.cell_category === "project"
                       ? "bg-blue-500/20 text-blue-300"
                       : "bg-purple-500/20 text-purple-300",
+                    metricsEnabled
+                      ? "cursor-pointer hover:opacity-80 active:scale-95"
+                      : "cursor-default",
                   )}
+                  title={metricsEnabled ? "عرض المقاييس" : undefined}
+                  aria-label={
+                    metricsEnabled
+                      ? `${group.cell_category === "project" ? "مشروع" : "حوار"} - عرض المقاييس`
+                      : group.cell_category === "project"
+                        ? "مشروع"
+                        : "حوار"
+                  }
                 >
                   {group.cell_category === "project" ? "مشروع" : "حوار"}
-                </span>
+                </button>
               )}
-              {metricsEnabled && (
+              {/* Fallback: show inline metric cards only when classification is disabled */}
+              {metricsEnabled && !classificationEnabled && (
                 <div className="flex gap-1">
                   <MetricCard
                     label="المسؤولية"
@@ -259,30 +277,80 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
                   )}
                 </div>
               )}
+              <p className="text-[10px] md:text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap m-0">
+                <span className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse shadow-[0_0_6px_var(--success)]" />
+                  {onlineCount} متصل
+                </span>
+                <span className="text-muted-foreground/40">•</span>
+                <span>{members.length} أعضاء</span>
+                {group.responsibility_score !== undefined && group.responsibility_score < 75 && (
+                  <>
+                    <span className="text-muted-foreground/40">•</span>
+                    <span
+                      className={cn(
+                        "flex items-center gap-1 font-medium",
+                        group.responsibility_score < 60 ? "text-destructive" : "text-warning",
+                      )}
+                    >
+                      {group.responsibility_score}%
+                    </span>
+                  </>
+                )}
+              </p>
             </div>
-            <p className="text-[10px] md:text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
-              <span className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse shadow-[0_0_6px_var(--success)]" />
-                {onlineCount} متصل
-              </span>
-              <span className="text-muted-foreground/40">•</span>
-              <span>{members.length} أعضاء</span>
-              {group.responsibility_score !== undefined && group.responsibility_score < 75 && (
-                <>
-                  <span className="text-muted-foreground/40">•</span>
-                  <span
-                    className={cn(
-                      "flex items-center gap-1 font-medium",
-                      group.responsibility_score < 60 ? "text-destructive" : "text-warning",
-                    )}
-                  >
-                    {group.responsibility_score}%
-                  </span>
-                </>
-              )}
-            </p>
           </div>
         </div>
+
+        {/* Metrics Selection Dialog (opened by clicking the cell category badge) */}
+        {metricsEnabled && classificationEnabled && (
+          <Dialog open={metricsDialogOpen} onOpenChange={setMetricsDialogOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
+                      group.cell_category === "project"
+                        ? "bg-blue-500/20 text-blue-300"
+                        : "bg-purple-500/20 text-purple-300",
+                    )}
+                  >
+                    {group.cell_category === "project" ? "مشروع" : "حوار"}
+                  </span>
+                  مقاييس الخلية
+                </DialogTitle>
+                <DialogDescription>
+                  {group.cell_category === "project"
+                    ? "اضغط على إحدى البطاقات لعرض التفاصيل"
+                    : "اضغط على بطاقة المسؤولية لعرض التفاصيل"}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-wrap gap-3 justify-center py-4">
+                <MetricCard
+                  label="المسؤولية"
+                  value={group.responsibility_score ?? 100}
+                  size="md"
+                  onClick={() => {
+                    setMetricsDialogOpen(false)
+                    setSelectedMetric("responsibility")
+                  }}
+                />
+                {group.cell_category === "project" && (
+                  <MetricCard
+                    label="التقدم"
+                    value={group.progress_score ?? 0}
+                    size="md"
+                    onClick={() => {
+                      setMetricsDialogOpen(false)
+                      setSelectedMetric("progress")
+                    }}
+                  />
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
 
         {/* Metric Details Modal */}
         {selectedMetric && (
