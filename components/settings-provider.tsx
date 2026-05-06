@@ -6,6 +6,7 @@ import { createContext, useContext, useEffect, useState } from "react"
 
 type Language = "ar" | "en" | "fr"
 type FontSize = "small" | "medium" | "large"
+type TranslationLanguage = "ar" | "en" | "fr"
 
 interface SettingsContextType {
   language: Language
@@ -14,6 +15,8 @@ interface SettingsContextType {
   setFontSize: (size: FontSize) => void
   timezone: string
   setTimezone: (tz: string) => void
+  translationLanguage: TranslationLanguage
+  setTranslationLanguage: (lang: TranslationLanguage) => void
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined)
@@ -28,6 +31,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<Language>("ar")
   const [fontSize, setFontSizeState] = useState<FontSize>("medium")
   const [timezone, setTimezoneState] = useState("Auto")
+  const [translationLanguage, setTranslationLanguageState] = useState<TranslationLanguage>("ar")
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -36,10 +40,17 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const savedLang = localStorage.getItem("language") as Language | null
     const savedFontSize = localStorage.getItem("fontSize") as FontSize | null
     const savedTimezone = localStorage.getItem("timezone")
+    const savedTranslationLang = localStorage.getItem("translationLanguage") as TranslationLanguage | null
 
     if (savedLang) setLanguageState(savedLang)
     if (savedFontSize) setFontSizeState(savedFontSize)
     if (savedTimezone) setTimezoneState(savedTimezone)
+    if (savedTranslationLang) {
+      setTranslationLanguageState(savedTranslationLang)
+    } else if (savedLang) {
+      // Default translation target to the user's UI language if not explicitly set
+      setTranslationLanguageState(savedLang)
+    }
   }, [])
 
   useEffect(() => {
@@ -76,8 +87,24 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("timezone", tz)
   }
 
+  const setTranslationLanguage = (lang: TranslationLanguage) => {
+    setTranslationLanguageState(lang)
+    localStorage.setItem("translationLanguage", lang)
+  }
+
   return (
-    <SettingsContext.Provider value={{ language, setLanguage, fontSize, setFontSize, timezone, setTimezone }}>
+    <SettingsContext.Provider
+      value={{
+        language,
+        setLanguage,
+        fontSize,
+        setFontSize,
+        timezone,
+        setTimezone,
+        translationLanguage,
+        setTranslationLanguage,
+      }}
+    >
       {children}
     </SettingsContext.Provider>
   )

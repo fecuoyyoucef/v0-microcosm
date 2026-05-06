@@ -714,45 +714,6 @@ export function GroupSettingsForm({
                   />
                 </div>
 
-                <div className="flex items-center justify-between gap-4 pt-2 border-t">
-                  <div className="min-w-0">
-                    <p className="font-medium">لغة الترجمة</p>
-                    <p className="text-sm text-muted-foreground">
-                      اللغة الافتراضية عند الضغط على "ترجمة" للرسائل في هذه الخلية
-                    </p>
-                  </div>
-                  <Select
-                    value={settings.translation_language || "auto"}
-                    onValueChange={(value) =>
-                      setSettings({
-                        ...settings,
-                        translation_language: value as
-                          | "ar"
-                          | "en"
-                          | "fr"
-                          | "es"
-                          | "de"
-                          | "tr"
-                          | "auto",
-                      })
-                    }
-                    disabled={!isAdmin}
-                  >
-                    <SelectTrigger className="w-40 shrink-0">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="auto">تلقائي (عربي ↔ إنجليزي)</SelectItem>
-                      <SelectItem value="ar">العربية</SelectItem>
-                      <SelectItem value="en">الإنجليزية</SelectItem>
-                      <SelectItem value="fr">الفرنسية</SelectItem>
-                      <SelectItem value="es">الإسبانية</SelectItem>
-                      <SelectItem value="de">الألمانية</SelectItem>
-                      <SelectItem value="tr">التركية</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
                 {isAdmin && (
                   <Button onClick={handleSave} disabled={isSaving}>
                     {isSaving ? <Loader2 className="h-4 w-4 animate-spin ml-2" /> : <Save className="h-4 w-4 ml-2" />}
