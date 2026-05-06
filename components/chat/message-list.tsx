@@ -321,27 +321,16 @@ export const MessageList = React.memo(function MessageList({
   }
 
   const handlePinMessage = async () => {
-    console.log("[v0] handlePinMessage called", { selectedMessage, currentUserId, groupId })
-    if (!selectedMessage) {
-      console.log("[v0] handlePinMessage: no selectedMessage, aborting")
-      return
-    }
+    if (!selectedMessage) return
     const messageToPin = selectedMessage
     setShowActionSheet(false)
     try {
-      console.log("[v0] handlePinMessage: sending request", {
-        messageId: messageToPin.id,
-        userId: currentUserId,
-        groupId,
-      })
       const response = await fetch("/api/messages/pin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messageId: messageToPin.id, userId: currentUserId, groupId }),
       })
-      console.log("[v0] handlePinMessage: response status", response.status)
       const payload = await response.json().catch(() => ({}))
-      console.log("[v0] handlePinMessage: response payload", payload)
       if (!response.ok) {
         toast({ title: payload?.error || "خطأ في تثبيت الرسالة", variant: "destructive" })
         return
@@ -356,8 +345,7 @@ export const MessageList = React.memo(function MessageList({
       )
       toast({ title: newPinned ? "تم التثبيت" : "تم إلغاء التثبيت" })
       setSelectedMessage(null)
-    } catch (err) {
-      console.log("[v0] handlePinMessage: caught error", err)
+    } catch {
       toast({ title: "خطأ في تثبيت الرسالة", variant: "destructive" })
     }
   }
