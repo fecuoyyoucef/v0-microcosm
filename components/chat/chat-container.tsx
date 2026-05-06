@@ -811,6 +811,7 @@ export function ChatContainer({
           messagesEndRef={messagesEndRef}
           groupId={groupId}
           translationLanguage={translationLanguage}
+          isAdmin={currentUserRole === "admin"}
         />
           <TypingIndicator userNames={typingUserNames} />
         </div>
