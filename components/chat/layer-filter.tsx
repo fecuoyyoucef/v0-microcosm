@@ -10,8 +10,6 @@ import {
   CodeBracketIcon,
   MagnifyingGlassIcon,
   ChartBarIcon,
-  ArchiveBoxIcon,
-  DocumentTextIcon,
   ArrowTrendingUpIcon,
 } from "@heroicons/react/24/solid"
 import type { MessageLayer, ConversationNode } from "@/lib/types"
@@ -196,20 +194,6 @@ export function LayerFilter({
               <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-purple-500/10">
                 <LightBulbIcon className="w-3.5 h-3.5 text-purple-600" />
                 الذاكرة
-              </Button>
-            </Link>
-
-            <Link href={`/chat/${groupId}/archive`}>
-              <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-stone-500/10">
-                <ArchiveBoxIcon className="w-3.5 h-3.5 text-stone-600" />
-                الأرشيف
-              </Button>
-            </Link>
-
-            <Link href={`/chat/${groupId}/summary`}>
-              <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-blue-500/10">
-                <DocumentTextIcon className="w-3.5 h-3.5 text-blue-600" />
-                الملخص
               </Button>
             </Link>
 
