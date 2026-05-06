@@ -23,6 +23,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { AttachmentsGallery } from "./attachments-gallery"
+import { PinnedBanner } from "./pinned-banner"
+import { PinnedMessagesSheet } from "./pinned-messages-sheet"
 
 /* ------------------------------------------------------------------ */
 /*  Brand-aligned avatar palette (matches home page & header gradients) */
@@ -211,7 +213,7 @@ export const MessageList = React.memo(function MessageList({
   const [localReactions, setLocalReactions] = useState<
     Record<string, Array<{ id: string; user_id: string; reaction: string }>>
   >({})
-  const [collapsedPinned, setCollapsedPinned] = useState(true)
+  const [showPinnedSheet, setShowPinnedSheet] = useState(false)
 
   const longPressTimer = useRef<NodeJS.Timeout | null>(null)
   const touchStartPos = useRef<{ x: number; y: number } | null>(null)
@@ -244,14 +246,21 @@ export const MessageList = React.memo(function MessageList({
     // Only re-attach when the container itself changes, not on every render.
   }, [scrollContainerRef])
 
-  /* Split & enrich */
-  const { pinnedMessages, regularEnriched, latestPinned } = useMemo(() => {
+  /* Enrich and collect pins.
+   * IMPORTANT: pinned messages MUST stay in the chat flow (Telegram-style).
+   * `pinnedSorted` is sorted by pinned_at ASC (oldest pin → newest pin),
+   * so the banner can default to the newest and cycle backwards on tap.
+   */
+  const { allEnriched, pinnedSorted } = useMemo(() => {
     const pinned = messages.filter((m) => m.is_pinned)
-    const regular = messages.filter((m) => !m.is_pinned)
+    const pinnedSorted = [...pinned].sort((a, b) => {
+      const at = a.pinned_at ? new Date(a.pinned_at).getTime() : new Date(a.created_at).getTime()
+      const bt = b.pinned_at ? new Date(b.pinned_at).getTime() : new Date(b.created_at).getTime()
+      return at - bt
+    })
     return {
-      pinnedMessages: pinned,
-      regularEnriched: enrichMessages(regular),
-      latestPinned: pinned[pinned.length - 1] || null,
+      allEnriched: enrichMessages(messages),
+      pinnedSorted,
     }
   }, [messages])
 
@@ -320,32 +329,55 @@ export const MessageList = React.memo(function MessageList({
     }
   }
 
-  const handlePinMessage = async () => {
-    if (!selectedMessage) return
+  const togglePin = async (message: Message) => {
     try {
       const response = await fetch("/api/messages/pin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messageId: selectedMessage.id, userId: currentUserId, groupId }),
+        body: JSON.stringify({ messageId: message.id, userId: currentUserId, groupId }),
       })
+      const payload = await response.json().catch(() => ({}))
       if (!response.ok) {
-        const error = await response.json()
-        toast({ title: error.error || "خطأ في تثبيت الرسالة", variant: "destructive" })
+        toast({ title: payload?.error || "خطأ في تثبيت الرسالة", variant: "destructive" })
         return
       }
-      setMessages((prev) =>
+      const newPinned = payload?.pinned ?? !message.is_pinned
+      setMessages?.((prev) =>
         prev.map((m) =>
-          m.id === selectedMessage.id
-            ? { ...m, is_pinned: !m.is_pinned, pinned_at: !m.is_pinned ? new Date().toISOString() : null }
+          m.id === message.id
+            ? { ...m, is_pinned: newPinned, pinned_at: newPinned ? new Date().toISOString() : null }
             : m,
         ),
       )
-      toast({ title: selectedMessage.is_pinned ? "تم إلغاء التثبيت" : "تم التثبيت" })
-      setShowActionSheet(false)
-      setSelectedMessage(null)
+      toast({ title: newPinned ? "تم التثبيت" : "تم إلغاء التثبيت" })
     } catch {
       toast({ title: "خطأ في تثبيت الرسالة", variant: "destructive" })
     }
+  }
+
+  const handlePinMessage = async () => {
+    if (!selectedMessage) return
+    const messageToPin = selectedMessage
+    setShowActionSheet(false)
+    setSelectedMessage(null)
+    await togglePin(messageToPin)
+  }
+
+  /** Smooth-scroll to a message in the flow and flash a ring around it. */
+  const handleJumpToMessage = (messageId: string) => {
+    const el = document.getElementById(`message-${messageId}`)
+    if (!el) {
+      toast({
+        title: "الرسالة غير محمّلة",
+        description: "اسحب للأعلى لتحميل الرسائل الأقدم.",
+      })
+      return
+    }
+    el.scrollIntoView({ behavior: "smooth", block: "center" })
+    el.classList.add("ring-2", "ring-primary", "ring-offset-2", "rounded-2xl")
+    window.setTimeout(() => {
+      el.classList.remove("ring-2", "ring-primary", "ring-offset-2", "rounded-2xl")
+    }, 1600)
   }
 
   const handleTranslate = async () => {
@@ -764,29 +796,15 @@ export const MessageList = React.memo(function MessageList({
   /* ------------------------------------------------------------ */
   return (
     <>
-      {/* Sticky pinned banner — Telegram-style compact */}
-      {latestPinned && (
-        <div className="sticky top-0 z-20 px-3 pt-2">
-          <button
-            type="button"
-            onClick={() => setCollapsedPinned((c) => !c)}
-            className="w-full glass border border-border/50 rounded-2xl shadow-sm overflow-hidden"
-          >
-            <div className="flex items-center gap-2.5 px-3 py-2">
-              <div className="h-8 w-1 rounded-full bg-primary shrink-0" />
-              <div className="flex-1 min-w-0 text-start">
-                <div className="text-[10px] font-bold text-primary uppercase tracking-wider flex items-center gap-1">
-                  <Pin className="h-3 w-3 fill-current" />
-                  <span>رسالة مثبتة{pinnedMessages.length > 1 ? ` (${pinnedMessages.length})` : ""}</span>
-                </div>
-                <div className="text-xs text-foreground truncate font-medium">
-                  {latestPinned.content?.slice(0, 80) || "رسالة مثبتة"}
-                </div>
-              </div>
-            </div>
-          </button>
-        </div>
-      )}
+      {/* Telegram-style sticky pinned banner with cycling, dots, dismiss & quick unpin */}
+      <PinnedBanner
+        pinnedMessages={pinnedSorted}
+        groupId={groupId}
+        isAdmin={isAdmin}
+        onJump={handleJumpToMessage}
+        onUnpin={togglePin}
+        onShowAll={() => setShowPinnedSheet(true)}
+      />
 
       <div className="flex-1 px-3 pt-3 space-y-0">
         {/* Subtle loading indicator while fetching older messages — triggered by scroll to top */}
@@ -796,7 +814,7 @@ export const MessageList = React.memo(function MessageList({
           </div>
         )}
 
-        {regularEnriched.map((message) => (
+        {allEnriched.map((message) => (
           <React.Fragment key={message.id}>
             {message._showDateSeparator && (
               <div className="flex justify-center my-3">
@@ -911,6 +929,16 @@ export const MessageList = React.memo(function MessageList({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* "All pinned messages" sheet — opened via long-press on banner */}
+      <PinnedMessagesSheet
+        open={showPinnedSheet}
+        onOpenChange={setShowPinnedSheet}
+        pinnedMessages={pinnedSorted}
+        isAdmin={isAdmin}
+        onJump={handleJumpToMessage}
+        onUnpin={togglePin}
+      />
     </>
   )
 })

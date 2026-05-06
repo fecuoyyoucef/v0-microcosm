@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
   }
 
-  const { data: group } = await supabase.from("groups").select("owner_id").eq("id", groupId).single()
+  const { data: group } = await supabase.from("groups").select("created_by").eq("id", groupId).single()
 
   // Check if user is owner or admin
   const { data: member } = await supabase
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     .eq("user_id", userId)
     .single()
 
-  const isOwner = group?.owner_id === userId
+  const isOwner = group?.created_by === userId
   const isAdmin = member?.role === "admin" || member?.role === "moderator"
 
   if (!group || (!isOwner && !isAdmin)) {
