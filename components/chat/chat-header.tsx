@@ -40,6 +40,7 @@ import { useRouter } from "next/navigation"
 import type { Group, GroupMember } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { MetricCard } from "@/components/ui/metric-card"
+import { TranslationLanguageToolbar } from "./translation-language-toolbar"
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -361,6 +362,9 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
         </Dialog>
 
         <div className="flex items-center gap-1 shrink-0">
+          {/* Translation Language Selector (per-user preference) */}
+          <TranslationLanguageToolbar />
+
           {/* Discussion Quality Assessment Button */}
           <Button
             variant="ghost"

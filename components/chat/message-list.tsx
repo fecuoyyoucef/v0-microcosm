@@ -178,7 +178,7 @@ interface MessageListProps {
   onMessageDeleted?: (messageId: string) => void
   setMessages?: React.Dispatch<React.SetStateAction<Message[]>>
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>
-  translationLanguage?: "ar" | "en" | "fr" | "es" | "de" | "tr" | "auto"
+  translationLanguage?: "ar" | "en" | "fr"
 }
 
 export const MessageList = React.memo(function MessageList({
@@ -195,7 +195,7 @@ export const MessageList = React.memo(function MessageList({
   onMessageDeleted,
   setMessages,
   scrollContainerRef,
-  translationLanguage = "auto",
+  translationLanguage = "ar",
 }: MessageListProps) {
   const supabase = createClient()
 
@@ -351,13 +351,7 @@ export const MessageList = React.memo(function MessageList({
     setTranslatingId(selectedMessage.id)
     setShowActionSheet(false)
     try {
-      const isArabic = /[\u0600-\u06FF]/.test(selectedMessage.content)
-      const targetLang =
-        translationLanguage && translationLanguage !== "auto"
-          ? translationLanguage
-          : isArabic
-            ? "en"
-            : "ar"
+      const targetLang = translationLanguage || "ar"
       const response = await fetch("/api/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

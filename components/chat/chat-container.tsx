@@ -12,6 +12,7 @@ import { TypingIndicator } from "./typing-indicator"
 import { ImportantMessageToast } from "./important-message-toast"
 import type { Group, GroupMember, Message, MessageLayer, ConversationNode, GroupSettings } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { useSettings } from "@/components/settings-provider"
 
 interface ChatContainerProps {
   groupId: string
@@ -60,6 +61,7 @@ export function ChatContainer({
   const supabase = createClient()
   const isMounted = useRef(true)
   const pendingMessageIds = useRef<Set<string>>(new Set())
+  const { translationLanguage } = useSettings()
 
   const resetUnreadCount = useCallback(async () => {
     try {
@@ -808,7 +810,7 @@ export function ChatContainer({
           scrollContainerRef={scrollContainerRef}
           messagesEndRef={messagesEndRef}
           groupId={groupId}
-          translationLanguage={groupSettings.translation_language || "auto"}
+          translationLanguage={translationLanguage}
         />
           <TypingIndicator userNames={typingUserNames} />
         </div>
