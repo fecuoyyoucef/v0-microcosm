@@ -179,6 +179,7 @@ interface MessageListProps {
   setMessages?: React.Dispatch<React.SetStateAction<Message[]>>
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>
   translationLanguage?: "ar" | "en" | "fr"
+  isAdmin?: boolean
 }
 
 export const MessageList = React.memo(function MessageList({
@@ -196,6 +197,7 @@ export const MessageList = React.memo(function MessageList({
   setMessages,
   scrollContainerRef,
   translationLanguage = "ar",
+  isAdmin = false,
 }: MessageListProps) {
   const supabase = createClient()
 
@@ -857,17 +859,19 @@ export const MessageList = React.memo(function MessageList({
               <span>ترجمة</span>
             </Button>
 
+            {isAdmin && (
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-3 h-11 rounded-xl"
+                onClick={handlePinMessage}
+              >
+                <Pin className="h-4 w-4" />
+                <span>{selectedMessage?.is_pinned ? "إلغاء التثبيت" : "تثبيت"}</span>
+              </Button>
+            )}
+
             {selectedMessage?.sender_id === currentUserId && (
               <>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start gap-3 h-11 rounded-xl"
-                  onClick={handlePinMessage}
-                >
-                  <Pin className="h-4 w-4" />
-                  <span>{selectedMessage?.is_pinned ? "إلغاء التثبيت" : "تثبيت"}</span>
-                </Button>
-
                 <Button variant="ghost" className="w-full justify-start gap-3 h-11 rounded-xl" onClick={handleEdit}>
                   <Edit2 className="h-4 w-4" />
                   <span>تعديل</span>
