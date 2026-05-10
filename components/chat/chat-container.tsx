@@ -591,12 +591,23 @@ export function ChatContainer({
     return () => scrollContainer.removeEventListener("scroll", handleScroll)
   }, [scrollDirection])
 
+  // Filter shadow messages based on visible_to - only show to sender or selected recipients
+  const visibleMessages = messages.filter((m) => {
+    // If it's a shadow message with visible_to restrictions
+    if (m.layer === "shadow" && m.visible_to && m.visible_to.length > 0) {
+      // Show only to sender or users in visible_to array
+      return m.sender_id === currentUserId || m.visible_to.includes(currentUserId)
+    }
+    // All other messages are visible to everyone
+    return true
+  })
+
   const filteredMessages =
     activeLayer === "all"
       ? selectedNodeId
-        ? messages.filter((m) => m.node_id === selectedNodeId)
-        : messages
-      : messages.filter((m) => m.layer === activeLayer && (!selectedNodeId || m.node_id === selectedNodeId))
+        ? visibleMessages.filter((m) => m.node_id === selectedNodeId)
+        : visibleMessages
+      : visibleMessages.filter((m) => m.layer === activeLayer && (!selectedNodeId || m.node_id === selectedNodeId))
 
   const handleReply = (message: Message) => {
     setReplyingTo(message)
