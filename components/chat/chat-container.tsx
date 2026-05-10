@@ -719,7 +719,13 @@ export function ChatContainer({
       )
 
       try {
-        const recipientIds = members.filter((m) => m.user_id !== currentUserId).map((m) => m.user_id)
+        // Filter recipients - for shadow messages with visible_to, only notify those users
+        let recipientIds = members.filter((m) => m.user_id !== currentUserId).map((m) => m.user_id)
+        
+        if (layer === "shadow" && visibleTo && visibleTo.length > 0) {
+          // Only notify users who are allowed to see this shadow message
+          recipientIds = recipientIds.filter((id) => visibleTo.includes(id))
+        }
 
         if (recipientIds.length > 0) {
           fetch("/api/notifications/send", {
