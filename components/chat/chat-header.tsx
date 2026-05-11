@@ -53,9 +53,10 @@ interface ChatHeaderProps {
   currentUserRole: "admin" | "member"
   currentUserId: string
   onMembersUpdate?: () => void
+  onlineCount?: number
 }
 
-export function ChatHeader({ group, members, currentUserRole, currentUserId, onMembersUpdate }: ChatHeaderProps) {
+export function ChatHeader({ group, members, currentUserRole, currentUserId, onMembersUpdate, onlineCount: propOnlineCount }: ChatHeaderProps) {
   const [isInviteOpen, setIsInviteOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
@@ -175,7 +176,8 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
     return colors[index]
   }
 
-  const onlineCount = Math.min(members.length, Math.ceil(members.length * 0.6))
+  // Use real presence data if provided, otherwise show 1 (current user is online)
+  const onlineCount = propOnlineCount !== undefined ? propOnlineCount : 1
 
   const getMetricColor = (val: number) => {
     if (val > 90) return "bg-blue-500/20 border-blue-500/30"
