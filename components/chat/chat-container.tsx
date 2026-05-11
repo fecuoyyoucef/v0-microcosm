@@ -8,6 +8,7 @@ import { MessageInput } from "./message-input"
 import { LayerFilter } from "./layer-filter"
 import { AnimatedBackground, type BackgroundStyle } from "@/components/background/animated-background"
 import { useRealtimePresence } from "@/hooks/use-realtime-presence"
+import { useGlobalPresence } from "@/hooks/use-global-presence"
 import { TypingIndicator } from "./typing-indicator"
 import { ImportantMessageToast } from "./important-message-toast"
 import type { Group, GroupMember, Message, MessageLayer, ConversationNode, GroupSettings } from "@/lib/types"
@@ -307,6 +308,12 @@ export function ChatContainer({
   const currentProfile = members.find((m) => m.user_id === currentUserId)?.profile
   const { onlineUsers, typingUsers, broadcastTyping } = useRealtimePresence(
     groupId,
+    currentUserId,
+    currentProfile?.display_name || "مستخدم",
+  )
+  
+  // Global presence tracks all users in the app (not just this group)
+  const { onlineUserIds, onlineCount: globalOnlineCount } = useGlobalPresence(
     currentUserId,
     currentProfile?.display_name || "مستخدم",
   )
@@ -782,14 +789,14 @@ export function ChatContainer({
       )}
 
       <div className="relative z-10 flex flex-col h-full overflow-hidden bg-transparent">
-        <ChatHeader
-          group={group}
-          members={members}
-          currentUserRole={currentUserRole}
-          currentUserId={currentUserId}
-          onMembersUpdate={fetchMembers}
-          onlineCount={onlineUsers.length + 1}
-        />
+<ChatHeader
+  group={group}
+  members={members}
+  currentUserRole={currentUserRole}
+  currentUserId={currentUserId}
+  onMembersUpdate={fetchMembers}
+  onlineUserIds={onlineUserIds}
+  />
 
         <LayerFilter
           activeLayer={activeLayer}
