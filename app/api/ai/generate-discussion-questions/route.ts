@@ -1,8 +1,15 @@
 import { createClient } from "@/lib/supabase/server"
 import { generateAIText } from "@/lib/ai"
+import { checkFeatureServer } from "@/lib/features-server"
 
 export async function POST(req: Request) {
   try {
+    // Check if feature is enabled
+    const enabled = await checkFeatureServer("ai_discussion_questions")
+    if (!enabled) {
+      return Response.json({ error: "Feature disabled" }, { status: 403 })
+    }
+
     const { groupId, nodeId, context } = await req.json()
     const supabase = await createClient()
 

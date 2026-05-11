@@ -45,14 +45,14 @@ export function AIToolbar({ groupId, messages, onInsertSummary }: AIToolbarProps
   const [searchQuery, setSearchQuery] = useState("")
   const [translateText, setTranslateText] = useState("")
 
-  // Feature flags
-  const aiAssistantEnabled = useFeature("ai_assistant")
-  const smartSummaryEnabled = useFeature("smart_summary")
-  const discussionQualityEnabled = useFeature("discussion_quality")
-  const semanticSearchEnabled = useFeature("semantic_search")
-  const messageTranslationEnabled = useFeature("message_translation")
-  const discussionQuestionsEnabled = useFeature("discussion_questions")
-  const dailyMemoryEnabled = useFeature("daily_memory")
+  // Feature flags - must match keys in feature_flags table
+  const aiAssistantEnabled = useFeature("ai_chat_assistant")
+  const smartSummaryEnabled = useFeature("collective_memory")
+  const discussionQualityEnabled = useFeature("ai_quality_assessment")
+  const semanticSearchEnabled = useFeature("ai_semantic_search")
+  const messageTranslationEnabled = useFeature("ai_translation")
+  const discussionQuestionsEnabled = useFeature("ai_discussion_questions")
+  const dailyMemoryEnabled = useFeature("collective_memory")
 
   // If no AI features are enabled, don't show toolbar
   const hasAnyFeature =
