@@ -61,10 +61,12 @@ export async function syncFeatures(): Promise<{ added: number; updated: number }
 
 export async function updateFeatureStatus(featureKey: string, isEnabled: boolean): Promise<boolean> {
   const supabase = await createClient()
+  const timestamp = new Date().toISOString()
 
+  // 1. تحديث feature_registry (المصدر الرئيسي)
   const { error } = await supabase
     .from("feature_registry")
-    .update({ is_enabled: isEnabled, updated_at: new Date().toISOString() })
+    .update({ is_enabled: isEnabled, updated_at: timestamp })
     .eq("feature_key", featureKey)
 
   if (error) {
@@ -72,11 +74,28 @@ export async function updateFeatureStatus(featureKey: string, isEnabled: boolean
     return false
   }
 
+  // 2. مزامنة مع feature_flags (الجدول الذي يقرأه التطبيق + Realtime)
+  const { error: flagsError } = await supabase
+    .from("feature_flags")
+    .upsert({
+      feature_key: featureKey,
+      is_enabled: isEnabled,
+      updated_at: timestamp,
+    }, {
+      onConflict: "feature_key"
+    })
+
+  if (flagsError) {
+    console.error(`[Feature Registry] Error syncing to feature_flags:`, flagsError)
+    // لا نرجع false لأن التحديث الأساسي نجح
+  }
+
+  // 3. مزامنة مع system_settings (للتوافق مع الكود القديم)
   await supabase.from("system_settings").upsert({
     key: featureKey,
     value: { value: isEnabled },
     description: `Auto-synced from feature registry`,
-    updated_at: new Date().toISOString(),
+    updated_at: timestamp,
   })
 
   return true
