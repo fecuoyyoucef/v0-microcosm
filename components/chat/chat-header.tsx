@@ -53,10 +53,10 @@ interface ChatHeaderProps {
   currentUserRole: "admin" | "member"
   currentUserId: string
   onMembersUpdate?: () => void
-  onlineCount?: number
+  onlineUserIds?: Set<string>
 }
 
-export function ChatHeader({ group, members, currentUserRole, currentUserId, onMembersUpdate, onlineCount: propOnlineCount }: ChatHeaderProps) {
+export function ChatHeader({ group, members, currentUserRole, currentUserId, onMembersUpdate, onlineUserIds }: ChatHeaderProps) {
   const [isInviteOpen, setIsInviteOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
@@ -176,8 +176,16 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
     return colors[index]
   }
 
-  // Use real presence data if provided, otherwise show 1 (current user is online)
-  const onlineCount = propOnlineCount !== undefined ? propOnlineCount : 1
+  // Calculate online count from members who are in the onlineUserIds set
+  const onlineCount = onlineUserIds 
+    ? members.filter((m) => onlineUserIds.has(m.user_id) || m.user_id === currentUserId).length 
+    : 1
+  
+  // Helper function to check if a user is online
+  const isUserOnline = (userId: string) => {
+    if (userId === currentUserId) return true
+    return onlineUserIds?.has(userId) ?? false
+  }
 
   const getMetricColor = (val: number) => {
     if (val > 90) return "bg-blue-500/20 border-blue-500/30"
@@ -493,17 +501,27 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
                         href={`/chat/profile/${member.user_id}`}
                         className="flex items-center gap-3 p-3 rounded-xl hover:bg-secondary transition-colors cursor-pointer"
                       >
-                        <Avatar className="h-10 w-10 ring-2 ring-background">
-                          {member.profile?.avatar_url && (
-                            <AvatarImage src={member.profile.avatar_url || "/placeholder.svg"} />
+                        <div className="relative">
+                          <Avatar className="h-10 w-10 ring-2 ring-background">
+                            {member.profile?.avatar_url && (
+                              <AvatarImage src={member.profile.avatar_url || "/placeholder.svg"} />
+                            )}
+                            <AvatarFallback className="bg-primary/20 text-primary font-semibold">
+                              {member.profile?.display_name?.charAt(0) || "؟"}
+                            </AvatarFallback>
+                          </Avatar>
+                          {isUserOnline(member.user_id) && (
+                            <span className="absolute bottom-0 right-0 w-3 h-3 bg-success rounded-full border-2 border-background shadow-[0_0_6px_var(--success)]" />
                           )}
-                          <AvatarFallback className="bg-primary/20 text-primary font-semibold">
-                            {member.profile?.display_name?.charAt(0) || "؟"}
-                          </AvatarFallback>
-                        </Avatar>
+                        </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate">{member.profile?.display_name || "مستخدم"}</p>
-                          <p className="text-xs text-muted-foreground">{member.role === "admin" ? "مسؤول" : "عضو"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {member.role === "admin" ? "مسؤول" : "عضو"}
+                            {isUserOnline(member.user_id) && (
+                              <span className="text-success mr-1">• نشط</span>
+                            )}
+                          </p>
                         </div>
                         {member.user_id === currentUserId && (
                           <span className="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full shrink-0">
