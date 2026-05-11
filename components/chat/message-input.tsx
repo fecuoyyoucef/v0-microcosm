@@ -3,6 +3,7 @@
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -98,6 +99,7 @@ export function MessageInput({
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const supabase = createClient()
   const router = useRouter()
+  const isMobile = useIsMobile()
 
   const otherMembers = members.filter((m) => m.user_id !== currentUserId)
   const currentLayerOption = layerOptions.find((l) => l.value === selectedLayer)!
@@ -270,7 +272,12 @@ export function MessageInput({
         // Shift+Enter = new line (default behavior)
         return
       }
-      // Enter alone = send
+      // On mobile: Enter = new line, on desktop: Enter = send
+      if (isMobile) {
+        // Allow default behavior (new line) on mobile
+        return
+      }
+      // Enter alone = send (desktop only)
       e.preventDefault()
       handleSend()
     }
