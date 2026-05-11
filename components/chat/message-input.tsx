@@ -266,10 +266,13 @@ export function MessageInput({
     }
 
     if (e.key === "Enter") {
-      if (e.shiftKey || e.ctrlKey) {
-        e.preventDefault()
-        handleSend()
+      if (e.shiftKey) {
+        // Shift+Enter = new line (default behavior)
+        return
       }
+      // Enter alone = send
+      e.preventDefault()
+      handleSend()
     }
   }
 
@@ -638,7 +641,7 @@ export function MessageInput({
 
         {/* Hint text */}
         <p className="text-[9px] text-muted-foreground/60 mt-1 text-center">
-          Shift + Enter للإرسال • اكتب @ للإشارة لشخص
+          Enter للإرسال • Shift+Enter لسطر جديد • اكتب @ للإشارة لشخص
         </p>
       </div>
     </div>
