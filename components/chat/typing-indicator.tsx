@@ -1,29 +1,28 @@
 "use client"
 
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 
 interface TypingIndicatorProps {
   userNames: string[]
 }
 
 export function TypingIndicator({ userNames }: TypingIndicatorProps) {
-  if (userNames.length === 0) return null
-
   const displayText =
     userNames.length === 1
-      ? `${userNames[0]} يكتب`
+      ? `${userNames[0]} يكتب...`
       : userNames.length === 2
-        ? `${userNames[0]} و ${userNames[1]} يكتبان`
-        : `${userNames.length} أشخاص يكتبون`
+        ? `${userNames[0]} و ${userNames[1]} يكتبان...`
+        : userNames.length > 2
+          ? `${userNames.length} أشخاص يكتبون...`
+          : null
 
+  // Always render a fixed-height container to prevent layout shift
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0, y: 8, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 8, scale: 0.95 }}
-        transition={{ duration: 0.18, ease: "easeOut" }}
-        className="px-4 py-2 flex items-end gap-2"
+    <div className="h-10 px-4 flex items-center">
+      <div
+        className={`flex items-center gap-2 transition-opacity duration-200 ${
+          userNames.length > 0 ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
       >
         {/* Telegram-style typing bubble */}
         <div className="bg-muted text-muted-foreground rounded-2xl rounded-br-md px-3 py-2 flex items-center gap-1.5 shadow-sm">
@@ -45,8 +44,8 @@ export function TypingIndicator({ userNames }: TypingIndicatorProps) {
             />
           </span>
         </div>
-        <span className="text-[11px] text-muted-foreground/80 mb-1">{displayText}</span>
-      </motion.div>
-    </AnimatePresence>
+        <span className="text-[11px] text-muted-foreground/80">{displayText}</span>
+      </div>
+    </div>
   )
 }
