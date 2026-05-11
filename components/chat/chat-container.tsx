@@ -788,6 +788,7 @@ export function ChatContainer({
           currentUserRole={currentUserRole}
           currentUserId={currentUserId}
           onMembersUpdate={fetchMembers}
+          onlineCount={onlineUsers.length + 1}
         />
 
         <LayerFilter
