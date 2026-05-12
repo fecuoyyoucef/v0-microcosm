@@ -54,8 +54,6 @@ export function CollectiveMemoryContainer({
         </div>
       </div>
 
-      
-
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
         <div className="px-4 py-2 border-b border-border bg-card/30 shrink-0">
@@ -82,7 +80,7 @@ export function CollectiveMemoryContainer({
                 <Brain className="w-8 h-8 text-purple-600" />
               </div>
               <p className="text-lg font-medium">الذاكرة فارغة</p>
-              <p className="text-sm">سيتم إنشاء ملخصات تلقائية للمحادثات</p>
+              <p className="text-sm">اضغط على "إنشاء ملخص اليوم" لتوليد أول ملخص</p>
             </div>
           ) : (
             memories.map((memory) => (
