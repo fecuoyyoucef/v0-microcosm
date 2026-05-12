@@ -31,8 +31,13 @@ export default function FeaturesPage() {
   const handleSync = async () => {
     setSyncing(true)
     try {
-      const result = await syncFlags()
+      // استخدام POST للمزامنة مع route sync
+      const res = await fetch("/api/admin/features/sync", { method: "POST" })
+      if (!res.ok) throw new Error("Sync failed")
+      const result = await res.json()
       toast.success(`تمت المزامنة: ${result.added} جديدة، ${result.updated} محدثة`)
+      // تحديث القائمة بعد المزامنة
+      window.location.reload()
     } catch {
       toast.error("فشلت المزامنة")
     } finally {
