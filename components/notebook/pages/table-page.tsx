@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -24,6 +24,7 @@ export function TablePage({ page, members: _members, currentUserId: _currentUser
   const [content, setContent] = useState<TableContent>({ columns: [], rows: [] })
   const [isSaving, setIsSaving] = useState(false)
   const [savedRecently, setSavedRecently] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -33,6 +34,17 @@ export function TablePage({ page, members: _members, currentUserId: _currentUser
       rows: pageContent.rows || [],
     })
   }, [page.content])
+
+  // In RTL, ensure the table starts scrolled to the right (showing the first column)
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    // For RTL, scrollLeft should be at max negative or max positive depending on browser
+    // Setting it to scrollWidth aligns the start (right side in RTL) to be visible
+    requestAnimationFrame(() => {
+      el.scrollLeft = el.scrollWidth
+    })
+  }, [content.columns.length])
 
   const saveContent = async (newContent: TableContent) => {
     setIsSaving(true)
@@ -173,18 +185,19 @@ export function TablePage({ page, members: _members, currentUserId: _currentUser
 
           {/* Table */}
           <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
-            <div 
+            <div
+              ref={scrollRef}
+              dir="rtl"
               className="overflow-auto max-h-[60vh]"
-              style={{ 
+              style={{
                 touchAction: 'pan-x pan-y',
                 overscrollBehaviorX: 'contain',
-                WebkitOverflowScrolling: 'touch'
+                WebkitOverflowScrolling: 'touch',
               }}
               onTouchStart={(e) => e.stopPropagation()}
               onTouchMove={(e) => e.stopPropagation()}
             >
-              <div className="min-w-fit px-4">
-              <table className="w-full border-collapse min-w-max">
+              <table className="border-collapse w-max">
                 <thead>
                   <tr>
                     {content.columns.map((column, index) => (
@@ -263,7 +276,6 @@ export function TablePage({ page, members: _members, currentUserId: _currentUser
                   ))}
                 </tbody>
               </table>
-              </div>
             </div>
 
             {content.rows.length === 0 && (

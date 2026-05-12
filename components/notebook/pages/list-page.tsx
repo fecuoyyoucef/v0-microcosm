@@ -37,12 +37,15 @@ export function ListPage({ page, members, currentUserId }: ListPageProps) {
   const supabase = createClient()
 
   const fetchContributions = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("notebook_contributions")
-      .select("*, contributor:profiles(*)")
+      .select("*")
       .eq("page_id", page.id)
       .order("position", { ascending: true })
 
+    if (error) {
+      console.log("[v0] list-page fetch error:", error.message)
+    }
     if (data) {
       setContributions(data)
     }
@@ -80,14 +83,20 @@ export function ListPage({ page, members, currentUserId }: ListPageProps) {
     try {
       const nextPosition = contributions.length
 
-      await supabase.from("notebook_contributions").insert({
+      const { error } = await supabase.from("notebook_contributions").insert({
         page_id: page.id,
         user_id: currentUserId,
         content: { text: newItem.trim(), completed: false, votes: [] },
         position: nextPosition,
       })
 
+      if (error) {
+        console.log("[v0] list-page insert error:", error.message)
+        return
+      }
+
       setNewItem("")
+      fetchContributions()
     } finally {
       setIsAdding(false)
     }
