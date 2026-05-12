@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/generate-summaries",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/update-responsibility",
+      "schedule": "0 1 * * *"
+    }
+  ]
+}
