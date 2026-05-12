@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { FEATURE_DEFINITIONS, type Feature } from "./feature-registry"
 
 export async function getAllFeatures(): Promise<Feature[]> {
@@ -60,7 +60,8 @@ export async function syncFeatures(): Promise<{ added: number; updated: number }
 }
 
 export async function updateFeatureStatus(featureKey: string, isEnabled: boolean): Promise<boolean> {
-  const supabase = await createClient()
+  // نستخدم service client لتجاوز RLS عند الكتابة في feature_flags
+  const supabase = createServiceClient()
   const timestamp = new Date().toISOString()
 
   // 1. جلب بيانات الميزة الكاملة من feature_registry
@@ -87,14 +88,14 @@ export async function updateFeatureStatus(featureKey: string, isEnabled: boolean
   }
 
   // 3. مزامنة مع feature_flags (الجدول الذي يقرأه التطبيق + Realtime)
-  // نرسل جميع الحقول المطلوبة
+  // ملاحظة: أعمدة feature_flags هي feature_name_en و description_en وليس feature_name/description
   const { error: flagsError } = await supabase
     .from("feature_flags")
     .upsert({
       feature_key: featureKey,
-      feature_name: featureData.feature_name,
+      feature_name_en: featureData.feature_name,
       feature_name_ar: featureData.feature_name_ar,
-      description: featureData.description,
+      description_en: featureData.description,
       description_ar: featureData.description_ar,
       category: featureData.category,
       is_enabled: isEnabled,
@@ -105,11 +106,11 @@ export async function updateFeatureStatus(featureKey: string, isEnabled: boolean
 
   if (flagsError) {
     console.error(`[Feature Registry] Error syncing to feature_flags:`, flagsError)
-    // لا نرجع false لأن التحديث الأساسي نجح
+    return false
   }
 
   // 4. مزامنة مع system_settings (للتوافق مع الكود القديم)
-  await supabase.from("system_settings").upsert({
+  const { error: settingsError } = await supabase.from("system_settings").upsert({
     key: featureKey,
     value: { value: isEnabled },
     description: `Auto-synced from feature registry`,
@@ -117,6 +118,10 @@ export async function updateFeatureStatus(featureKey: string, isEnabled: boolean
   }, {
     onConflict: "key"
   })
+
+  if (settingsError) {
+    console.error(`[Feature Registry] Error syncing to system_settings:`, settingsError)
+  }
 
   return true
 }
