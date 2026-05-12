@@ -35,8 +35,6 @@ export function CollectiveMemoryContainer({
   const [memories] = useState<CollectiveMemory[]>(initialMemories)
   const [activeTab, setActiveTab] = useState("timeline")
 
-  
-
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Header */}
@@ -54,8 +52,6 @@ export function CollectiveMemoryContainer({
             <span className="text-muted-foreground">الذاكرة المشتركة</span>
           </div>
         </div>
-
-        
       </div>
 
       
@@ -86,7 +82,7 @@ export function CollectiveMemoryContainer({
                 <Brain className="w-8 h-8 text-purple-600" />
               </div>
               <p className="text-lg font-medium">الذاكرة فارغة</p>
-              <p className="text-sm">اضغط على "إنشاء ملخص اليوم" لتوليد أول ملخص</p>
+              <p className="text-sm">سيتم إنشاء ملخصات تلقائية للمحادثات</p>
             </div>
           ) : (
             memories.map((memory) => (
