@@ -17,7 +17,7 @@ export interface FeatureFlag {
   requires_admin: boolean
   dependencies: string[] | null
   metadata: Record<string, any> | null
-  created_at: string
+  added_date: string
   updated_at: string
 }
 
@@ -67,7 +67,8 @@ export function useFeatureFlags(options: UseFeatureFlagsOptions = {}): UseFeatur
   const fetchFlags = useCallback(async () => {
     try {
       const supabase = createClient()
-      let query = supabase.from("feature_flags").select("*")
+      // استخدام feature_registry كمصدر رئيسي للميزات
+      let query = supabase.from("feature_registry").select("*")
 
       if (category) {
         query = query.eq("category", category)
@@ -104,17 +105,15 @@ export function useFeatureFlags(options: UseFeatureFlagsOptions = {}): UseFeatur
 
     const setupRealtimeSubscription = () => {
       channel = supabase
-        .channel("feature_flags_changes")
+        .channel("feature_registry_changes")
         .on(
           "postgres_changes",
           {
             event: "*",
             schema: "public",
-            table: "feature_flags",
+            table: "feature_registry",
           },
           (payload) => {
-            console.log("[v0] Feature flag change received:", payload)
-
             if (payload.eventType === "INSERT") {
               const newFlag = payload.new as FeatureFlag
               // Apply filters
@@ -135,9 +134,7 @@ export function useFeatureFlags(options: UseFeatureFlagsOptions = {}): UseFeatur
             }
           }
         )
-        .subscribe((status) => {
-          console.log("[v0] Feature flags subscription status:", status)
-        })
+        .subscribe()
     }
 
     setupRealtimeSubscription()
@@ -209,8 +206,9 @@ export function useAdminFeatureFlags() {
     setUpdating(featureKey)
     try {
       const supabase = createClient()
+      // تحديث feature_registry مباشرة
       const { error: updateError } = await supabase
-        .from("feature_flags")
+        .from("feature_registry")
         .update({ 
           is_enabled: !currentValue,
           updated_at: new Date().toISOString()
@@ -237,7 +235,7 @@ export function useAdminFeatureFlags() {
     try {
       const supabase = createClient()
       const { error: updateError } = await supabase
-        .from("feature_flags")
+        .from("feature_registry")
         .update({
           ...updates,
           updated_at: new Date().toISOString()

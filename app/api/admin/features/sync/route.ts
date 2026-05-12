@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
-import { syncFeatures } from "@/lib/feature-registry"
+import { syncFeatures } from "@/lib/feature-registry-server"
 
 // POST - مزامنة الميزات من الكود إلى قاعدة البيانات
 export async function POST(request: NextRequest) {
