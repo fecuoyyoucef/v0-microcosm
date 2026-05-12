@@ -2,9 +2,16 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getAIModel } from "@/lib/ai"
 import { generateText } from "ai"
+import { checkFeatureServer } from "@/lib/features-server"
 
 export async function POST(request: NextRequest) {
   try {
+    // Check if feature is enabled
+    const enabled = await checkFeatureServer("ai_quality_assessment")
+    if (!enabled) {
+      return NextResponse.json({ error: "Feature disabled" }, { status: 403 })
+    }
+
     const supabase = await createClient()
     const {
       data: { user },
