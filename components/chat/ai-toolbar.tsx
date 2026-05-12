@@ -13,7 +13,6 @@ import {
   Sparkles,
   Brain,
   FileText,
-  BookOpen,
   Lightbulb,
   Search,
   Languages,
@@ -52,7 +51,6 @@ export function AIToolbar({ groupId, messages, onInsertSummary }: AIToolbarProps
   const semanticSearchEnabled = useFeature("ai_semantic_search")
   const messageTranslationEnabled = useFeature("ai_translation")
   const discussionQuestionsEnabled = useFeature("ai_discussion_questions")
-  const dailyMemoryEnabled = useFeature("collective_memory")
 
   // If no AI features are enabled, don't show toolbar
   const hasAnyFeature =
@@ -61,8 +59,7 @@ export function AIToolbar({ groupId, messages, onInsertSummary }: AIToolbarProps
     discussionQualityEnabled ||
     semanticSearchEnabled ||
     messageTranslationEnabled ||
-    discussionQuestionsEnabled ||
-    dailyMemoryEnabled
+    discussionQuestionsEnabled
 
   if (!hasAnyFeature) return null
 
@@ -179,27 +176,7 @@ export function AIToolbar({ groupId, messages, onInsertSummary }: AIToolbarProps
     }
   }
 
-  const handleDailyMemory = async () => {
-    setIsLoading(true)
-    setActiveDialog("memory")
-    try {
-      const res = await fetch("/api/ai/generate-daily-memory", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ groupId }),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setResult(data.memory || "لا توجد ذكريات لليوم")
-      } else {
-        setResult("فشل في إنشاء الذاكرة")
-      }
-    } catch {
-      setResult("حدث خطأ")
-    } finally {
-      setIsLoading(false)
-    }
-  }
+
 
   const closeDialog = () => {
     setActiveDialog(null)
@@ -290,19 +267,7 @@ export function AIToolbar({ groupId, messages, onInsertSummary }: AIToolbarProps
               </Button>
             )}
 
-            {dailyMemoryEnabled && (
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-2 h-9"
-                onClick={() => {
-                  setIsOpen(false)
-                  handleDailyMemory()
-                }}
-              >
-                <BookOpen className="w-4 h-4 text-rose-500" />
-                <span>ذاكرة اليوم</span>
-              </Button>
-            )}
+
           </div>
         </PopoverContent>
       </Popover>
@@ -437,27 +402,7 @@ export function AIToolbar({ groupId, messages, onInsertSummary }: AIToolbarProps
         </DialogContent>
       </Dialog>
 
-      {/* Memory Dialog */}
-      <Dialog open={activeDialog === "memory"} onOpenChange={(open) => !open && closeDialog()}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-rose-500" />
-              ذاكرة اليوم
-            </DialogTitle>
-            <DialogDescription>ملخص أهم ما حدث اليوم</DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="max-h-80">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-primary" />
-              </div>
-            ) : (
-              <div className="whitespace-pre-wrap text-sm">{result}</div>
-            )}
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
+
     </>
   )
 }
