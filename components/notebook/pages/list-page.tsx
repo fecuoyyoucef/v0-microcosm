@@ -78,13 +78,11 @@ export function ListPage({ page, members, currentUserId }: ListPageProps) {
 
     setIsAdding(true)
     try {
-      const nextPosition = contributions.length
-
       await supabase.from("notebook_contributions").insert({
         page_id: page.id,
         user_id: currentUserId,
         content: { text: newItem.trim(), completed: false, votes: [] },
-        position: nextPosition,
+        // الترتيب يعتمد على created_at — نتجنّب إسناد position يدوياً لمنع التضارب
       })
 
       setNewItem("")
@@ -93,14 +91,22 @@ export function ListPage({ page, members, currentUserId }: ListPageProps) {
     }
   }
 
+  // قراءة-تعديل-كتابة آمنة: نجلب أحدث محتوى قبل التحديث
+  // لتقليل ضياع الأصوات/حالة الإكمال عند التحرير المتزامن
   const toggleComplete = async (contribution: NotebookContribution) => {
     if (page.is_locked) return
 
-    const content = contribution.content as ListItem
+    const { data: fresh } = await supabase
+      .from("notebook_contributions")
+      .select("content")
+      .eq("id", contribution.id)
+      .single()
+
+    const latest = (fresh?.content ?? contribution.content) as unknown as ListItem
     await supabase
       .from("notebook_contributions")
       .update({
-        content: { ...content, completed: !content.completed },
+        content: { ...latest, completed: !latest.completed },
       })
       .eq("id", contribution.id)
   }
@@ -108,15 +114,21 @@ export function ListPage({ page, members, currentUserId }: ListPageProps) {
   const toggleVote = async (contribution: NotebookContribution) => {
     if (page.is_locked) return
 
-    const content = contribution.content as ListItem
-    const votes = content.votes || []
+    const { data: fresh } = await supabase
+      .from("notebook_contributions")
+      .select("content")
+      .eq("id", contribution.id)
+      .single()
+
+    const latest = (fresh?.content ?? contribution.content) as unknown as ListItem
+    const votes = latest.votes || []
     const hasVoted = votes.includes(currentUserId)
 
     await supabase
       .from("notebook_contributions")
       .update({
         content: {
-          ...content,
+          ...latest,
           votes: hasVoted ? votes.filter((v) => v !== currentUserId) : [...votes, currentUserId],
         },
       })
@@ -132,7 +144,7 @@ export function ListPage({ page, members, currentUserId }: ListPageProps) {
 
   const stats = useMemo(() => {
     const total = contributions.length
-    const completed = contributions.filter((c) => (c.content as ListItem).completed).length
+    const completed = contributions.filter((c) => (c.content as unknown as ListItem).completed).length
     return {
       total,
       completed,
@@ -144,7 +156,7 @@ export function ListPage({ page, members, currentUserId }: ListPageProps) {
   const filteredContributions = useMemo(() => {
     if (filter === "all") return contributions
     return contributions.filter((c) => {
-      const completed = (c.content as ListItem).completed
+      const completed = (c.content as unknown as ListItem).completed
       return filter === "completed" ? completed : !completed
     })
   }, [contributions, filter])
@@ -241,7 +253,7 @@ export function ListPage({ page, members, currentUserId }: ListPageProps) {
               </div>
             ) : (
               filteredContributions.map((contribution) => {
-                const content = contribution.content as ListItem
+                const content = contribution.content as unknown as ListItem
                 const member = getMember(contribution.user_id)
                 const votes = content.votes || []
                 const hasVoted = votes.includes(currentUserId)

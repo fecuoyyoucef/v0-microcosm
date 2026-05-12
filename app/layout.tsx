@@ -7,6 +7,7 @@ import { SettingsProvider } from "@/components/settings-provider"
 import { FeaturesProvider } from "@/components/features/features-provider"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import { TutorialProvider } from "@/lib/contexts/tutorial-context"
+import { Toaster } from "sonner"
 import "./globals.css"
 
 // Primary Arabic font for body text
@@ -103,6 +104,7 @@ export default function RootLayout({
             </FeaturesProvider>
           </SettingsProvider>
         </ThemeProvider>
+        <Toaster richColors position="top-center" dir="rtl" />
         <Analytics />
         <script
           dangerouslySetInnerHTML={{
