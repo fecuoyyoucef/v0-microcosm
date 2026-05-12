@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -8,9 +8,9 @@ import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { RefreshCw, Search, Layers, Sparkles, Settings2, Beaker, Shield, Check, X } from "lucide-react"
+import { RefreshCw, Search, Layers, Sparkles, Settings2, Beaker, Shield, Check, X, Wifi, WifiOff } from "lucide-react"
 import { toast } from "react-toastify"
-import type { Feature } from "@/lib/feature-registry"
+import { useAdminFeatureFlags } from "@/hooks/use-feature-flags"
 
 const categoryConfig = {
   ai: { label: "الذكاء الاصطناعي", icon: Sparkles, color: "text-purple-400", bg: "bg-purple-500/10" },
@@ -22,73 +22,34 @@ const categoryConfig = {
 
 export default function FeaturesPage() {
   const router = useRouter()
-  const [features, setFeatures] = useState<Feature[]>([])
-  const [loading, setLoading] = useState(true)
+  const { flags, loading, updating, stats, toggleFlag, syncFlags } = useAdminFeatureFlags()
   const [syncing, setSyncing] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [activeCategory, setActiveCategory] = useState("all")
-
-  useEffect(() => {
-    fetchFeatures()
-  }, [])
-
-  const fetchFeatures = async () => {
-    try {
-      const res = await fetch("/api/admin/features")
-      if (!res.ok) {
-        if (res.status === 401) {
-          router.push("/admin/login")
-          return
-        }
-        throw new Error("Failed to fetch features")
-      }
-      const data = await res.json()
-      setFeatures(data.features || [])
-    } catch (error) {
-      console.error("Features error:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const [isRealtime, setIsRealtime] = useState(true)
 
   const handleSync = async () => {
     setSyncing(true)
     try {
-      const res = await fetch("/api/admin/features", { method: "PUT" })
-      if (res.ok) {
-        const data = await res.json()
-        await fetchFeatures()
-        toast.success(`تمت المزامنة: ${data.added} جديدة، ${data.updated} محدثة`)
-      } else {
-        toast.error("فشلت المزامنة")
-      }
-    } catch (error) {
-      toast.error("حدث خطأ")
+      const result = await syncFlags()
+      toast.success(`تمت المزامنة: ${result.added} جديدة، ${result.updated} محدثة`)
+    } catch {
+      toast.error("فشلت المزامنة")
     } finally {
       setSyncing(false)
     }
   }
 
   const handleToggle = async (featureKey: string, currentValue: boolean) => {
-    try {
-      const res = await fetch("/api/admin/features", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ feature_key: featureKey, is_enabled: !currentValue }),
-      })
-
-      if (res.ok) {
-        await fetchFeatures()
-        toast.success(!currentValue ? "تم تفعيل الميزة" : "تم تعطيل الميزة")
-      } else {
-        toast.error("فشل تحديث الميزة")
-      }
-    } catch (error) {
-      toast.error("حدث خطأ")
+    const success = await toggleFlag(featureKey, currentValue)
+    if (success) {
+      toast.success(!currentValue ? "تم تفعيل الميزة" : "تم تعطيل الميزة")
+    } else {
+      toast.error("فشل تحديث الميزة")
     }
   }
 
-  const filteredFeatures = features.filter((f) => {
+  const filteredFeatures = flags.filter((f) => {
     const matchesSearch =
       f.feature_name_ar.toLowerCase().includes(searchQuery.toLowerCase()) ||
       f.feature_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -98,9 +59,6 @@ export default function FeaturesPage() {
 
     return matchesSearch && matchesCategory
   })
-
-  const enabledCount = features.filter((f) => f.is_enabled).length
-  const totalCount = features.length
 
   if (loading) {
     return (
@@ -115,9 +73,22 @@ export default function FeaturesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">إدارة الميزات</h1>
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            إدارة الميزات
+            {isRealtime ? (
+              <Badge className="bg-emerald-500/20 text-emerald-400 border-0 gap-1">
+                <Wifi className="w-3 h-3" />
+                مباشر
+              </Badge>
+            ) : (
+              <Badge className="bg-slate-500/20 text-slate-400 border-0 gap-1">
+                <WifiOff className="w-3 h-3" />
+                غير متصل
+              </Badge>
+            )}
+          </h1>
           <p className="text-slate-400">
-            {enabledCount} من {totalCount} ميزة مفعلة
+            {stats.enabled} من {stats.total} ميزة مفعلة
           </p>
         </div>
         <Button onClick={handleSync} disabled={syncing} className="gap-2 bg-cyan-600 hover:bg-cyan-700 text-white">
@@ -129,8 +100,9 @@ export default function FeaturesPage() {
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {Object.entries(categoryConfig).map(([key, config]) => {
-          const count = features.filter((f) => f.category === key).length
-          const enabled = features.filter((f) => f.category === key && f.is_enabled).length
+          const categoryFlags = stats.byCategory[key as keyof typeof stats.byCategory] || []
+          const count = categoryFlags.length
+          const enabled = categoryFlags.filter((f) => f.is_enabled).length
           return (
             <Card
               key={key}
@@ -173,10 +145,11 @@ export default function FeaturesPage() {
             <div className="divide-y divide-slate-800">
               {filteredFeatures.map((feature) => {
                 const config = categoryConfig[feature.category as keyof typeof categoryConfig]
+                const isUpdating = updating === feature.feature_key
                 return (
                   <div
                     key={feature.id}
-                    className="flex items-center justify-between p-4 hover:bg-slate-800/30 transition-colors"
+                    className={`flex items-center justify-between p-4 hover:bg-slate-800/30 transition-colors ${isUpdating ? "opacity-50" : ""}`}
                   >
                     <div className="flex items-center gap-4 flex-1">
                       <div className={`w-10 h-10 rounded-xl ${config.bg} flex items-center justify-center shrink-0`}>
@@ -215,6 +188,7 @@ export default function FeaturesPage() {
                       <Switch
                         checked={feature.is_enabled}
                         onCheckedChange={() => handleToggle(feature.feature_key, feature.is_enabled)}
+                        disabled={isUpdating}
                       />
                     </div>
                   </div>
