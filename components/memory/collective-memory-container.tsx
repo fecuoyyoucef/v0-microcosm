@@ -19,7 +19,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import type { Group, CollectiveMemory } from "@/lib/types"
-import { format } from "date-fns"
+import { format, isToday, parseISO } from "date-fns"
 import { ar } from "date-fns/locale"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
@@ -40,6 +40,12 @@ export function CollectiveMemoryContainer({
   const [isGenerating, setIsGenerating] = useState(false)
   const [activeTab, setActiveTab] = useState("timeline")
   const [error, setError] = useState<string | null>(null)
+
+  // Check if there's already a summary for today
+  const hasTodaySummary = memories.some((memory) => {
+    const summaryDate = typeof memory.summary_date === "string" ? parseISO(memory.summary_date) : memory.summary_date
+    return isToday(summaryDate)
+  })
 
   const generateDailySummary = async () => {
     setIsGenerating(true)
@@ -90,10 +96,12 @@ export function CollectiveMemoryContainer({
           </div>
         </div>
 
-        <Button size="sm" onClick={generateDailySummary} disabled={isGenerating}>
-          {isGenerating ? <Loader2 className="w-4 h-4 ml-2 animate-spin" /> : <Sparkles className="w-4 h-4 ml-2" />}
-          إنشاء ملخص اليوم
-        </Button>
+        {!hasTodaySummary && (
+          <Button size="sm" onClick={generateDailySummary} disabled={isGenerating}>
+            {isGenerating ? <Loader2 className="w-4 h-4 ml-2 animate-spin" /> : <Sparkles className="w-4 h-4 ml-2" />}
+            إنشاء ملخص اليوم
+          </Button>
+        )}
       </div>
 
       {error && (
