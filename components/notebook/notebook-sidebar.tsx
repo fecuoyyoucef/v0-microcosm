@@ -14,9 +14,20 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { toast } from "sonner"
 import {
   Plus,
   FileText,
@@ -68,6 +79,8 @@ export function NotebookSidebar({
   const [isCreating, setIsCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [pageToDelete, setPageToDelete] = useState<NotebookPage | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const supabase = createClient()
 
   const filteredPages = useMemo(() => {
@@ -114,21 +127,42 @@ export function NotebookSidebar({
     }
   }
 
-  const deletePage = async (pageId: string) => {
-    const { error } = await supabase.from("notebook_pages").delete().eq("id", pageId)
-    if (!error) {
-      onPageDeleted(pageId)
+  const confirmDeletePage = async () => {
+    if (!pageToDelete) return
+    setIsDeleting(true)
+    try {
+      const { error } = await supabase.from("notebook_pages").delete().eq("id", pageToDelete.id)
+      if (error) {
+        toast.error("تعذّر حذف الصفحة", {
+          description: error.message || "قد لا تملك الصلاحية الكافية.",
+        })
+        return
+      }
+      toast.success("تم حذف الصفحة")
+      onPageDeleted(pageToDelete.id)
+      setPageToDelete(null)
+    } finally {
+      setIsDeleting(false)
     }
   }
 
   const toggleLock = async (page: NotebookPage) => {
-    await supabase
+    const willLock = !page.is_locked
+    const { error } = await supabase
       .from("notebook_pages")
       .update({
-        is_locked: !page.is_locked,
-        locked_by: !page.is_locked ? currentUserId : null,
+        is_locked: willLock,
+        locked_by: willLock ? currentUserId : null,
       })
       .eq("id", page.id)
+
+    if (error) {
+      toast.error(willLock ? "تعذّر قفل الصفحة" : "تعذّر فتح القفل", {
+        description: "قد لا تملك الصلاحية لتعديل هذه الصفحة.",
+      })
+      return
+    }
+    toast.success(willLock ? "تم قفل الصفحة" : "تم فتح القفل")
   }
 
   const getInitialContent = (type: Exclude<NotebookPageType, "canvas">) => {
@@ -385,7 +419,7 @@ export function NotebookSidebar({
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         className="text-destructive focus:text-destructive"
-                        onClick={() => deletePage(page.id)}
+                        onClick={() => setPageToDelete(page)}
                       >
                         <Trash2 className="h-4 w-4 ml-2" />
                         حذف
@@ -398,6 +432,45 @@ export function NotebookSidebar({
           )}
         </div>
       </ScrollArea>
+
+      {/* حوار تأكيد الحذف */}
+      <AlertDialog
+        open={pageToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) setPageToDelete(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>حذف الصفحة؟</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pageToDelete
+                ? `سيتم حذف صفحة "${pageToDelete.title}" وجميع مساهماتها نهائياً. لا يمكن التراجع عن هذا الإجراء.`
+                : "هل أنت متأكد من حذف هذه الصفحة؟"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                void confirmDeletePage()
+              }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                  جاري الحذف...
+                </>
+              ) : (
+                "حذف نهائياً"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
