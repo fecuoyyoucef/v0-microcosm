@@ -10,21 +10,11 @@ function verifyAdminTokenInMiddleware(token: string): { id: string; email: strin
 
     const parts = token.split(".")
     
-    // دعم التوكنات القديمة مؤقتاً (base64 فقط) - سيتم رفضها
-    if (parts.length === 1) {
-      try {
-        const decoded = JSON.parse(Buffer.from(token, "base64").toString())
-        // التوكنات القديمة منتهية الصلاحية تلقائياً بعد التحديث
-        if (decoded.exp < Date.now()) return null
-        // نسمح بها مؤقتاً ولكن نسجل تحذير
-        console.warn("Legacy token format detected - will be rejected after re-login")
-        return decoded
-      } catch {
-        return null
-      }
+    // رفض أي token ليس بصيغة payload.signature
+    if (parts.length !== 2) {
+      console.warn("Invalid token format - must be payload.signature")
+      return null
     }
-
-    if (parts.length !== 2) return null
 
     const [payloadBase64, signature] = parts
     const payloadString = Buffer.from(payloadBase64, "base64url").toString()
