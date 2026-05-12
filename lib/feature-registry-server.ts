@@ -63,7 +63,19 @@ export async function updateFeatureStatus(featureKey: string, isEnabled: boolean
   const supabase = await createClient()
   const timestamp = new Date().toISOString()
 
-  // 1. تحديث feature_registry (المصدر الرئيسي)
+  // 1. جلب بيانات الميزة الكاملة من feature_registry
+  const { data: featureData, error: fetchError } = await supabase
+    .from("feature_registry")
+    .select("*")
+    .eq("feature_key", featureKey)
+    .single()
+
+  if (fetchError || !featureData) {
+    console.error(`[Feature Registry] Error fetching ${featureKey}:`, fetchError)
+    return false
+  }
+
+  // 2. تحديث feature_registry (المصدر الرئيسي)
   const { error } = await supabase
     .from("feature_registry")
     .update({ is_enabled: isEnabled, updated_at: timestamp })
@@ -74,11 +86,17 @@ export async function updateFeatureStatus(featureKey: string, isEnabled: boolean
     return false
   }
 
-  // 2. مزامنة مع feature_flags (الجدول الذي يقرأه التطبيق + Realtime)
+  // 3. مزامنة مع feature_flags (الجدول الذي يقرأه التطبيق + Realtime)
+  // نرسل جميع الحقول المطلوبة
   const { error: flagsError } = await supabase
     .from("feature_flags")
     .upsert({
       feature_key: featureKey,
+      feature_name: featureData.feature_name,
+      feature_name_ar: featureData.feature_name_ar,
+      description: featureData.description,
+      description_ar: featureData.description_ar,
+      category: featureData.category,
       is_enabled: isEnabled,
       updated_at: timestamp,
     }, {
@@ -90,12 +108,14 @@ export async function updateFeatureStatus(featureKey: string, isEnabled: boolean
     // لا نرجع false لأن التحديث الأساسي نجح
   }
 
-  // 3. مزامنة مع system_settings (للتوافق مع الكود القديم)
+  // 4. مزامنة مع system_settings (للتوافق مع الكود القديم)
   await supabase.from("system_settings").upsert({
     key: featureKey,
     value: { value: isEnabled },
     description: `Auto-synced from feature registry`,
     updated_at: timestamp,
+  }, {
+    onConflict: "key"
   })
 
   return true
