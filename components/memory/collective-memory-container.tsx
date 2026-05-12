@@ -10,18 +10,14 @@ import {
   Hash,
   Calendar,
   Brain,
-  Sparkles,
-  Loader2,
   Clock,
   Lightbulb,
   CheckCircle,
-  AlertCircle,
 } from "lucide-react"
 import Link from "next/link"
 import type { Group, CollectiveMemory } from "@/lib/types"
 import { format } from "date-fns"
 import { ar } from "date-fns/locale"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface CollectiveMemoryContainerProps {
   groupId: string
@@ -36,41 +32,10 @@ export function CollectiveMemoryContainer({
   memories: initialMemories,
   currentUserId,
 }: CollectiveMemoryContainerProps) {
-  const [memories, setMemories] = useState<CollectiveMemory[]>(initialMemories)
-  const [isGenerating, setIsGenerating] = useState(false)
+  const [memories] = useState<CollectiveMemory[]>(initialMemories)
   const [activeTab, setActiveTab] = useState("timeline")
-  const [error, setError] = useState<string | null>(null)
 
-  const generateDailySummary = async () => {
-    setIsGenerating(true)
-    setError(null)
-    try {
-      const response = await fetch("/api/ai/generate-daily-memory", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ groupId }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        setError(data.error || "فشل في إنشاء الملخص")
-        return
-      }
-
-      if (data.memory) {
-        setMemories((prev) => [data.memory, ...prev.filter((m) => m.id !== data.memory.id)])
-      } else if (data.parsed) {
-        // If memory wasn't saved but we got parsed data, still show success
-        setError("تم إنشاء الملخص لكن فشل في حفظه")
-      }
-    } catch (error) {
-      console.error("Error generating memory:", error)
-      setError("حدث خطأ في الاتصال")
-    } finally {
-      setIsGenerating(false)
-    }
-  }
+  
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -90,18 +55,10 @@ export function CollectiveMemoryContainer({
           </div>
         </div>
 
-        <Button size="sm" onClick={generateDailySummary} disabled={isGenerating}>
-          {isGenerating ? <Loader2 className="w-4 h-4 ml-2 animate-spin" /> : <Sparkles className="w-4 h-4 ml-2" />}
-          إنشاء ملخص اليوم
-        </Button>
+        
       </div>
 
-      {error && (
-        <Alert variant="destructive" className="m-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
