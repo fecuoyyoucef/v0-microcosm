@@ -1,5 +1,5 @@
 "use client"
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import * as d3 from "d3"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -16,7 +16,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Plus, ChevronLeft, Hash, Loader2, Search, X, ChevronDown, ChevronRight } from "lucide-react"
+import { Plus, ChevronLeft, Hash, Loader2, Search, X, ZoomIn, ZoomOut, Maximize2 } from "lucide-react"
 import Link from "next/link"
 import type { ConversationNode, Group, Message } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -28,16 +28,20 @@ interface ConversationMapProps {
   currentUserId: string
 }
 
-const NODE_COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#06B6D4"]
-
-interface TreeNode extends d3.HierarchyNode<ConversationNode> {
-  _children?: TreeNode[]
-  collapsed?: boolean
-}
+const NODE_COLORS = [
+  { bg: "#3B82F6", light: "#DBEAFE" },
+  { bg: "#10B981", light: "#D1FAE5" },
+  { bg: "#F59E0B", light: "#FEF3C7" },
+  { bg: "#EF4444", light: "#FEE2E2" },
+  { bg: "#8B5CF6", light: "#EDE9FE" },
+  { bg: "#EC4899", light: "#FCE7F3" },
+  { bg: "#06B6D4", light: "#CFFAFE" },
+]
 
 export function ConversationMap({ groupId, group, nodes: initialNodes, currentUserId }: ConversationMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
+  const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null)
   const [selectedNode, setSelectedNode] = useState<ConversationNode | null>(null)
   const [nodeMessages, setNodeMessages] = useState<Message[]>([])
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
@@ -45,11 +49,10 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
   const [newNodeTitle, setNewNodeTitle] = useState("")
   const [newNodeDescription, setNewNodeDescription] = useState("")
   const [newNodeParent, setNewNodeParent] = useState<string | null>(null)
-  const [newNodeColor, setNewNodeColor] = useState(NODE_COLORS[0])
+  const [newNodeColor, setNewNodeColor] = useState(NODE_COLORS[0].bg)
   const [isCreating, setIsCreating] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [localNodes, setLocalNodes] = useState<ConversationNode[]>(initialNodes)
-  const [isHorizontal, setIsHorizontal] = useState(true)
   const supabase = createClient()
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 })
 
@@ -165,7 +168,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
     const rootNodes = nodes.filter((n) => !n.parent_id)
     if (rootNodes.length === 0) return null
 
-    const nodeMap = new Map(nodes.map((n) => [n.id, { ...n, children: [] as any[] }]))
+    const nodeMap = new Map(nodes.map((n) => [n.id, { ...n, children: [] as ConversationNode[] }]))
 
     nodes.forEach((node) => {
       if (node.parent_id) {
@@ -185,178 +188,205 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
       id: "virtual-root",
       title: group.name,
       color: "#6366f1",
+      messages_count: 0,
       children: rootNodes.map((r) => nodeMap.get(r.id)).filter(Boolean),
     }
   }
 
-  const toggleNode = (d: TreeNode) => {
-    if (d.children) {
-      d._children = d.children
-      d.children = undefined as any
-      d.collapsed = true
-    } else if (d._children) {
-      d.children = d._children
-      d._children = undefined
-      d.collapsed = false
-    }
-  }
+  const fitToScreen = useCallback(() => {
+    if (!svgRef.current || !zoomRef.current) return
+    const svg = d3.select(svgRef.current)
+    svg.transition().duration(500).call(zoomRef.current.transform, d3.zoomIdentity)
+  }, [])
+
+  const zoomIn = useCallback(() => {
+    if (!svgRef.current || !zoomRef.current) return
+    const svg = d3.select(svgRef.current)
+    svg.transition().duration(300).call(zoomRef.current.scaleBy, 1.3)
+  }, [])
+
+  const zoomOut = useCallback(() => {
+    if (!svgRef.current || !zoomRef.current) return
+    const svg = d3.select(svgRef.current)
+    svg.transition().duration(300).call(zoomRef.current.scaleBy, 0.7)
+  }, [])
 
   useEffect(() => {
     if (!svgRef.current || localNodes.length === 0) return
 
     const width = containerSize.width
     const height = containerSize.height
-    const margin = { top: 40, right: 120, bottom: 40, left: 120 }
 
     d3.select(svgRef.current).selectAll("*").remove()
 
     const hierarchyData = buildHierarchy(localNodes)
     if (!hierarchyData) return
 
-    const root = d3.hierarchy(hierarchyData as any) as TreeNode
+    const root = d3.hierarchy(hierarchyData as ConversationNode)
 
-    const treeLayout = d3.tree<ConversationNode>().nodeSize(isHorizontal ? [80, 250] : [250, 80])
+    // RTL layout - tree grows from right to left
+    const treeLayout = d3.tree<ConversationNode>().nodeSize([100, 220])
+    treeLayout(root)
 
-    treeLayout(root as any)
+    // Calculate bounds to center the tree
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+    root.descendants().forEach(d => {
+      if (d.x < minX) minX = d.x
+      if (d.x > maxX) maxX = d.x
+      if (d.y < minY) minY = d.y
+      if (d.y > maxY) maxY = d.y
+    })
+
+    const treeWidth = maxY - minY + 300
+    const treeHeight = maxX - minX + 150
+    const scale = Math.min(width / treeWidth, height / treeHeight, 1) * 0.85
+    const offsetX = width / 2 + (maxY + minY) / 2 * scale
+    const offsetY = height / 2 - (maxX + minX) / 2 * scale
 
     const svg = d3
       .select(svgRef.current)
       .attr("width", width)
       .attr("height", height)
-      .attr("viewBox", `${-width / 2} ${-height / 2} ${width} ${height}`)
 
-    const g = svg.append("g").attr("transform", `translate(${margin.left}, ${height / 2})`)
+    // Create gradient definitions
+    const defs = svg.append("defs")
+    
+    // Add drop shadow filter
+    const filter = defs.append("filter")
+      .attr("id", "node-shadow")
+      .attr("x", "-50%")
+      .attr("y", "-50%")
+      .attr("width", "200%")
+      .attr("height", "200%")
+    
+    filter.append("feDropShadow")
+      .attr("dx", 0)
+      .attr("dy", 4)
+      .attr("stdDeviation", 8)
+      .attr("flood-color", "rgba(0,0,0,0.1)")
 
-    const zoom = d3
-      .zoom()
-      .scaleExtent([0.3, 3])
+    const g = svg.append("g")
+      .attr("transform", `translate(${offsetX}, ${offsetY}) scale(${scale})`)
+
+    const zoom = d3.zoom<SVGSVGElement, unknown>()
+      .scaleExtent([0.2, 4])
       .on("zoom", (event) => {
         g.attr("transform", event.transform)
       })
 
-    svg.call(zoom as any)
+    zoomRef.current = zoom
+    svg.call(zoom)
+    
+    // Set initial transform
+    svg.call(zoom.transform, d3.zoomIdentity.translate(offsetX, offsetY).scale(scale))
 
-    const update = (source: TreeNode) => {
-      const nodes = root.descendants()
-      const links = root.links()
+    const nodes = root.descendants()
+    const links = root.links()
 
-      const linkPath = (d: any) => {
-        if (isHorizontal) {
-          return `M${d.source.y},${d.source.x}
-                  C${(d.source.y + d.target.y) / 2},${d.source.x}
-                   ${(d.source.y + d.target.y) / 2},${d.target.x}
-                   ${d.target.y},${d.target.x}`
-        } else {
-          return `M${d.source.x},${d.source.y}
-                  C${d.source.x},${(d.source.y + d.target.y) / 2}
-                   ${d.target.x},${(d.source.y + d.target.y) / 2}
-                   ${d.target.x},${d.target.y}`
+    // Draw curved links (RTL: negative y for x position)
+    g.selectAll(".link")
+      .data(links)
+      .join("path")
+      .attr("class", "link")
+      .attr("d", (d) => {
+        const sourceX = -d.source.y
+        const sourceY = d.source.x
+        const targetX = -d.target.y
+        const targetY = d.target.x
+        const midX = (sourceX + targetX) / 2
+        return `M${sourceX},${sourceY} C${midX},${sourceY} ${midX},${targetY} ${targetX},${targetY}`
+      })
+      .attr("fill", "none")
+      .attr("stroke", (d) => {
+        const color = (d.target.data as ConversationNode).color || "#64748b"
+        return color
+      })
+      .attr("stroke-width", 3)
+      .attr("stroke-opacity", 0.4)
+      .attr("stroke-linecap", "round")
+
+    // Draw nodes
+    const nodeGroups = g.selectAll(".node")
+      .data(nodes)
+      .join("g")
+      .attr("class", "node")
+      .attr("transform", (d) => `translate(${-d.y},${d.x})`)
+      .attr("cursor", "pointer")
+      .on("click", (_event, d) => {
+        if ((d.data as ConversationNode).id !== "virtual-root") {
+          handleNodeClick(d.data as ConversationNode)
         }
-      }
+      })
 
-      const link = g
-        .selectAll(".link")
-        .data(links, (d: any) => d.target.data.id)
-        .join("path")
-        .attr("class", "link")
-        .attr("d", linkPath as any)
-        .attr("fill", "none")
-        .attr("stroke", (d: any) => d.target.data.color || "#64748b")
-        .attr("stroke-width", 2)
-        .attr("stroke-opacity", 0.4)
+    // Node card background with shadow
+    nodeGroups.append("rect")
+      .attr("width", 160)
+      .attr("height", 70)
+      .attr("x", -80)
+      .attr("y", -35)
+      .attr("rx", 16)
+      .attr("fill", (d) => {
+        const nodeData = d.data as ConversationNode
+        const colorObj = NODE_COLORS.find(c => c.bg === nodeData.color)
+        return colorObj?.light || "#F1F5F9"
+      })
+      .attr("stroke", (d) => (d.data as ConversationNode).color || "#3b82f6")
+      .attr("stroke-width", 2.5)
+      .attr("filter", "url(#node-shadow)")
+      .on("mouseenter", function() {
+        d3.select(this).transition().duration(150)
+          .attr("stroke-width", 4)
+      })
+      .on("mouseleave", function(event, d) {
+        const isSelected = selectedNode?.id === (d.data as ConversationNode).id
+        d3.select(this).transition().duration(150)
+          .attr("stroke-width", isSelected ? 4 : 2.5)
+      })
 
-      const node = g
-        .selectAll(".node")
-        .data(nodes, (d: any) => d.data.id)
-        .join("g")
-        .attr("class", "node")
-        .attr("transform", (d: any) => (isHorizontal ? `translate(${d.y},${d.x})` : `translate(${d.x},${d.y})`))
-        .attr("cursor", "pointer")
-        .on("click", (event: any, d: any) => {
-          event.stopPropagation()
-          if (d.data.id !== "virtual-root") {
-            handleNodeClick(d.data)
-          }
-          if (d.children || d._children) {
-            toggleNode(d)
-            update(d)
-          }
-        })
+    // Selected state highlight
+    nodeGroups.filter(d => selectedNode?.id === (d.data as ConversationNode).id)
+      .select("rect")
+      .attr("stroke-width", 4)
 
-      node
-        .append("rect")
-        .attr("width", 180)
-        .attr("height", 60)
-        .attr("x", -90)
-        .attr("y", -30)
-        .attr("rx", 8)
-        .attr("fill", (d: any) => d.data.color || "#3b82f6")
-        .attr("fill-opacity", 0.15)
-        .attr("stroke", (d: any) => d.data.color || "#3b82f6")
-        .attr("stroke-width", 2)
-        .style("filter", (d: any) => (selectedNode?.id === d.data.id ? "drop-shadow(0 0 8px rgba(0,0,0,0.3))" : "none"))
+    // Node title
+    nodeGroups.append("text")
+      .attr("dy", (d) => (d.data as ConversationNode).messages_count > 0 ? -2 : 5)
+      .attr("text-anchor", "middle")
+      .attr("font-size", 14)
+      .attr("font-weight", "600")
+      .attr("fill", (d) => (d.data as ConversationNode).color || "#1E293B")
+      .attr("font-family", "system-ui, -apple-system, sans-serif")
+      .text((d) => {
+        const title = (d.data as ConversationNode).title || ""
+        return title.length > 14 ? title.substring(0, 12) + "..." : title
+      })
 
-      node
-        .append("text")
-        .attr("dy", -5)
-        .attr("text-anchor", "middle")
-        .attr("font-size", 13)
-        .attr("font-weight", "600")
-        .attr("fill", (d: any) => d.data.color || "#3b82f6")
-        .text((d: any) => {
-          const title = d.data.title || ""
-          return title.length > 20 ? title.substring(0, 18) + "..." : title
-        })
-
-      node
-        .filter((d: any) => d.data.messages_count > 0)
-        .append("circle")
-        .attr("cx", 70)
-        .attr("cy", -20)
-        .attr("r", 12)
-        .attr("fill", (d: any) => d.data.color || "#3b82f6")
-
-      node
-        .filter((d: any) => d.data.messages_count > 0)
-        .append("text")
-        .attr("x", 70)
-        .attr("y", -20)
-        .attr("dy", 4)
-        .attr("text-anchor", "middle")
-        .attr("font-size", 10)
-        .attr("font-weight", "bold")
-        .attr("fill", "white")
-        .text((d: any) => d.data.messages_count)
-
-      node
-        .filter((d: any) => d.children || d._children)
-        .append("circle")
-        .attr("cx", isHorizontal ? 90 : 0)
-        .attr("cy", isHorizontal ? 0 : 30)
-        .attr("r", 10)
-        .attr("fill", (d: any) => d.data.color || "#3b82f6")
-        .attr("stroke", "white")
-        .attr("stroke-width", 2)
-
-      node
-        .filter((d: any) => d.children || d._children)
-        .append("text")
-        .attr("x", isHorizontal ? 90 : 0)
-        .attr("y", isHorizontal ? 0 : 30)
-        .attr("dy", 4)
-        .attr("text-anchor", "middle")
-        .attr("font-size", 12)
-        .attr("fill", "white")
-        .attr("font-weight", "bold")
-        .text((d: any) => (d.collapsed ? "+" : "-"))
-    }
-
-    update(root)
+    // Message count badge
+    nodeGroups.filter((d) => (d.data as ConversationNode).messages_count > 0)
+      .append("g")
+      .attr("transform", "translate(0, 18)")
+      .call(g => {
+        g.append("rect")
+          .attr("width", 50)
+          .attr("height", 22)
+          .attr("x", -25)
+          .attr("y", -11)
+          .attr("rx", 11)
+          .attr("fill", (d) => (d.data as ConversationNode).color || "#3b82f6")
+        
+        g.append("text")
+          .attr("text-anchor", "middle")
+          .attr("dy", 4)
+          .attr("font-size", 11)
+          .attr("font-weight", "700")
+          .attr("fill", "white")
+          .text((d) => `${(d.data as ConversationNode).messages_count} رسالة`)
+      })
 
     return () => {
       svg.selectAll("*").remove()
     }
-  }, [localNodes, selectedNode?.id, containerSize, isHorizontal, group.name])
+  }, [localNodes, selectedNode?.id, containerSize, group.name])
 
   const filteredNodes = searchQuery
     ? localNodes.filter(
@@ -378,8 +408,6 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
           <div className="flex items-center gap-2 min-w-0">
             <Hash className="w-4 h-4 text-primary shrink-0" />
             <span className="font-medium truncate">{group.name}</span>
-            <span className="text-muted-foreground hidden sm:inline">/</span>
-            <span className="text-muted-foreground hidden sm:inline">خريطة المحادثة</span>
           </div>
         </div>
 
@@ -393,16 +421,6 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
               className="w-48 pr-9 h-8 bg-background"
             />
           </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 hidden md:flex bg-transparent"
-            onClick={() => setIsHorizontal(!isHorizontal)}
-          >
-            {isHorizontal ? <ChevronRight className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
-            <span className="text-xs">{isHorizontal ? "أفقي" : "عمودي"}</span>
-          </Button>
 
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
@@ -456,13 +474,13 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
                   <div className="flex gap-2 flex-wrap">
                     {NODE_COLORS.map((color) => (
                       <button
-                        key={color}
-                        onClick={() => setNewNodeColor(color)}
+                        key={color.bg}
+                        onClick={() => setNewNodeColor(color.bg)}
                         className={cn(
                           "w-8 h-8 rounded-full transition-transform",
-                          newNodeColor === color && "ring-2 ring-offset-2 ring-primary scale-110",
+                          newNodeColor === color.bg && "ring-2 ring-offset-2 ring-primary scale-110",
                         )}
-                        style={{ backgroundColor: color }}
+                        style={{ backgroundColor: color.bg }}
                       />
                     ))}
                   </div>
@@ -486,9 +504,26 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
       <div className="flex-1 flex overflow-hidden min-h-0">
         <div
           ref={containerRef}
-          className="flex-1 overflow-hidden relative bg-gradient-to-br from-background to-muted/20"
+          className="flex-1 overflow-hidden relative"
+          style={{ 
+            background: "radial-gradient(circle at 50% 50%, hsl(var(--muted)/0.3) 0%, hsl(var(--background)) 70%)"
+          }}
         >
           <svg ref={svgRef} className="w-full h-full" />
+          
+          {/* Zoom controls */}
+          <div className="absolute bottom-4 left-4 flex flex-col gap-1 bg-card/90 backdrop-blur-sm rounded-lg border border-border p-1 shadow-lg">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={zoomIn}>
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={zoomOut}>
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <div className="h-px bg-border my-1" />
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={fitToScreen}>
+              <Maximize2 className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         {selectedNode && (
