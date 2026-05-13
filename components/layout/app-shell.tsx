@@ -132,6 +132,10 @@ function AppShellContent({ children, userId, profile, groups }: AppShellProps) {
   const [commandOpen, setCommandOpen] = useState(false)
   const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
+  // Activity counts per group_id over the last 7 days. Used to rank the
+  // sidebar cells list so we only show the 5 most active ones — the goal is
+  // a quick-navigation shortcut, not a full directory.
+  const [activityCounts, setActivityCounts] = useState<Record<string, number>>({})
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [cellsExpanded, setCellsExpanded] = useState(true)
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
@@ -213,6 +217,53 @@ function AppShellContent({ children, userId, profile, groups }: AppShellProps) {
       supabase.removeChannel(channel)
     }
   }, [userId, supabase, fetchUnreadData])
+
+  // Fetch the per-group message count for the last 7 days. We aggregate
+  // client-side to avoid needing a custom RPC. This is what powers the
+  // top-5-active ranking shown in the sidebar.
+  useEffect(() => {
+    let cancelled = false
+    const run = async () => {
+      if (!groups || groups.length === 0) {
+        setActivityCounts({})
+        return
+      }
+      const groupIds = groups.map((g) => g.id)
+      const sinceIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      const { data } = await supabase
+        .from("messages")
+        .select("group_id")
+        .in("group_id", groupIds)
+        .gte("created_at", sinceIso)
+      if (cancelled || !data) return
+      const counts: Record<string, number> = {}
+      for (const row of data as Array<{ group_id: string }>) {
+        counts[row.group_id] = (counts[row.group_id] || 0) + 1
+      }
+      setActivityCounts(counts)
+    }
+    run()
+    return () => {
+      cancelled = true
+    }
+  }, [groups, supabase])
+
+  // Sort groups by activity (last 7 days), tie-break by unread count, then
+  // by updated_at — and only keep the top 5 for the sidebar shortcut list.
+  const topActiveGroups = (() => {
+    const sorted = groups.slice().sort((a, b) => {
+      const ca = activityCounts[a.id] || 0
+      const cb = activityCounts[b.id] || 0
+      if (cb !== ca) return cb - ca
+      const ua = unreadCounts[a.id] || 0
+      const ub = unreadCounts[b.id] || 0
+      if (ub !== ua) return ub - ua
+      const ta = new Date((a as any).updated_at || (a as any).created_at || 0).getTime()
+      const tb = new Date((b as any).updated_at || (b as any).created_at || 0).getTime()
+      return tb - ta
+    })
+    return sorted.slice(0, 5)
+  })()
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -355,7 +406,9 @@ function AppShellContent({ children, userId, profile, groups }: AppShellProps) {
 
           {cellsExpanded && (
             <>
-              {groups.map((group) => (
+              {/* Show only the 5 most active cells as a quick-navigation
+                  shortcut. The full directory lives on the home page. */}
+              {topActiveGroups.map((group) => (
                 <Link key={group.id} href={`/chat/${group.id}`} onClick={() => isMobile && setMobileMenuOpen(false)}>
                   <Button
                     variant={isActiveGroup(group.id) ? "secondary" : "ghost"}

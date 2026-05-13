@@ -29,6 +29,11 @@ import {
   ArrowPathIcon as Loader2,
   ChatBubbleLeftIcon as MessageCircle,
   LinkIcon as Link2,
+  ClockIcon,
+  StarIcon,
+  AdjustmentsHorizontalIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
 } from "@heroicons/react/24/outline"
 import type { Group, Profile } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -74,6 +79,12 @@ const translations = {
     join: "انضم",
     joining: "جاري الانضمام...",
     invalidInviteLink: "رابط الدعوة غير صالح",
+    sortNewest: "الأحدث",
+    sortImportant: "الأهم",
+    sortCustom: "تخصيص",
+    moveUp: "تحريك للأعلى",
+    moveDown: "تحريك للأسفل",
+    sortBy: "ترتيب حسب",
   },
   en: {
     welcome: "Welcome",
@@ -107,6 +118,12 @@ const translations = {
     join: "Join",
     joining: "Joining...",
     invalidInviteLink: "Invalid invite link",
+    sortNewest: "Newest",
+    sortImportant: "Important",
+    sortCustom: "Custom",
+    moveUp: "Move up",
+    moveDown: "Move down",
+    sortBy: "Sort by",
   },
   fr: {
     welcome: "Bienvenue",
@@ -140,6 +157,12 @@ const translations = {
     join: "Rejoindre",
     joining: "En cours...",
     invalidInviteLink: "Lien invalide",
+    sortNewest: "Récent",
+    sortImportant: "Important",
+    sortCustom: "Personnalisé",
+    moveUp: "Monter",
+    moveDown: "Descendre",
+    sortBy: "Trier par",
   },
 }
 
@@ -172,6 +195,51 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
   const [isJoining, setIsJoining] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+
+  // ----- Sort state -----
+  // 'newest'    -> by groups.updated_at desc (recent activity)
+  // 'important' -> by unread count desc, then updated_at desc
+  // 'custom'    -> user-defined order, persisted in localStorage and reorderable
+  type SortMode = "newest" | "important" | "custom"
+  const sortStorageKey = `cells:sort-mode:${userId}`
+  const orderStorageKey = `cells:custom-order:${userId}`
+  const [sortMode, setSortMode] = useState<SortMode>("newest")
+  const [customOrder, setCustomOrder] = useState<string[]>([])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      const savedMode = window.localStorage.getItem(sortStorageKey) as SortMode | null
+      if (savedMode === "newest" || savedMode === "important" || savedMode === "custom") {
+        setSortMode(savedMode)
+      }
+      const savedOrder = window.localStorage.getItem(orderStorageKey)
+      if (savedOrder) {
+        const parsed = JSON.parse(savedOrder)
+        if (Array.isArray(parsed)) setCustomOrder(parsed)
+      }
+    } catch {
+      // ignore corrupted localStorage
+    }
+  }, [sortStorageKey, orderStorageKey])
+
+  const updateSortMode = (mode: SortMode) => {
+    setSortMode(mode)
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(sortStorageKey, mode)
+      } catch {}
+    }
+  }
+
+  const persistCustomOrder = (order: string[]) => {
+    setCustomOrder(order)
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(orderStorageKey, JSON.stringify(order))
+      } catch {}
+    }
+  }
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -241,13 +309,58 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
     }
   }
 
-  const filteredGroups = searchQuery
-    ? groups.filter(
-        (g) =>
-          g.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          g.description?.toLowerCase().includes(searchQuery.toLowerCase()),
-      )
-    : groups
+  // Apply text search filter, then apply the active sort mode.
+  const filteredGroups = (() => {
+    const base = searchQuery
+      ? groups.filter(
+          (g) =>
+            g.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            g.description?.toLowerCase().includes(searchQuery.toLowerCase()),
+        )
+      : groups.slice()
+
+    if (sortMode === "newest") {
+      return base.sort((a, b) => {
+        const ta = new Date(a.updated_at || a.created_at).getTime()
+        const tb = new Date(b.updated_at || b.created_at).getTime()
+        return tb - ta
+      })
+    }
+
+    if (sortMode === "important") {
+      return base.sort((a, b) => {
+        const ua = unreadCounts[a.id] || 0
+        const ub = unreadCounts[b.id] || 0
+        if (ub !== ua) return ub - ua
+        const ta = new Date(a.updated_at || a.created_at).getTime()
+        const tb = new Date(b.updated_at || b.created_at).getTime()
+        return tb - ta
+      })
+    }
+
+    // custom: use saved order; unknown ids fall back to the end in updated_at order.
+    const orderIndex = new Map(customOrder.map((id, i) => [id, i]))
+    return base.sort((a, b) => {
+      const ia = orderIndex.has(a.id) ? (orderIndex.get(a.id) as number) : Number.MAX_SAFE_INTEGER
+      const ib = orderIndex.has(b.id) ? (orderIndex.get(b.id) as number) : Number.MAX_SAFE_INTEGER
+      if (ia !== ib) return ia - ib
+      const ta = new Date(a.updated_at || a.created_at).getTime()
+      const tb = new Date(b.updated_at || b.created_at).getTime()
+      return tb - ta
+    })
+  })()
+
+  // Reorder a single group up/down in custom mode.
+  const moveGroup = (groupId: string, direction: -1 | 1) => {
+    const currentIds = filteredGroups.map((g) => g.id)
+    const idx = currentIds.indexOf(groupId)
+    if (idx === -1) return
+    const target = idx + direction
+    if (target < 0 || target >= currentIds.length) return
+    const next = currentIds.slice()
+    ;[next[idx], next[target]] = [next[target], next[idx]]
+    persistCustomOrder(next)
+  }
 
   const createGroup = async () => {
     if (!newGroupName.trim()) return
@@ -454,6 +567,56 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
               className="pe-10 bg-muted/40 border-border/50 rounded-xl h-11 w-full"
             />
           </div>
+
+          {/* Sort toolbar: 3 segmented chips. Persisted per-user. */}
+          <div
+            role="tablist"
+            aria-label={t.sortBy}
+            className="flex items-center gap-1.5 p-1 bg-muted/40 rounded-xl border border-border/50"
+          >
+            <button
+              role="tab"
+              aria-selected={sortMode === "newest"}
+              onClick={() => updateSortMode("newest")}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg text-xs font-medium transition-all",
+                sortMode === "newest"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <ClockIcon className="w-4 h-4" />
+              {t.sortNewest}
+            </button>
+            <button
+              role="tab"
+              aria-selected={sortMode === "important"}
+              onClick={() => updateSortMode("important")}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg text-xs font-medium transition-all",
+                sortMode === "important"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <StarIcon className="w-4 h-4" />
+              {t.sortImportant}
+            </button>
+            <button
+              role="tab"
+              aria-selected={sortMode === "custom"}
+              onClick={() => updateSortMode("custom")}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg text-xs font-medium transition-all",
+                sortMode === "custom"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <AdjustmentsHorizontalIcon className="w-4 h-4" />
+              {t.sortCustom}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -513,47 +676,116 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
                   {t.cells}
                 </h3>
                 <div className="space-y-1.5 w-full">
-                  {filteredGroups.map((group) => {
+                  {filteredGroups.map((group, index) => {
                     const hasUnread = unreadCounts[group.id] > 0
+                    const isFirst = index === 0
+                    const isLast = index === filteredGroups.length - 1
+                    // Only allow reordering on the unfiltered full list.
+                    const inCustomMode = sortMode === "custom" && !searchQuery
+
+                    const rowContent = (
+                      <div
+                        className={cn(
+                          "group flex items-center gap-3 p-3 rounded-2xl transition-all min-w-0",
+                          "hover:bg-muted/60 active:scale-[0.99]",
+                          hasUnread && "bg-primary/[0.04]",
+                        )}
+                      >
+                        <Avatar className="h-12 w-12 rounded-2xl shrink-0 ring-2 ring-background shadow-sm">
+                          {group.avatar_url ? (
+                            <AvatarImage src={group.avatar_url || "/placeholder.svg"} />
+                          ) : (
+                            <AvatarFallback
+                              className={cn(
+                                "rounded-2xl bg-gradient-to-br text-white font-bold text-base",
+                                getGroupColor(group.name),
+                              )}
+                            >
+                              {group.name.substring(0, 2)}
+                            </AvatarFallback>
+                          )}
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2 mb-0.5 min-w-0">
+                            <h3
+                              className={cn(
+                                "truncate text-[15px]",
+                                hasUnread ? "font-bold text-foreground" : "font-semibold text-foreground/90",
+                              )}
+                            >
+                              {group.name}
+                            </h3>
+                            {hasUnread && (
+                              <span className="h-5 min-w-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[11px] flex items-center justify-center font-bold shrink-0 tabular-nums">
+                                {unreadCounts[group.id] > 99 ? "99+" : unreadCounts[group.id]}
+                              </span>
+                            )}
+                          </div>
+                          {group.description && (
+                            <p className="text-sm text-muted-foreground truncate">{group.description}</p>
+                          )}
+                          {!group.description && (
+                            <p className="text-xs text-muted-foreground/75">
+                              {memberCounts[group.id] || 1} {t.members}
+                            </p>
+                          )}
+                        </div>
+                        {inCustomMode && (
+                          <div
+                            className="flex flex-col gap-0.5 shrink-0"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                            }}
+                          >
+                            <button
+                              type="button"
+                              aria-label={t.moveUp}
+                              disabled={isFirst}
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                moveGroup(group.id, -1)
+                              }}
+                              className={cn(
+                                "h-8 w-8 rounded-md flex items-center justify-center transition-colors",
+                                isFirst
+                                  ? "text-muted-foreground/30 cursor-not-allowed"
+                                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                              )}
+                            >
+                              <ChevronUpIcon className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={t.moveDown}
+                              disabled={isLast}
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                moveGroup(group.id, 1)
+                              }}
+                              className={cn(
+                                "h-8 w-8 rounded-md flex items-center justify-center transition-colors",
+                                isLast
+                                  ? "text-muted-foreground/30 cursor-not-allowed"
+                                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                              )}
+                            >
+                              <ChevronDownIcon className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )
+
                     return (
                       <Link key={group.id} href={`/chat/${group.id}`} className="block w-full">
-                        <div
-                          className={cn(
-                            "group flex items-center gap-3 p-3 rounded-2xl transition-all min-w-0",
-                            "hover:bg-muted/60 active:scale-[0.99]",
-                            hasUnread && "bg-primary/[0.04]",
-                          )}
-                        >
-                          <Avatar className="h-12 w-12 rounded-2xl shrink-0 ring-2 ring-background shadow-sm">
-                            {group.avatar_url ? (
-                              <AvatarImage src={group.avatar_url || "/placeholder.svg"} />
-                            ) : (
-                              <AvatarFallback
-                                className={cn(
-                                  "rounded-2xl bg-gradient-to-br text-white font-bold text-base",
-                                  getGroupColor(group.name),
-                                )}
-                              >
-                                {group.name.substring(0, 2)}
-                              </AvatarFallback>
-                            )}
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2 mb-0.5">
-                              <h3
-                                className={cn(
-                                  "truncate text-[15px]",
-                                  hasUnread ? "font-bold text-foreground" : "font-semibold text-foreground/90",
-                                )}
-                              >
-                                {group.name}
-                              </h3>
-                              {hasUnread && (
-                                <span className="h-5 min-w-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[11px] flex items-center justify-center font-bold shrink-0 tabular-nums">
-                                  {unreadCounts[group.id] > 99 ? "99+" : unreadCounts[group.id]}
-                                </span>
-                              )}
-                            </div>
+                        {rowContent}
+                      </Link>
+                    )
+                  })}
+                </div>
                             <p
                               className={cn(
                                 "text-sm truncate",
