@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Card, CardContent } from "@/components/ui/card"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
   Dialog,
   DialogContent,
@@ -34,6 +35,7 @@ import {
   AdjustmentsHorizontalIcon,
   ChevronUpIcon,
   ChevronDownIcon,
+  ArrowsUpDownIcon,
 } from "@heroicons/react/24/outline"
 import type { Group, Profile } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -557,65 +559,84 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
             </div>
           </div>
 
-          {/* Search with refined input */}
-          <div className="relative w-full">
-            <Search className="absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t.search}
-              className="pe-10 bg-muted/40 border-border/50 rounded-xl h-11 w-full"
-            />
-          </div>
+          {/* Search input + collapsed sort button.
+              The 3 sort options live inside a popover that opens only when
+              the small up/down arrows button is tapped — keeping the header
+              clean by default. */}
+          <div className="flex items-center gap-2 w-full">
+            <div className="relative flex-1 min-w-0">
+              <Search className="absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={t.search}
+                className="pe-10 bg-muted/40 border-border/50 rounded-xl h-11 w-full"
+              />
+            </div>
 
-          {/* Sort toolbar: 3 segmented chips. Persisted per-user. */}
-          <div
-            role="tablist"
-            aria-label={t.sortBy}
-            className="flex items-center gap-1.5 p-1 bg-muted/40 rounded-xl border border-border/50"
-          >
-            <button
-              role="tab"
-              aria-selected={sortMode === "newest"}
-              onClick={() => updateSortMode("newest")}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg text-xs font-medium transition-all",
-                sortMode === "newest"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <ClockIcon className="w-4 h-4" />
-              {t.sortNewest}
-            </button>
-            <button
-              role="tab"
-              aria-selected={sortMode === "important"}
-              onClick={() => updateSortMode("important")}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg text-xs font-medium transition-all",
-                sortMode === "important"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <StarIcon className="w-4 h-4" />
-              {t.sortImportant}
-            </button>
-            <button
-              role="tab"
-              aria-selected={sortMode === "custom"}
-              onClick={() => updateSortMode("custom")}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg text-xs font-medium transition-all",
-                sortMode === "custom"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <AdjustmentsHorizontalIcon className="w-4 h-4" />
-              {t.sortCustom}
-            </button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t.sortBy}
+                  className={cn(
+                    "h-11 w-11 shrink-0 rounded-xl bg-muted/40 border border-border/50 hover:bg-muted/60",
+                    // subtle accent when a non-default sort is active
+                    sortMode !== "newest" && "text-primary",
+                  )}
+                >
+                  <ArrowsUpDownIcon className="w-5 h-5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-56 p-1.5">
+                <div className="px-2 pt-1 pb-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                  {t.sortBy}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => updateSortMode("newest")}
+                  className={cn(
+                    "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors",
+                    sortMode === "newest"
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "hover:bg-muted text-foreground",
+                  )}
+                >
+                  <ClockIcon className="w-4 h-4 shrink-0" />
+                  <span className="flex-1 text-start">{t.sortNewest}</span>
+                  {sortMode === "newest" && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateSortMode("important")}
+                  className={cn(
+                    "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors",
+                    sortMode === "important"
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "hover:bg-muted text-foreground",
+                  )}
+                >
+                  <StarIcon className="w-4 h-4 shrink-0" />
+                  <span className="flex-1 text-start">{t.sortImportant}</span>
+                  {sortMode === "important" && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateSortMode("custom")}
+                  className={cn(
+                    "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors",
+                    sortMode === "custom"
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "hover:bg-muted text-foreground",
+                  )}
+                >
+                  <AdjustmentsHorizontalIcon className="w-4 h-4 shrink-0" />
+                  <span className="flex-1 text-start">{t.sortCustom}</span>
+                  {sortMode === "custom" && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
+                </button>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
       </header>
