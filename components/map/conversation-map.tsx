@@ -17,7 +17,21 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Plus, ChevronLeft, Hash, Loader2, Search, X, ZoomIn, ZoomOut, Maximize2 } from "lucide-react"
+import {
+  Plus,
+  ChevronLeft,
+  Hash,
+  Loader2,
+  Search,
+  X,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  Pencil,
+  Trash2,
+  GitMerge,
+  AlertTriangle,
+} from "lucide-react"
 import Link from "next/link"
 import type { ConversationNode, Group, Message } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -97,6 +111,32 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
   const supabase = createClient()
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 })
+
+  // Long-press action menu state.
+  // When set, a floating context menu is rendered near (x, y) for the given node.
+  const [actionMenuNode, setActionMenuNode] = useState<ConversationNode | null>(null)
+  const [actionMenuPos, setActionMenuPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+
+  // Edit dialog state
+  const [editOpen, setEditOpen] = useState(false)
+  const [editNode, setEditNode] = useState<ConversationNode | null>(null)
+  const [editTitle, setEditTitle] = useState("")
+  const [editDescription, setEditDescription] = useState("")
+  const [editColor, setEditColor] = useState(NODE_COLORS[0])
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
+
+  // Delete confirm dialog state
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteNode, setDeleteNode] = useState<ConversationNode | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  // Merge dialog state
+  const [mergeOpen, setMergeOpen] = useState(false)
+  const [mergeSource, setMergeSource] = useState<ConversationNode | null>(null)
+  const [mergeTargetId, setMergeTargetId] = useState<string>("")
+  const [mergeNewName, setMergeNewName] = useState("")
+  const [isMerging, setIsMerging] = useState(false)
+  const [mergeError, setMergeError] = useState<string | null>(null)
 
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
@@ -197,6 +237,181 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
       setNodeMessages([])
     } finally {
       setIsLoadingMessages(false)
+    }
+  }
+
+  // ----- Long-press / action handlers -----
+
+  // Open the floating action menu anchored near the given screen position.
+  const openActionMenu = useCallback((node: ConversationNode, screenX: number, screenY: number) => {
+    if (!containerRef.current) return
+    const rect = containerRef.current.getBoundingClientRect()
+    // Position relative to the canvas container so it scrolls/moves with it.
+    setActionMenuPos({
+      x: Math.max(8, Math.min(screenX - rect.left, rect.width - 200)),
+      y: Math.max(8, Math.min(screenY - rect.top, rect.height - 180)),
+    })
+    setActionMenuNode(node)
+  }, [])
+
+  const closeActionMenu = useCallback(() => setActionMenuNode(null), [])
+
+  // ----- Edit -----
+  const beginEdit = useCallback((node: ConversationNode) => {
+    setEditNode(node)
+    setEditTitle(node.title)
+    setEditDescription(node.description || "")
+    setEditColor(node.color || NODE_COLORS[0])
+    setEditOpen(true)
+    closeActionMenu()
+  }, [closeActionMenu])
+
+  const saveEdit = async () => {
+    if (!editNode || !editTitle.trim()) return
+    setIsSavingEdit(true)
+    try {
+      const { error } = await supabase
+        .from("conversation_nodes")
+        .update({
+          title: editTitle.trim(),
+          description: editDescription.trim() || null,
+          color: editColor,
+        })
+        .eq("id", editNode.id)
+      if (!error) {
+        // Optimistic local update (realtime will also refresh).
+        setLocalNodes((prev) =>
+          prev.map((n) =>
+            n.id === editNode.id
+              ? { ...n, title: editTitle.trim(), description: editDescription.trim() || null, color: editColor }
+              : n,
+          ),
+        )
+        setEditOpen(false)
+        setEditNode(null)
+      }
+    } finally {
+      setIsSavingEdit(false)
+    }
+  }
+
+  // ----- Delete -----
+  const beginDelete = useCallback((node: ConversationNode) => {
+    setDeleteNode(node)
+    setDeleteOpen(true)
+    closeActionMenu()
+  }, [closeActionMenu])
+
+  const confirmDelete = async () => {
+    if (!deleteNode) return
+    setIsDeleting(true)
+    try {
+      // Re-parent direct children to the deleted node's parent (could be null = roots).
+      await supabase
+        .from("conversation_nodes")
+        .update({ parent_id: deleteNode.parent_id })
+        .eq("parent_id", deleteNode.id)
+
+      // Detach messages from the deleted node (set node_id = null).
+      await supabase.from("messages").update({ node_id: null }).eq("node_id", deleteNode.id)
+
+      // Delete the node itself.
+      const { error } = await supabase.from("conversation_nodes").delete().eq("id", deleteNode.id)
+
+      if (!error) {
+        setLocalNodes((prev) =>
+          prev
+            .map((n) => (n.parent_id === deleteNode.id ? { ...n, parent_id: deleteNode.parent_id } : n))
+            .filter((n) => n.id !== deleteNode.id),
+        )
+        if (selectedNode?.id === deleteNode.id) setSelectedNode(null)
+        setDeleteOpen(false)
+        setDeleteNode(null)
+      }
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  // ----- Merge -----
+  const beginMerge = useCallback((node: ConversationNode) => {
+    setMergeSource(node)
+    setMergeTargetId("")
+    setMergeNewName(node.title)
+    setMergeError(null)
+    setMergeOpen(true)
+    closeActionMenu()
+  }, [closeActionMenu])
+
+  // Build the set of descendants for a given node id (used to prevent merging
+  // a node into its own descendant which would create a cycle).
+  const getDescendantIds = useCallback(
+    (rootId: string): Set<string> => {
+      const ids = new Set<string>()
+      const stack = [rootId]
+      while (stack.length) {
+        const cur = stack.pop()!
+        localNodes.forEach((n) => {
+          if (n.parent_id === cur && !ids.has(n.id)) {
+            ids.add(n.id)
+            stack.push(n.id)
+          }
+        })
+      }
+      return ids
+    },
+    [localNodes],
+  )
+
+  const confirmMerge = async () => {
+    if (!mergeSource || !mergeTargetId || !mergeNewName.trim()) return
+    if (mergeSource.id === mergeTargetId) {
+      setMergeError("لا يمكن دمج العقدة مع نفسها")
+      return
+    }
+    const descendants = getDescendantIds(mergeSource.id)
+    if (descendants.has(mergeTargetId)) {
+      setMergeError("لا يمكن الدمج مع عقدة من فروع نفس العقدة")
+      return
+    }
+    setIsMerging(true)
+    setMergeError(null)
+    try {
+      // 1) Move every message from source → target.
+      await supabase.from("messages").update({ node_id: mergeTargetId }).eq("node_id", mergeSource.id)
+
+      // 2) Re-parent source's direct children to the target node.
+      await supabase
+        .from("conversation_nodes")
+        .update({ parent_id: mergeTargetId })
+        .eq("parent_id", mergeSource.id)
+
+      // 3) Rename the target node to the new name.
+      await supabase.from("conversation_nodes").update({ title: mergeNewName.trim() }).eq("id", mergeTargetId)
+
+      // 4) Delete the source node.
+      const { error } = await supabase.from("conversation_nodes").delete().eq("id", mergeSource.id)
+
+      if (error) {
+        setMergeError(error.message)
+      } else {
+        setLocalNodes((prev) =>
+          prev
+            .map((n) => {
+              if (n.id === mergeTargetId) return { ...n, title: mergeNewName.trim() }
+              if (n.parent_id === mergeSource.id) return { ...n, parent_id: mergeTargetId }
+              return n
+            })
+            .filter((n) => n.id !== mergeSource.id),
+        )
+        if (selectedNode?.id === mergeSource.id) setSelectedNode(null)
+        setMergeOpen(false)
+        setMergeSource(null)
+      }
+    } catch (e: any) {
+      setMergeError(e?.message || "حدث خطأ أثناء الدمج")
+    } finally {
+      setIsMerging(false)
     }
   }
 
@@ -413,9 +628,61 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
       .attr("stroke-width", 3)
       .attr("filter", "url(#soft-shadow)")
       .style("cursor", "pointer")
-      .on("click", (event, d) => {
-        event.stopPropagation()
-        if (d.data._raw) handleNodeClick(d.data._raw)
+      .each(function (d) {
+        // Long-press detection per node.
+        // - tap (short press) opens the node sidebar (existing behavior)
+        // - long press (>= 500ms without significant movement) opens the action menu
+        // The virtual root is excluded since it isn't a real node.
+        if (d.data.id === "virtual-root" || !d.data._raw) return
+        const node = d.data._raw
+        const sel = d3.select(this)
+        let timer: ReturnType<typeof setTimeout> | null = null
+        let longPressFired = false
+        let startX = 0
+        let startY = 0
+        const LONG_PRESS_MS = 450
+        const MOVE_THRESHOLD = 6 // pixels
+
+        const clearTimer = () => {
+          if (timer) {
+            clearTimeout(timer)
+            timer = null
+          }
+        }
+
+        sel.on("pointerdown", (event: PointerEvent) => {
+          event.stopPropagation()
+          longPressFired = false
+          startX = event.clientX
+          startY = event.clientY
+          clearTimer()
+          timer = setTimeout(() => {
+            longPressFired = true
+            openActionMenu(node, event.clientX, event.clientY)
+          }, LONG_PRESS_MS)
+        })
+
+        sel.on("pointermove", (event: PointerEvent) => {
+          if (!timer) return
+          if (
+            Math.abs(event.clientX - startX) > MOVE_THRESHOLD ||
+            Math.abs(event.clientY - startY) > MOVE_THRESHOLD
+          ) {
+            clearTimer()
+          }
+        })
+
+        sel.on("pointerup", (event: PointerEvent) => {
+          event.stopPropagation()
+          clearTimer()
+          if (!longPressFired) {
+            handleNodeClick(node)
+          }
+        })
+
+        sel.on("pointercancel pointerleave", () => {
+          clearTimer()
+        })
       })
       .on("mouseenter", function () {
         d3.select(this).transition().duration(120).attr("transform", "scale(1.03)")
@@ -505,7 +772,16 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
           .attr("pointer-events", "none")
           .text(text)
       })
-  }, [hierarchyData, containerSize, collapsedIds, selectedNode?.id, childCountMap, toggleCollapse, palette])
+  }, [
+    hierarchyData,
+    containerSize,
+    collapsedIds,
+    selectedNode?.id,
+    childCountMap,
+    toggleCollapse,
+    palette,
+    openActionMenu,
+  ])
 
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
@@ -631,7 +907,6 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
         >
           <svg ref={svgRef} className="w-full h-full" />
 
-          {/* Zoom controls */}
           <div className="absolute bottom-4 left-4 flex flex-col gap-1 bg-card/95 backdrop-blur-sm rounded-lg border border-border p-1 shadow-md">
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={zoomIn} aria-label="تكبير">
               <ZoomIn className="h-4 w-4" />
@@ -644,6 +919,54 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
               <Maximize2 className="h-4 w-4" />
             </Button>
           </div>
+
+          {/* Floating action menu (long-press context menu) */}
+          {actionMenuNode && (
+            <>
+              {/* Backdrop to close menu on outside click */}
+              <div
+                className="absolute inset-0 z-40"
+                style={{ pointerEvents: "auto" }}
+                onClick={closeActionMenu}
+                onContextMenu={(e) => {
+                  e.preventDefault()
+                  closeActionMenu()
+                }}
+              />
+              <div
+                className="absolute z-50 bg-card border border-border rounded-lg shadow-lg overflow-hidden"
+                style={{
+                  left: actionMenuPos.x,
+                  top: actionMenuPos.y,
+                  minWidth: 180,
+                  pointerEvents: "auto",
+                }}
+              >
+                <button
+                  onClick={() => beginEdit(actionMenuNode)}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-sm hover:bg-accent transition-colors"
+                >
+                  <Pencil className="h-4 w-4 text-blue-500" />
+                  <span>تعديل العقدة</span>
+                </button>
+                <button
+                  onClick={() => beginMerge(actionMenuNode)}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-sm hover:bg-accent transition-colors"
+                >
+                  <GitMerge className="h-4 w-4 text-purple-500" />
+                  <span>دمج مع عقدة أخرى</span>
+                </button>
+                <div className="h-px bg-border" />
+                <button
+                  onClick={() => beginDelete(actionMenuNode)}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-sm hover:bg-accent transition-colors text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>حذف العقدة</span>
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         {selectedNode && (
@@ -708,6 +1031,171 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
           </div>
         )}
       </div>
+
+      {/* ----- Edit dialog ----- */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>تعديل العقدة</DialogTitle>
+            <DialogDescription>عدّل عنوان أو وصف أو لون العقدة</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label>العنوان</Label>
+              <Input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="عنوان العقدة"
+                className="bg-background"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>الوصف (اختياري)</Label>
+              <Textarea
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="وصف مختصر للموضوع..."
+                className="bg-background resize-none"
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>اللون</Label>
+              <div className="flex gap-2 flex-wrap">
+                {NODE_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    onClick={() => setEditColor(color)}
+                    className={cn(
+                      "w-8 h-8 rounded-full transition-transform",
+                      editColor === color && "ring-2 ring-offset-2 ring-primary scale-110",
+                    )}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+            </div>
+            <Button onClick={saveEdit} disabled={!editTitle.trim() || isSavingEdit} className="w-full">
+              {isSavingEdit ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                  جاري الحفظ...
+                </>
+              ) : (
+                "حفظ التغييرات"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ----- Delete confirm dialog ----- */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              حذف العقدة
+            </DialogTitle>
+            <DialogDescription>
+              هل أنت متأكد من حذف العقدة <span className="font-bold">{deleteNode?.title}</span>؟
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-2 text-sm text-muted-foreground space-y-1">
+            <p>• ستُنقل العقد الفرعية لتصبح أبناء العقدة الأب الحالية.</p>
+            <p>• ستُفصل الرسائل المرتبطة عن هذه العقدة (لن تُحذف).</p>
+          </div>
+          <div className="flex gap-2 mt-4">
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={isDeleting} className="flex-1">
+              إلغاء
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete} disabled={isDeleting} className="flex-1">
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                  جاري الحذف...
+                </>
+              ) : (
+                "حذف"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ----- Merge dialog ----- */}
+      <Dialog open={mergeOpen} onOpenChange={setMergeOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GitMerge className="h-5 w-5 text-purple-500" />
+              دمج العقدة
+            </DialogTitle>
+            <DialogDescription>
+              اختر عقدة لدمجها مع <span className="font-bold">{mergeSource?.title}</span>. سيتم نقل كل الرسائل
+              والعقد الفرعية إلى العقدة المختارة.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label>العقدة الهدف</Label>
+              <select
+                value={mergeTargetId}
+                onChange={(e) => setMergeTargetId(e.target.value)}
+                className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">اختر عقدة...</option>
+                {localNodes
+                  .filter((n) => {
+                    if (!mergeSource) return false
+                    if (n.id === mergeSource.id) return false
+                    // Block descendants of the source to avoid creating a cycle.
+                    return !getDescendantIds(mergeSource.id).has(n.id)
+                  })
+                  .map((node) => (
+                    <option key={node.id} value={node.id}>
+                      {node.title}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label>الاسم الجديد للعقدة المدموجة</Label>
+              <Input
+                value={mergeNewName}
+                onChange={(e) => setMergeNewName(e.target.value)}
+                placeholder="الاسم الجديد"
+                className="bg-background"
+              />
+            </div>
+            {mergeError && (
+              <p className="text-sm text-destructive flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                {mergeError}
+              </p>
+            )}
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setMergeOpen(false)} disabled={isMerging} className="flex-1">
+                إلغاء
+              </Button>
+              <Button
+                onClick={confirmMerge}
+                disabled={!mergeTargetId || !mergeNewName.trim() || isMerging}
+                className="flex-1"
+              >
+                {isMerging ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                    جاري الدمج...
+                  </>
+                ) : (
+                  "تنفيذ الدمج"
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
