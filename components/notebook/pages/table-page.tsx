@@ -134,8 +134,8 @@ export function TablePage({ page, members: _members, currentUserId: _currentUser
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <ScrollArea className="flex-1">
-        <div className="px-4 md:px-8 py-6 max-w-6xl mx-auto">
+      <ScrollArea className="flex-1 w-full">
+        <div className="px-4 md:px-8 py-6 max-w-6xl mx-auto w-full min-w-0">
           {/* Hero */}
           <div className="mb-6 pb-6 border-b border-border flex items-start justify-between gap-3">
             <div className="flex items-start gap-3 min-w-0">
@@ -184,11 +184,11 @@ export function TablePage({ page, members: _members, currentUserId: _currentUser
           </div>
 
           {/* Table */}
-          <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
+          <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm max-w-full">
             <div
               ref={scrollRef}
               dir="rtl"
-              className="overflow-auto max-h-[60vh]"
+              className="overflow-x-auto overflow-y-auto max-h-[60vh] w-full"
               style={{
                 touchAction: 'pan-x pan-y',
                 overscrollBehaviorX: 'contain',
@@ -197,7 +197,7 @@ export function TablePage({ page, members: _members, currentUserId: _currentUser
               onTouchStart={(e) => e.stopPropagation()}
               onTouchMove={(e) => e.stopPropagation()}
             >
-              <table className="border-collapse w-max">
+              <table className="border-collapse w-full min-w-max">
                 <thead>
                   <tr>
                     {content.columns.map((column, index) => (
