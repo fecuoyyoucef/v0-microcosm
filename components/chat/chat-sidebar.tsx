@@ -38,6 +38,7 @@ import {
   XMarkIcon as XIcon,
   LinkIcon as Link2Icon,
   TrophyIcon,
+  FireIcon,
 } from "@heroicons/react/24/solid"
 import { ArrowPathIcon as Loader2Icon } from "@heroicons/react/24/outline"
 import type { Profile } from "@/lib/types"
@@ -89,6 +90,9 @@ const translations = {
     joining: "جاري الانضمام...",
     invalidInviteLink: "رابط الدعوة غير صالح",
     joinSuccess: "تم الانضمام بنجاح!",
+    activeGroups: "أنشط الخلايا",
+    noActiveGroups: "لا توجد خلايا نشطة مؤخراً",
+    messagesLast7Days: "رسائل (آخر 7 أيام)",
   },
   en: {
     profile: "My Profile",
@@ -123,6 +127,9 @@ const translations = {
     joining: "Joining...",
     invalidInviteLink: "Invalid invite link",
     joinSuccess: "Joined successfully!",
+    activeGroups: "Most Active Cells",
+    noActiveGroups: "No recent activity",
+    messagesLast7Days: "msgs (last 7d)",
   },
   fr: {
     profile: "Mon Profil",
@@ -157,6 +164,9 @@ const translations = {
     joining: "Rejoignez...",
     invalidInviteLink: "Lien d'invitation invalide",
     joinSuccess: "Rejoint avec succès!",
+    activeGroups: "Cellules Actives",
+    noActiveGroups: "Aucune activité récente",
+    messagesLast7Days: "msgs (7 derniers j.)",
   },
 }
 
@@ -186,6 +196,10 @@ export function ChatSidebar({ currentUserId, groups, onSignOut }: ChatSidebarPro
   const [inviteLink, setInviteLink] = useState("")
   const [isJoining, setIsJoining] = useState(false)
 
+  // Top 5 most active groups (highest message count in the last 7 days,
+  // among the groups the user is a member of).
+  const [activeGroups, setActiveGroups] = useState<Array<{ group: any; count: number }>>([])
+
   const touchStartX = useRef<number>(0)
   const touchStartY = useRef<number>(0)
   const touchEndX = useRef<number>(0)
@@ -195,6 +209,7 @@ export function ChatSidebar({ currentUserId, groups, onSignOut }: ChatSidebarPro
     fetchProfile()
     fetchUnreadNotifications()
     checkOwnerStatus()
+    fetchActiveGroups()
 
     const channel = supabase
       .channel("sidebar-notifications")
@@ -299,6 +314,50 @@ export function ChatSidebar({ currentUserId, groups, onSignOut }: ChatSidebarPro
 
     setUnreadNotifications(count || 0)
   }
+
+  // Compute the 5 most active groups (by message count in the last 7 days)
+  // among the groups the user is a member of. We pull message rows scoped to
+  // those group ids and then aggregate client-side — this avoids the need
+  // for a custom RPC/view.
+  const fetchActiveGroups = async () => {
+    if (!groups || groups.length === 0) {
+      setActiveGroups([])
+      return
+    }
+    const groupIds = groups.map((g) => g.id)
+    const sinceIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+
+    const { data, error } = await supabase
+      .from("messages")
+      .select("group_id, created_at")
+      .in("group_id", groupIds)
+      .gte("created_at", sinceIso)
+
+    if (error || !data) {
+      setActiveGroups([])
+      return
+    }
+
+    const counts = new Map<string, number>()
+    for (const row of data as Array<{ group_id: string }>) {
+      counts.set(row.group_id, (counts.get(row.group_id) || 0) + 1)
+    }
+
+    const byId = new Map(groups.map((g) => [g.id, g]))
+    const ranked = Array.from(counts.entries())
+      .map(([gid, count]) => ({ group: byId.get(gid), count }))
+      .filter((x) => !!x.group)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5)
+
+    setActiveGroups(ranked as Array<{ group: any; count: number }>)
+  }
+
+  // Refresh the ranking whenever the list of groups the user belongs to changes.
+  useEffect(() => {
+    fetchActiveGroups()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groups])
 
   const createGroup = async () => {
     if (!newGroupName.trim()) return
@@ -604,6 +663,42 @@ export function ChatSidebar({ currentUserId, groups, onSignOut }: ChatSidebarPro
           </Link>
 
           <Separator className="my-2" />
+
+          {/* Top 5 most active cells (last 7 days). Only rendered if we have data. */}
+          {activeGroups.length > 0 && (
+            <div className="px-2 py-1">
+              <div className="flex items-center gap-2 px-2 pb-1.5 pt-1">
+                <FireIcon className="w-4 h-4 text-orange-500" />
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  {t.activeGroups}
+                </span>
+              </div>
+              <div className="space-y-0.5">
+                {activeGroups.map(({ group, count }) => (
+                  <Link key={group.id} href={`/chat/${group.id}`} onClick={closeSidebar}>
+                    <div className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-secondary transition-colors cursor-pointer">
+                      <Avatar className="h-8 w-8 shrink-0">
+                        {group.avatar_url ? (
+                          <AvatarImage src={group.avatar_url || "/placeholder.svg"} className="object-cover" />
+                        ) : (
+                          <AvatarFallback className="bg-primary/15 text-primary text-xs font-bold">
+                            {group.name?.substring(0, 2) || "?"}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{group.name}</p>
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          {count} {t.messagesLast7Days}
+                        </p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+              <Separator className="my-2" />
+            </div>
+          )}
 
           <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer opacity-50">
             <UserPlusIcon className="w-5 h-5 text-muted-foreground" />
