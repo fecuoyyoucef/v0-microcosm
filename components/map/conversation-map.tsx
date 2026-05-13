@@ -905,7 +905,17 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
           style={isDark ? undefined : { background: palette.bg }}
           dir="ltr"
         >
-          <svg ref={svgRef} className="w-full h-full" />
+          {/* Disable text selection + iOS callout so long-press behaves like Telegram (no text-select). */}
+          <svg
+            ref={svgRef}
+            className="w-full h-full select-none"
+            style={{
+              WebkitUserSelect: "none",
+              userSelect: "none",
+              WebkitTouchCallout: "none",
+              touchAction: "none",
+            }}
+          />
 
           <div className="absolute bottom-4 left-4 flex flex-col gap-1 bg-card/95 backdrop-blur-sm rounded-lg border border-border p-1 shadow-md">
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={zoomIn} aria-label="تكبير">
