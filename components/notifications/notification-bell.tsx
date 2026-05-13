@@ -226,18 +226,35 @@ export function NotificationBell({ userId }: NotificationBellProps) {
         },
         (payload) => {
           const updated = payload.new as Notification
-          setNotifications((prev) =>
-            prev.map((n) => (n.id === updated.id ? { ...n, ...updated } : n)),
-          )
-          if (updated.is_read) {
-            setUnreadCount((prev) => Math.max(0, prev - 1))
-          }
+          setNotifications((prev) => {
+            const next = prev.map((n) => (n.id === updated.id ? { ...n, ...updated } : n))
+            // Recompute unread count from the source of truth instead of guessing.
+            // This avoids double-decrement on idempotent updates and stays correct
+            // even when payload.old isn't available (REPLICA IDENTITY != FULL).
+            setUnreadCount(next.filter((n) => !n.is_read).length)
+            return next
+          })
         },
       )
       .subscribe()
 
+    // Refetch on custom event (fired after bulk mark-as-read from elsewhere)
+    // and when the tab becomes visible again (mobile/PWA wake-up).
+    const handleExternalRefresh = () => {
+      fetchNotifications()
+    }
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchNotifications()
+      }
+    }
+    window.addEventListener("notifications:refresh", handleExternalRefresh)
+    document.addEventListener("visibilitychange", handleVisibility)
+
     return () => {
       supabase.removeChannel(channel)
+      window.removeEventListener("notifications:refresh", handleExternalRefresh)
+      document.removeEventListener("visibilitychange", handleVisibility)
     }
   }, [userId, supabase, fetchNotifications, fetchEnrichedById])
 

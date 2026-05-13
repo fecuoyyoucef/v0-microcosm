@@ -88,6 +88,13 @@ export function ChatContainer({
         .eq("user_id", currentUserId)
         .eq("group_id", groupId)
         .eq("is_read", false)
+
+      // Notify the bell to refresh immediately (don't rely solely on realtime
+      // UPDATE events, which can be missed if the WS reconnected or replica
+      // identity isn't FULL on the notifications table)
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("notifications:refresh"))
+      }
     } catch (error) {
       console.error("Error marking cell notifications as read:", error)
     }
@@ -139,23 +146,34 @@ export function ChatContainer({
     }
   }, [groupId, supabase])
 
-  // Enriches a batch of raw messages with sender profiles and reply previews.
-  // Optimized: skips read counts and reactions on initial load for performance.
-  // Reactions are handled via realtime subscriptions and local state.
+  // Enriches a batch of raw messages with sender profiles, reply previews, and reactions.
+  // Reactions are fetched in a single query for all messages, then merged per message_id
+  // so they persist across reloads (not just during the live session).
   const enrichMessages = useCallback(
     async (messagesData: Record<string, unknown>[]) => {
       if (!messagesData.length) return []
 
       const senderIds = [...new Set(messagesData.map((m) => m.sender_id as string))]
+      const messageIds = messagesData.map((m) => m.id as string)
 
-      // Fetch profiles for all unique senders in a single query (max ~50 senders)
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, display_name, avatar_url")
-        .in("id", senderIds)
-      
+      // Run profile, reply-target, and reaction queries in parallel
+      const [profilesRes, reactionsRes] = await Promise.all([
+        supabase.from("profiles").select("id, display_name, avatar_url").in("id", senderIds),
+        supabase
+          .from("message_reactions")
+          .select("id, message_id, user_id, reaction, created_at")
+          .in("message_id", messageIds),
+      ])
+
       const profileMap = new Map<string, { id: string; display_name: string; avatar_url: string | null }>()
-      profiles?.forEach((p) => profileMap.set(p.id, p))
+      profilesRes.data?.forEach((p) => profileMap.set(p.id, p))
+
+      // Group reactions by message_id
+      const reactionsByMessage: Record<string, Array<{ id: string; user_id: string; reaction: string; created_at: string }>> = {}
+      reactionsRes.data?.forEach((r) => {
+        const list = reactionsByMessage[r.message_id] || (reactionsByMessage[r.message_id] = [])
+        list.push({ id: r.id, user_id: r.user_id, reaction: r.reaction, created_at: r.created_at })
+      })
 
       // Fetch reply-to previews — only unique IDs
       const replyMessagesMap: Record<string, { content: string; sender?: { display_name: string } }> = {}
@@ -165,7 +183,7 @@ export function ChatContainer({
           .from("messages")
           .select("id, content, sender_id")
           .in("id", replyToIds)
-        
+
         replyMsgs?.forEach((rm) => {
           const senderProfile = profileMap.get(rm.sender_id)
           replyMessagesMap[rm.id] = {
@@ -179,7 +197,7 @@ export function ChatContainer({
         ...m,
         sender: profileMap.get(m.sender_id as string) || null,
         read_count: 0,
-        reactions: [],
+        reactions: reactionsByMessage[m.id as string] || [],
         reply_to_message: m.reply_to ? replyMessagesMap[m.reply_to as string] ?? null : null,
       })) as Message[]
     },
