@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Plus, Trash2, Loader2, Table2, Check, Lock } from "lucide-react"
 import type { NotebookPage, GroupMember } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -134,7 +133,7 @@ export function TablePage({ page, members: _members, currentUserId: _currentUser
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <ScrollArea className="flex-1 w-full">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden w-full">
         <div className="px-4 md:px-8 py-6 max-w-6xl mx-auto w-full min-w-0">
           {/* Hero */}
           <div className="mb-6 pb-6 border-b border-border flex items-start justify-between gap-3">
@@ -295,7 +294,7 @@ export function TablePage({ page, members: _members, currentUserId: _currentUser
             )}
           </div>
         </div>
-      </ScrollArea>
+      </div>
 
       {!page.is_locked && content.rows.length > 0 && (
         <div className="border-t border-border bg-card/40 backdrop-blur-sm px-4 md:px-8 py-4 shrink-0">
