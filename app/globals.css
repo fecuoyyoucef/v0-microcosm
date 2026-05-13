@@ -15,6 +15,32 @@ body {
   min-height: 100dvh;
 }
 
+/* Suppress the mobile browser's long-press context menu (copy link, save
+   image, share...) on interactive surfaces so the app feels native.
+   Text inputs, textareas, contenteditable regions and elements explicitly
+   opted into selection still allow normal copy / context behaviour. */
+a,
+button,
+img,
+video,
+[role="button"] {
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input,
+textarea,
+[contenteditable="true"],
+.allow-select,
+.allow-select * {
+  -webkit-touch-callout: default;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 /* Synaptic Space - Brand Color System
  * Primary: Deep Synaptic Teal (intellectual + alive)
  * Accent: Warm Saffron (Arabic warmth)

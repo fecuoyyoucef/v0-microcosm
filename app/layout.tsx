@@ -119,6 +119,18 @@ export default function RootLayout({
                   );
                 });
               }
+
+              // Suppress the browser long-press / right-click context menu on
+              // non-editable surfaces. Inputs, textareas and contenteditable
+              // areas keep their native menus so users can still copy/paste.
+              document.addEventListener('contextmenu', function(e) {
+                var t = e.target;
+                if (!t) return;
+                var tag = t.tagName;
+                if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+                if (t.closest && t.closest('[contenteditable="true"], .allow-select')) return;
+                e.preventDefault();
+              });
             `,
           }}
         />

@@ -87,6 +87,8 @@ const translations = {
     moveUp: "تحريك للأعلى",
     moveDown: "تحريك للأسفل",
     sortBy: "ترتيب حسب",
+    editOrder: "تحرير الترتيب",
+    done: "تم",
   },
   en: {
     welcome: "Welcome",
@@ -126,6 +128,8 @@ const translations = {
     moveUp: "Move up",
     moveDown: "Move down",
     sortBy: "Sort by",
+    editOrder: "Edit order",
+    done: "Done",
   },
   fr: {
     welcome: "Bienvenue",
@@ -165,6 +169,8 @@ const translations = {
     moveUp: "Monter",
     moveDown: "Descendre",
     sortBy: "Trier par",
+    editOrder: "Modifier l'ordre",
+    done: "Terminé",
   },
 }
 
@@ -207,6 +213,9 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
   const orderStorageKey = `cells:custom-order:${userId}`
   const [sortMode, setSortMode] = useState<SortMode>("newest")
   const [customOrder, setCustomOrder] = useState<string[]>([])
+  // Reorder arrows are only visible while the user is explicitly editing the
+  // custom order. Tapping "Done" exits edit mode and hides the arrows.
+  const [isEditingOrder, setIsEditingOrder] = useState(false)
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -227,6 +236,9 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
 
   const updateSortMode = (mode: SortMode) => {
     setSortMode(mode)
+    // Leaving custom mode (or switching back into it) always starts with
+    // the arrows hidden — the user opts in via the explicit edit button.
+    if (mode !== "custom") setIsEditingOrder(false)
     if (typeof window !== "undefined") {
       try {
         window.localStorage.setItem(sortStorageKey, mode)
@@ -693,16 +705,38 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
               </div>
             ) : (
               <div className="space-y-3 w-full">
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1">
-                  {t.cells}
-                </h3>
+                <div className="flex items-center justify-between px-1">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    {t.cells}
+                  </h3>
+                  {/* Edit-order toggle is only available in custom mode and
+                      when no search is active. Outside this scope reordering
+                      would be misleading. */}
+                  {sortMode === "custom" && !searchQuery && filteredGroups.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingOrder((v) => !v)}
+                      className={cn(
+                        "text-xs font-medium rounded-md px-2 py-1 transition-colors",
+                        isEditingOrder
+                          ? "bg-primary text-primary-foreground"
+                          : "text-primary hover:bg-primary/10",
+                      )}
+                    >
+                      {isEditingOrder ? t.done : t.editOrder}
+                    </button>
+                  )}
+                </div>
                 <div className="space-y-1.5 w-full">
                   {filteredGroups.map((group, index) => {
                     const hasUnread = unreadCounts[group.id] > 0
                     const isFirst = index === 0
                     const isLast = index === filteredGroups.length - 1
                     // Only allow reordering on the unfiltered full list.
-                    const inCustomMode = sortMode === "custom" && !searchQuery
+                    // Arrows are only rendered while the user is explicitly
+                    // editing the custom order. Hidden during search to avoid
+                    // reordering against an incomplete list.
+                    const inCustomMode = sortMode === "custom" && isEditingOrder && !searchQuery
 
                     const rowContent = (
                       <div
