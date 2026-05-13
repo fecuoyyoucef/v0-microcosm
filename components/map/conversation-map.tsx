@@ -578,10 +578,8 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
                       // A node can be a parent only if its depth < MAX_DEPTH,
                       // because the new child will be at depth + 1.
                       const disabled = depth >= MAX_DEPTH
-                      const indent = "— ".repeat(Math.max(0, depth - 1))
                       return (
                         <option key={node.id} value={node.id} disabled={disabled}>
-                          {indent}
                           {node.title}
                           {disabled ? "  (وصلت للحد الأقصى)" : ""}
                         </option>
