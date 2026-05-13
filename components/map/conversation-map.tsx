@@ -1,5 +1,5 @@
 "use client"
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import * as d3 from "d3"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -28,20 +28,39 @@ interface ConversationMapProps {
   currentUserId: string
 }
 
-const NODE_COLORS = [
-  { bg: "#3B82F6", light: "#DBEAFE" },
-  { bg: "#10B981", light: "#D1FAE5" },
-  { bg: "#F59E0B", light: "#FEF3C7" },
-  { bg: "#EF4444", light: "#FEE2E2" },
-  { bg: "#8B5CF6", light: "#EDE9FE" },
-  { bg: "#EC4899", light: "#FCE7F3" },
-  { bg: "#06B6D4", light: "#CFFAFE" },
-]
+const NODE_COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#06B6D4"]
+
+// Visual constants matching the NotebookLM reference
+const NODE_WIDTH = 200
+const NODE_HEIGHT = 56
+const NODE_RADIUS = 14
+const TOGGLE_RADIUS = 14
+const TOGGLE_GAP = 10 // gap between node edge and toggle button
+const LEVEL_GAP = 280 // horizontal distance between levels
+const SIBLING_GAP = 24 // vertical gap between siblings
+
+const NODE_FILL = "#2C3540" // dark slate, matches reference
+const NODE_FILL_ROOT = "#574F6E" // lavender root, matches reference
+const NODE_TEXT = "#FFFFFF"
+const LINK_COLOR = "#A8B5E8" // soft lavender-blue
+const BG_COLOR = "#FAFAF7" // warm off-white background
+const TOGGLE_FILL = "#2C3540"
+
+interface HierarchyNodeData {
+  id: string
+  title: string
+  color?: string
+  messages_count?: number
+  description?: string | null
+  children?: HierarchyNodeData[]
+  _raw?: ConversationNode
+}
 
 export function ConversationMap({ groupId, group, nodes: initialNodes, currentUserId }: ConversationMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null)
+  const gRef = useRef<SVGGElement | null>(null)
   const [selectedNode, setSelectedNode] = useState<ConversationNode | null>(null)
   const [nodeMessages, setNodeMessages] = useState<Message[]>([])
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
@@ -49,10 +68,11 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
   const [newNodeTitle, setNewNodeTitle] = useState("")
   const [newNodeDescription, setNewNodeDescription] = useState("")
   const [newNodeParent, setNewNodeParent] = useState<string | null>(null)
-  const [newNodeColor, setNewNodeColor] = useState(NODE_COLORS[0].bg)
+  const [newNodeColor, setNewNodeColor] = useState(NODE_COLORS[0])
   const [isCreating, setIsCreating] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [localNodes, setLocalNodes] = useState<ConversationNode[]>(initialNodes)
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
   const supabase = createClient()
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 })
 
@@ -65,7 +85,6 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
         })
       }
     }
-
     updateSize()
     window.addEventListener("resize", updateSize)
     return () => window.removeEventListener("resize", updateSize)
@@ -92,14 +111,10 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
             .select("*")
             .eq("group_id", groupId)
             .order("created_at", { ascending: true })
-
-          if (data) {
-            setLocalNodes(data)
-          }
+          if (data) setLocalNodes(data)
         },
       )
       .subscribe()
-
     return () => {
       supabase.removeChannel(channel)
     }
@@ -107,7 +122,6 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
 
   const createNode = async () => {
     if (!newNodeTitle.trim()) return
-
     setIsCreating(true)
     try {
       const { error } = await supabase.from("conversation_nodes").insert({
@@ -120,7 +134,6 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
         position_y: 0,
         created_by: currentUserId,
       })
-
       if (!error) {
         setNewNodeTitle("")
         setNewNodeDescription("")
@@ -135,18 +148,15 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
   const handleNodeClick = async (node: ConversationNode) => {
     setSelectedNode(node)
     setIsLoadingMessages(true)
-
     try {
       const { data: messagesData } = await supabase
         .from("messages")
         .select("*")
         .eq("node_id", node.id)
         .order("created_at", { ascending: true })
-
       if (messagesData && messagesData.length > 0) {
         const senderIds = [...new Set(messagesData.map((m) => m.sender_id))]
         const { data: profiles } = await supabase.from("profiles").select("*").in("id", senderIds)
-
         const profileMap = new Map(profiles?.map((p) => [p.id, p]) || [])
         const messagesWithSender = messagesData.map((m) => ({
           ...m,
@@ -164,237 +174,291 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
     }
   }
 
-  const buildHierarchy = (nodes: ConversationNode[]) => {
-    const rootNodes = nodes.filter((n) => !n.parent_id)
-    if (rootNodes.length === 0) return null
-
-    const nodeMap = new Map(nodes.map((n) => [n.id, { ...n, children: [] as ConversationNode[] }]))
-
-    nodes.forEach((node) => {
-      if (node.parent_id) {
-        const parent = nodeMap.get(node.parent_id)
-        const child = nodeMap.get(node.id)
-        if (parent && child) {
-          parent.children.push(child)
-        }
-      }
+  const toggleCollapse = useCallback((id: string) => {
+    setCollapsedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
     })
+  }, [])
 
-    if (rootNodes.length === 1) {
-      return nodeMap.get(rootNodes[0].id)
+  // Build hierarchy, respecting collapsed state
+  const hierarchyData = useMemo<HierarchyNodeData | null>(() => {
+    if (localNodes.length === 0) return null
+
+    const rootNodes = localNodes.filter((n) => !n.parent_id)
+
+    const buildChildren = (parentId: string): HierarchyNodeData[] => {
+      return localNodes
+        .filter((n) => n.parent_id === parentId)
+        .map((n) => ({
+          id: n.id,
+          title: n.title,
+          color: n.color,
+          messages_count: n.messages_count,
+          description: n.description,
+          _raw: n,
+          children: collapsedIds.has(n.id) ? undefined : buildChildren(n.id),
+        }))
     }
 
     return {
       id: "virtual-root",
       title: group.name,
-      color: "#6366f1",
-      messages_count: 0,
-      children: rootNodes.map((r) => nodeMap.get(r.id)).filter(Boolean),
+      color: NODE_FILL_ROOT,
+      children: rootNodes.map((r) => ({
+        id: r.id,
+        title: r.title,
+        color: r.color,
+        messages_count: r.messages_count,
+        description: r.description,
+        _raw: r,
+        children: collapsedIds.has(r.id) ? undefined : buildChildren(r.id),
+      })),
     }
-  }
+  }, [localNodes, collapsedIds, group.name])
+
+  // Determine which nodes have hidden children (collapsed) vs visible children (expandable indicator)
+  const childCountMap = useMemo(() => {
+    const map = new Map<string, number>()
+    localNodes.forEach((n) => {
+      const count = localNodes.filter((x) => x.parent_id === n.id).length
+      map.set(n.id, count)
+    })
+    return map
+  }, [localNodes])
 
   const fitToScreen = useCallback(() => {
-    if (!svgRef.current || !zoomRef.current) return
+    if (!svgRef.current || !zoomRef.current || !gRef.current) return
     const svg = d3.select(svgRef.current)
-    svg.transition().duration(500).call(zoomRef.current.transform, d3.zoomIdentity)
-  }, [])
+    const bounds = gRef.current.getBBox()
+    const width = containerSize.width
+    const height = containerSize.height
+    const scale = Math.min(width / (bounds.width + 100), height / (bounds.height + 100), 1.2)
+    const tx = width / 2 - (bounds.x + bounds.width / 2) * scale
+    const ty = height / 2 - (bounds.y + bounds.height / 2) * scale
+    svg.transition().duration(500).call(zoomRef.current.transform, d3.zoomIdentity.translate(tx, ty).scale(scale))
+  }, [containerSize])
 
   const zoomIn = useCallback(() => {
     if (!svgRef.current || !zoomRef.current) return
-    const svg = d3.select(svgRef.current)
-    svg.transition().duration(300).call(zoomRef.current.scaleBy, 1.3)
+    d3.select(svgRef.current).transition().duration(250).call(zoomRef.current.scaleBy, 1.3)
   }, [])
 
   const zoomOut = useCallback(() => {
     if (!svgRef.current || !zoomRef.current) return
-    const svg = d3.select(svgRef.current)
-    svg.transition().duration(300).call(zoomRef.current.scaleBy, 0.7)
+    d3.select(svgRef.current).transition().duration(250).call(zoomRef.current.scaleBy, 0.7)
   }, [])
 
+  // Main render effect
   useEffect(() => {
-    if (!svgRef.current || localNodes.length === 0) return
+    if (!svgRef.current || !hierarchyData) return
 
     const width = containerSize.width
     const height = containerSize.height
+    const svgSel = d3.select(svgRef.current)
+    svgSel.selectAll("*").remove()
 
-    d3.select(svgRef.current).selectAll("*").remove()
+    // Filter definitions
+    const defs = svgSel.append("defs")
+    const filter = defs.append("filter")
+      .attr("id", "soft-shadow")
+      .attr("x", "-50%")
+      .attr("y", "-50%")
+      .attr("width", "200%")
+      .attr("height", "200%")
+    filter.append("feDropShadow")
+      .attr("dx", 0)
+      .attr("dy", 2)
+      .attr("stdDeviation", 3)
+      .attr("flood-color", "rgba(0,0,0,0.12)")
 
-    const hierarchyData = buildHierarchy(localNodes)
-    if (!hierarchyData) return
+    svgSel.attr("width", width).attr("height", height)
 
-    const root = d3.hierarchy(hierarchyData as ConversationNode)
+    const g = svgSel.append("g")
+    gRef.current = g.node()
 
-    // RTL layout - tree grows from right to left
-    const treeLayout = d3.tree<ConversationNode>().nodeSize([100, 220])
+    // Tree layout: LTR, root on left
+    const root = d3.hierarchy<HierarchyNodeData>(hierarchyData)
+    const treeLayout = d3
+      .tree<HierarchyNodeData>()
+      .nodeSize([NODE_HEIGHT + SIBLING_GAP, LEVEL_GAP])
+      .separation((a, b) => (a.parent === b.parent ? 1 : 1.3))
+
     treeLayout(root)
 
-    // Calculate bounds to center the tree
+    // After layout: d.x is vertical position, d.y is horizontal
+    // Compute bounds for centering
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
-    root.descendants().forEach(d => {
+    root.descendants().forEach((d) => {
       if (d.x < minX) minX = d.x
       if (d.x > maxX) maxX = d.x
       if (d.y < minY) minY = d.y
       if (d.y > maxY) maxY = d.y
     })
 
-    const treeWidth = maxY - minY + 300
-    const treeHeight = maxX - minX + 150
-    const scale = Math.min(width / treeWidth, height / treeHeight, 1) * 0.85
-    const offsetX = width / 2 + (maxY + minY) / 2 * scale
-    const offsetY = height / 2 - (maxX + minX) / 2 * scale
+    const treeW = maxY - minY + NODE_WIDTH + TOGGLE_RADIUS * 2 + 40
+    const treeH = maxX - minX + NODE_HEIGHT + 40
+    const scale = Math.min(width / treeW, height / treeH, 1)
+    const tx = width / 2 - ((minY + maxY) / 2) * scale
+    const ty = height / 2 - ((minX + maxX) / 2) * scale
 
-    const svg = d3
-      .select(svgRef.current)
-      .attr("width", width)
-      .attr("height", height)
-
-    // Create gradient definitions
-    const defs = svg.append("defs")
-    
-    // Add drop shadow filter
-    const filter = defs.append("filter")
-      .attr("id", "node-shadow")
-      .attr("x", "-50%")
-      .attr("y", "-50%")
-      .attr("width", "200%")
-      .attr("height", "200%")
-    
-    filter.append("feDropShadow")
-      .attr("dx", 0)
-      .attr("dy", 4)
-      .attr("stdDeviation", 8)
-      .attr("flood-color", "rgba(0,0,0,0.1)")
-
-    const g = svg.append("g")
-      .attr("transform", `translate(${offsetX}, ${offsetY}) scale(${scale})`)
-
-    const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.2, 4])
+    // Setup zoom
+    const zoom = d3
+      .zoom<SVGSVGElement, unknown>()
+      .scaleExtent([0.15, 3])
       .on("zoom", (event) => {
-        g.attr("transform", event.transform)
+        g.attr("transform", event.transform.toString())
       })
-
     zoomRef.current = zoom
-    svg.call(zoom)
-    
-    // Set initial transform
-    svg.call(zoom.transform, d3.zoomIdentity.translate(offsetX, offsetY).scale(scale))
+    svgSel.call(zoom)
+    svgSel.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale))
 
-    const nodes = root.descendants()
-    const links = root.links()
-
-    // Draw curved links (RTL: negative y for x position)
-    g.selectAll(".link")
-      .data(links)
+    // Draw links as smooth bezier curves
+    const linksLayer = g.append("g").attr("class", "links")
+    linksLayer
+      .selectAll("path")
+      .data(root.links())
       .join("path")
-      .attr("class", "link")
       .attr("d", (d) => {
-        const sourceX = -d.source.y
-        const sourceY = d.source.x
-        const targetX = -d.target.y
-        const targetY = d.target.x
-        const midX = (sourceX + targetX) / 2
-        return `M${sourceX},${sourceY} C${midX},${sourceY} ${midX},${targetY} ${targetX},${targetY}`
+        // Source connection point: right edge of source node + toggle button
+        const sx = d.source.y + NODE_WIDTH / 2 + TOGGLE_GAP + TOGGLE_RADIUS
+        const sy = d.source.x
+        // Target connection point: left edge of target node
+        const tx2 = d.target.y - NODE_WIDTH / 2
+        const ty2 = d.target.x
+        const midX = (sx + tx2) / 2
+        return `M${sx},${sy} C${midX},${sy} ${midX},${ty2} ${tx2},${ty2}`
       })
       .attr("fill", "none")
-      .attr("stroke", (d) => {
-        const color = (d.target.data as ConversationNode).color || "#64748b"
-        return color
-      })
-      .attr("stroke-width", 3)
-      .attr("stroke-opacity", 0.4)
+      .attr("stroke", LINK_COLOR)
+      .attr("stroke-width", 2)
       .attr("stroke-linecap", "round")
+      .attr("opacity", 0)
+      .transition()
+      .duration(400)
+      .attr("opacity", 0.7)
 
     // Draw nodes
-    const nodeGroups = g.selectAll(".node")
-      .data(nodes)
+    const nodesLayer = g.append("g").attr("class", "nodes")
+    const nodeGroups = nodesLayer
+      .selectAll("g.node")
+      .data(root.descendants(), (d) => (d as d3.HierarchyNode<HierarchyNodeData>).data.id)
       .join("g")
       .attr("class", "node")
-      .attr("transform", (d) => `translate(${-d.y},${d.x})`)
-      .attr("cursor", "pointer")
-      .on("click", (_event, d) => {
-        if ((d.data as ConversationNode).id !== "virtual-root") {
-          handleNodeClick(d.data as ConversationNode)
-        }
+      .attr("transform", (d) => `translate(${d.y},${d.x})`)
+      .style("opacity", 0)
+
+    nodeGroups.transition().duration(400).style("opacity", 1)
+
+    // Node rectangle
+    nodeGroups
+      .append("rect")
+      .attr("x", -NODE_WIDTH / 2)
+      .attr("y", -NODE_HEIGHT / 2)
+      .attr("width", NODE_WIDTH)
+      .attr("height", NODE_HEIGHT)
+      .attr("rx", NODE_RADIUS)
+      .attr("ry", NODE_RADIUS)
+      .attr("fill", (d) => (d.data.id === "virtual-root" ? NODE_FILL_ROOT : NODE_FILL))
+      .attr("stroke", (d) => (selectedNode?.id === d.data.id ? d.data.color || LINK_COLOR : "transparent"))
+      .attr("stroke-width", 3)
+      .attr("filter", "url(#soft-shadow)")
+      .style("cursor", "pointer")
+      .on("click", (event, d) => {
+        event.stopPropagation()
+        if (d.data._raw) handleNodeClick(d.data._raw)
+      })
+      .on("mouseenter", function () {
+        d3.select(this).transition().duration(120).attr("transform", "scale(1.03)")
+      })
+      .on("mouseleave", function () {
+        d3.select(this).transition().duration(120).attr("transform", "scale(1)")
       })
 
-    // Node card background with shadow
-    nodeGroups.append("rect")
-      .attr("width", 160)
-      .attr("height", 70)
-      .attr("x", -80)
-      .attr("y", -35)
-      .attr("rx", 16)
-      .attr("fill", (d) => {
-        const nodeData = d.data as ConversationNode
-        const colorObj = NODE_COLORS.find(c => c.bg === nodeData.color)
-        return colorObj?.light || "#F1F5F9"
-      })
-      .attr("stroke", (d) => (d.data as ConversationNode).color || "#3b82f6")
-      .attr("stroke-width", 2.5)
-      .attr("filter", "url(#node-shadow)")
-      .on("mouseenter", function() {
-        d3.select(this).transition().duration(150)
-          .attr("stroke-width", 4)
-      })
-      .on("mouseleave", function(event, d) {
-        const isSelected = selectedNode?.id === (d.data as ConversationNode).id
-        d3.select(this).transition().duration(150)
-          .attr("stroke-width", isSelected ? 4 : 2.5)
-      })
-
-    // Selected state highlight
-    nodeGroups.filter(d => selectedNode?.id === (d.data as ConversationNode).id)
-      .select("rect")
-      .attr("stroke-width", 4)
-
-    // Node title
-    nodeGroups.append("text")
-      .attr("dy", (d) => (d.data as ConversationNode).messages_count > 0 ? -2 : 5)
+    // Node title text
+    nodeGroups
+      .append("text")
       .attr("text-anchor", "middle")
+      .attr("dy", "0.35em")
       .attr("font-size", 14)
-      .attr("font-weight", "600")
-      .attr("fill", (d) => (d.data as ConversationNode).color || "#1E293B")
-      .attr("font-family", "system-ui, -apple-system, sans-serif")
+      .attr("font-weight", 500)
+      .attr("fill", NODE_TEXT)
+      .attr("pointer-events", "none")
+      .style("font-family", "system-ui, -apple-system, sans-serif")
       .text((d) => {
-        const title = (d.data as ConversationNode).title || ""
-        return title.length > 14 ? title.substring(0, 12) + "..." : title
+        const t = d.data.title || ""
+        return t.length > 22 ? t.substring(0, 20) + "…" : t
       })
 
-    // Message count badge
-    nodeGroups.filter((d) => (d.data as ConversationNode).messages_count > 0)
-      .append("g")
-      .attr("transform", "translate(0, 18)")
-      .call(g => {
-        g.append("rect")
-          .attr("width", 50)
-          .attr("height", 22)
-          .attr("x", -25)
-          .attr("y", -11)
-          .attr("rx", 11)
-          .attr("fill", (d) => (d.data as ConversationNode).color || "#3b82f6")
-        
-        g.append("text")
-          .attr("text-anchor", "middle")
-          .attr("dy", 4)
-          .attr("font-size", 11)
-          .attr("font-weight", "700")
-          .attr("fill", "white")
-          .text((d) => `${(d.data as ConversationNode).messages_count} رسالة`)
-      })
-
-    return () => {
-      svg.selectAll("*").remove()
-    }
-  }, [localNodes, selectedNode?.id, containerSize, group.name])
-
-  const filteredNodes = searchQuery
-    ? localNodes.filter(
-        (n) =>
-          n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          n.description?.toLowerCase().includes(searchQuery.toLowerCase()),
+    // Toggle indicator on the right of each node that has children
+    const togglesLayer = g.append("g").attr("class", "toggles")
+    const toggleGroups = togglesLayer
+      .selectAll("g.toggle")
+      .data(
+        root.descendants().filter((d) => {
+          if (d.data.id === "virtual-root") return (d.children?.length || 0) > 0
+          const realCount = childCountMap.get(d.data.id) || 0
+          return realCount > 0
+        }),
       )
-    : localNodes
+      .join("g")
+      .attr("class", "toggle")
+      .attr("transform", (d) => `translate(${d.y + NODE_WIDTH / 2 + TOGGLE_GAP + TOGGLE_RADIUS},${d.x})`)
+      .style("cursor", "pointer")
+      .on("click", (event, d) => {
+        event.stopPropagation()
+        if (d.data.id !== "virtual-root") toggleCollapse(d.data.id)
+      })
+
+    toggleGroups
+      .append("circle")
+      .attr("r", TOGGLE_RADIUS)
+      .attr("fill", TOGGLE_FILL)
+      .attr("filter", "url(#soft-shadow)")
+
+    toggleGroups
+      .append("text")
+      .attr("text-anchor", "middle")
+      .attr("dy", "0.35em")
+      .attr("font-size", 16)
+      .attr("font-weight", 600)
+      .attr("fill", NODE_TEXT)
+      .attr("pointer-events", "none")
+      .text((d) => {
+        const isCollapsed = collapsedIds.has(d.data.id)
+        // `<` indicates expanded (showing children), `>` indicates collapsed (can expand)
+        return isCollapsed ? ">" : "<"
+      })
+
+    // Message count badge (small pill below title, only if has messages)
+    nodeGroups
+      .filter((d) => (d.data.messages_count || 0) > 0)
+      .each(function (d) {
+        const sel = d3.select(this)
+        const count = d.data.messages_count || 0
+        const text = `${count}`
+        const badgeR = 9
+        sel
+          .append("circle")
+          .attr("cx", NODE_WIDTH / 2 - 14)
+          .attr("cy", -NODE_HEIGHT / 2 + 14)
+          .attr("r", badgeR)
+          .attr("fill", d.data.color || LINK_COLOR)
+        sel
+          .append("text")
+          .attr("x", NODE_WIDTH / 2 - 14)
+          .attr("y", -NODE_HEIGHT / 2 + 14)
+          .attr("text-anchor", "middle")
+          .attr("dy", "0.35em")
+          .attr("font-size", 10)
+          .attr("font-weight", 700)
+          .attr("fill", "#FFFFFF")
+          .attr("pointer-events", "none")
+          .text(text)
+      })
+  }, [hierarchyData, containerSize, collapsedIds, selectedNode?.id, childCountMap, toggleCollapse])
 
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
@@ -474,13 +538,13 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
                   <div className="flex gap-2 flex-wrap">
                     {NODE_COLORS.map((color) => (
                       <button
-                        key={color.bg}
-                        onClick={() => setNewNodeColor(color.bg)}
+                        key={color}
+                        onClick={() => setNewNodeColor(color)}
                         className={cn(
                           "w-8 h-8 rounded-full transition-transform",
-                          newNodeColor === color.bg && "ring-2 ring-offset-2 ring-primary scale-110",
+                          newNodeColor === color && "ring-2 ring-offset-2 ring-primary scale-110",
                         )}
-                        style={{ backgroundColor: color.bg }}
+                        style={{ backgroundColor: color }}
                       />
                     ))}
                   </div>
@@ -505,22 +569,21 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
         <div
           ref={containerRef}
           className="flex-1 overflow-hidden relative"
-          style={{ 
-            background: "radial-gradient(circle at 50% 50%, hsl(var(--muted)/0.3) 0%, hsl(var(--background)) 70%)"
-          }}
+          style={{ background: BG_COLOR }}
+          dir="ltr"
         >
           <svg ref={svgRef} className="w-full h-full" />
-          
+
           {/* Zoom controls */}
-          <div className="absolute bottom-4 left-4 flex flex-col gap-1 bg-card/90 backdrop-blur-sm rounded-lg border border-border p-1 shadow-lg">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={zoomIn}>
+          <div className="absolute bottom-4 left-4 flex flex-col gap-1 bg-card/95 backdrop-blur-sm rounded-lg border border-border p-1 shadow-md">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={zoomIn} aria-label="تكبير">
               <ZoomIn className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={zoomOut}>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={zoomOut} aria-label="تصغير">
               <ZoomOut className="h-4 w-4" />
             </Button>
             <div className="h-px bg-border my-1" />
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={fitToScreen}>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={fitToScreen} aria-label="ملء الشاشة">
               <Maximize2 className="h-4 w-4" />
             </Button>
           </div>
