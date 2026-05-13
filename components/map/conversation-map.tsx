@@ -1,6 +1,7 @@
 "use client"
 import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import * as d3 from "d3"
+import { useTheme } from "next-themes"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -39,9 +40,33 @@ const TOGGLE_GAP = 10 // gap between node edge and toggle button
 const LEVEL_GAP = 280 // horizontal distance between levels
 const SIBLING_GAP = 24 // vertical gap between siblings
 
-// Colors are theme-aware via CSS variables — values resolved at render time
-// from computed styles so SVG attributes get real color values.
-const MAX_DEPTH = 2 // root (group) → level 1 (parent) → level 2 (child) → level 3 (secondary). Beyond level 2 is not allowed.
+// Maximum allowed depth in the tree (root nodes = level 1).
+// New child nodes can only be created if parent depth < MAX_DEPTH.
+const MAX_DEPTH = 6
+
+// Theme-aware palette. Light palette matches the NotebookLM reference,
+// dark palette uses the app's deep-navy surface tokens.
+const LIGHT_PALETTE = {
+  bg: "#FAFAF7",
+  nodeFill: "#2C3540",
+  nodeFillRoot: "#574F6E",
+  nodeText: "#FFFFFF",
+  link: "#A8B5E8",
+  toggleFill: "#2C3540",
+  toggleText: "#FFFFFF",
+  shadow: "rgba(0,0,0,0.12)",
+}
+
+const DARK_PALETTE = {
+  bg: "transparent", // let bg-background show through
+  nodeFill: "#1E2733", // slightly lighter than the deep-navy bg for contrast
+  nodeFillRoot: "#6B5FA0", // brighter lavender for dark mode
+  nodeText: "#F5F7FB",
+  link: "#8B9BD9", // brighter lavender-blue
+  toggleFill: "#2A3441",
+  toggleText: "#F5F7FB",
+  shadow: "rgba(0,0,0,0.5)",
+}
 
 interface HierarchyNodeData {
   id: string
@@ -72,6 +97,10 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
   const supabase = createClient()
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 })
+
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === "dark"
+  const palette = isDark ? DARK_PALETTE : LIGHT_PALETTE
 
   useEffect(() => {
     const updateSize = () => {
@@ -119,15 +148,6 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
 
   const createNode = async () => {
     if (!newNodeTitle.trim()) return
-    // Enforce depth limit: a new node attached to a parent at depth d will be at depth d+1.
-    // We allow at most MAX_DEPTH, so the parent must be at depth < MAX_DEPTH.
-    if (newNodeParent) {
-      const parentDepth = depthMap.get(newNodeParent) ?? 1
-      if (parentDepth >= MAX_DEPTH) {
-        console.error("Cannot create node: parent is already at max depth")
-        return
-      }
-    }
     setIsCreating(true)
     try {
       const { error } = await supabase.from("conversation_nodes").insert({
@@ -210,9 +230,10 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
     }
 
     return {
+      // The render effect chooses the actual fill for "virtual-root" from the
+      // active palette, so we don't bake a theme-specific color in here.
       id: "virtual-root",
       title: group.name,
-      color: NODE_FILL_ROOT,
       children: rootNodes.map((r) => ({
         id: r.id,
         title: r.title,
@@ -235,27 +256,25 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
     return map
   }, [localNodes])
 
-  // Depth of each node (root-level nodes are depth 1; their children are depth 2, etc.)
-  // The virtual group root is depth 0.
+  // Compute the depth (level) of every node. Root nodes (no parent) are at depth 1.
+  // Used to enforce MAX_DEPTH when picking a parent for a new node.
   const depthMap = useMemo(() => {
     const map = new Map<string, number>()
-    const visit = (id: string, depth: number) => {
-      map.set(id, depth)
-      localNodes
-        .filter((x) => x.parent_id === id)
-        .forEach((child) => visit(child.id, depth + 1))
+    const byParent = new Map<string | null, ConversationNode[]>()
+    localNodes.forEach((n) => {
+      const key = n.parent_id || null
+      const arr = byParent.get(key) || []
+      arr.push(n)
+      byParent.set(key, arr)
+    })
+    const visit = (node: ConversationNode, depth: number) => {
+      map.set(node.id, depth)
+      const children = byParent.get(node.id) || []
+      children.forEach((c) => visit(c, depth + 1))
     }
-    localNodes.filter((n) => !n.parent_id).forEach((root) => visit(root.id, 1))
+    ;(byParent.get(null) || []).forEach((root) => visit(root, 1))
     return map
   }, [localNodes])
-
-  // Eligible parents for the create-node dialog: only nodes whose depth allows
-  // adding a child without exceeding MAX_DEPTH. depth=1 can host depth=2 children.
-  // depth=2 cannot host depth=3 children, so it's excluded.
-  const eligibleParents = useMemo(
-    () => localNodes.filter((n) => (depthMap.get(n.id) ?? 1) < MAX_DEPTH),
-    [localNodes, depthMap],
-  )
 
   const fitToScreen = useCallback(() => {
     if (!svgRef.current || !zoomRef.current || !gRef.current) return
@@ -279,15 +298,6 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
     d3.select(svgRef.current).transition().duration(250).call(zoomRef.current.scaleBy, 0.7)
   }, [])
 
-  // Track theme (light/dark) so SVG re-renders when the user toggles theme
-  const [themeVersion, setThemeVersion] = useState(0)
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    const observer = new MutationObserver(() => setThemeVersion((v) => v + 1))
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] })
-    return () => observer.disconnect()
-  }, [])
-
   // Main render effect
   useEffect(() => {
     if (!svgRef.current || !hierarchyData) return
@@ -296,20 +306,6 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
     const height = containerSize.height
     const svgSel = d3.select(svgRef.current)
     svgSel.selectAll("*").remove()
-
-    // Resolve theme colors from CSS variables at render time
-    const css = getComputedStyle(document.documentElement)
-    const v = (name: string, fallback: string) => {
-      const val = css.getPropertyValue(name).trim()
-      return val || fallback
-    }
-    const NODE_FILL = v("--card", "#2C3540")
-    const NODE_TEXT = v("--card-foreground", "#FFFFFF")
-    const NODE_FILL_ROOT = v("--primary", "#574F6E")
-    const NODE_TEXT_ROOT = v("--primary-foreground", "#FFFFFF")
-    const LINK_COLOR = v("--border", "#A8B5E8")
-    const TOGGLE_FILL = NODE_FILL
-    const SHADOW_OPACITY = document.documentElement.classList.contains("dark") ? "0.4" : "0.12"
 
     // Filter definitions
     const defs = svgSel.append("defs")
@@ -323,7 +319,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
       .attr("dx", 0)
       .attr("dy", 2)
       .attr("stdDeviation", 3)
-      .attr("flood-color", `rgba(0,0,0,${SHADOW_OPACITY})`)
+      .attr("flood-color", palette.shadow)
 
     svgSel.attr("width", width).attr("height", height)
 
@@ -383,7 +379,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
         return `M${sx},${sy} C${midX},${sy} ${midX},${ty2} ${tx2},${ty2}`
       })
       .attr("fill", "none")
-      .attr("stroke", LINK_COLOR)
+      .attr("stroke", palette.link)
       .attr("stroke-width", 2)
       .attr("stroke-linecap", "round")
       .attr("opacity", 0)
@@ -412,8 +408,8 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
       .attr("height", NODE_HEIGHT)
       .attr("rx", NODE_RADIUS)
       .attr("ry", NODE_RADIUS)
-      .attr("fill", (d) => (d.data.id === "virtual-root" ? NODE_FILL_ROOT : NODE_FILL))
-      .attr("stroke", (d) => (selectedNode?.id === d.data.id ? d.data.color || LINK_COLOR : "transparent"))
+      .attr("fill", (d) => (d.data.id === "virtual-root" ? palette.nodeFillRoot : palette.nodeFill))
+      .attr("stroke", (d) => (selectedNode?.id === d.data.id ? d.data.color || palette.link : "transparent"))
       .attr("stroke-width", 3)
       .attr("filter", "url(#soft-shadow)")
       .style("cursor", "pointer")
@@ -435,7 +431,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
       .attr("dy", "0.35em")
       .attr("font-size", 14)
       .attr("font-weight", 500)
-      .attr("fill", (d) => (d.data.id === "virtual-root" ? NODE_TEXT_ROOT : NODE_TEXT))
+      .attr("fill", palette.nodeText)
       .attr("pointer-events", "none")
       .style("font-family", "system-ui, -apple-system, sans-serif")
       .text((d) => {
@@ -466,7 +462,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
     toggleGroups
       .append("circle")
       .attr("r", TOGGLE_RADIUS)
-      .attr("fill", TOGGLE_FILL)
+      .attr("fill", palette.toggleFill)
       .attr("filter", "url(#soft-shadow)")
 
     toggleGroups
@@ -475,7 +471,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
       .attr("dy", "0.35em")
       .attr("font-size", 16)
       .attr("font-weight", 600)
-      .attr("fill", NODE_TEXT)
+      .attr("fill", palette.toggleText)
       .attr("pointer-events", "none")
       .text((d) => {
         const isCollapsed = collapsedIds.has(d.data.id)
@@ -496,7 +492,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
           .attr("cx", NODE_WIDTH / 2 - 14)
           .attr("cy", -NODE_HEIGHT / 2 + 14)
           .attr("r", badgeR)
-          .attr("fill", d.data.color || LINK_COLOR)
+          .attr("fill", d.data.color || palette.link)
         sel
           .append("text")
           .attr("x", NODE_WIDTH / 2 - 14)
@@ -509,7 +505,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
           .attr("pointer-events", "none")
           .text(text)
       })
-  }, [hierarchyData, containerSize, collapsedIds, selectedNode?.id, childCountMap, toggleCollapse, themeVersion])
+  }, [hierarchyData, containerSize, collapsedIds, selectedNode?.id, childCountMap, toggleCollapse, palette])
 
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
@@ -577,14 +573,23 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
                     className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
                   >
                     <option value="">بدون (عقدة رئيسية)</option>
-                    {eligibleParents.map((node) => (
-                      <option key={node.id} value={node.id}>
-                        {node.title}
-                      </option>
-                    ))}
+                    {localNodes.map((node) => {
+                      const depth = depthMap.get(node.id) || 1
+                      // A node can be a parent only if its depth < MAX_DEPTH,
+                      // because the new child will be at depth + 1.
+                      const disabled = depth >= MAX_DEPTH
+                      const indent = "— ".repeat(Math.max(0, depth - 1))
+                      return (
+                        <option key={node.id} value={node.id} disabled={disabled}>
+                          {indent}
+                          {node.title}
+                          {disabled ? "  (وصلت للحد الأقصى)" : ""}
+                        </option>
+                      )
+                    })}
                   </select>
                   <p className="text-xs text-muted-foreground">
-                    الحد الأقصى للتفرع: مستويان فقط تحت العقدة الرئيسية.
+                    الحد الأقصى للتسلسل هو {MAX_DEPTH} مستويات.
                   </p>
                 </div>
                 <div className="space-y-2">
@@ -623,6 +628,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
         <div
           ref={containerRef}
           className="flex-1 overflow-hidden relative bg-background"
+          style={isDark ? undefined : { background: palette.bg }}
           dir="ltr"
         >
           <svg ref={svgRef} className="w-full h-full" />
