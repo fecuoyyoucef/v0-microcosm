@@ -786,20 +786,6 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
                     )
                   })}
                 </div>
-                            <p
-                              className={cn(
-                                "text-sm truncate",
-                                hasUnread ? "text-foreground/70" : "text-muted-foreground",
-                              )}
-                            >
-                              {group.description || `${memberCounts[group.id] || 1} ${t.members}`}
-                            </p>
-                          </div>
-                        </div>
-                      </Link>
-                    )
-                  })}
-                </div>
               </div>
             )}
           </div>
