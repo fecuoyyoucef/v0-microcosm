@@ -164,6 +164,7 @@ function SingleImage({
 }) {
   const [ratio, setRatio] = useState<number | null>(null)
   const [loaded, setLoaded] = useState(false)
+  const [errored, setErrored] = useState(false)
 
   const handleLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget
@@ -173,6 +174,18 @@ function SingleImage({
       const clamped = Math.max(0.5, Math.min(1.91, raw))
       setRatio(clamped)
     }
+    setLoaded(true)
+  }
+
+  const handleError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    // Swallow the error event so it doesn't bubble up to window
+    // and appear as a generic {isTrusted: true} runtime error.
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.currentTarget.src !== window.location.origin + "/placeholder.svg") {
+      e.currentTarget.src = "/placeholder.svg"
+    }
+    setErrored(true)
     setLoaded(true)
   }
 
@@ -189,9 +202,11 @@ function SingleImage({
         loading="lazy"
         decoding="async"
         onLoad={handleLoad}
+        onError={handleError}
         className={cn(
           "h-full w-full object-cover transition-opacity duration-300",
           loaded ? "opacity-100" : "opacity-0",
+          errored && "opacity-50",
         )}
       />
       {!loaded && (
@@ -221,6 +236,15 @@ function MosaicTile({
 }) {
   const [loaded, setLoaded] = useState(false)
 
+  const handleError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.currentTarget.src !== window.location.origin + "/placeholder.svg") {
+      e.currentTarget.src = "/placeholder.svg"
+    }
+    setLoaded(true)
+  }
+
   return (
     <button
       onClick={onClick}
@@ -236,6 +260,7 @@ function MosaicTile({
         loading="lazy"
         decoding="async"
         onLoad={() => setLoaded(true)}
+        onError={handleError}
         className={cn(
           "h-full w-full object-cover transition-all duration-300 group-hover:scale-[1.03]",
           loaded ? "opacity-100" : "opacity-0",
@@ -308,8 +333,10 @@ function Lightbox({
   const current = images[currentIndex]
 
   const handleDownload = async () => {
+    if (!current?.url) return
     try {
       const res = await fetch(current.url)
+      if (!res.ok) throw new Error("Download failed")
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
@@ -454,6 +481,14 @@ function ZoomableImage({
     lastTapRef.current = now
   }
 
+  const handleError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.currentTarget.src !== window.location.origin + "/placeholder.svg") {
+      e.currentTarget.src = "/placeholder.svg"
+    }
+  }
+
   return (
     <div
       ref={containerRef}
@@ -465,6 +500,7 @@ function ZoomableImage({
         alt={alt}
         draggable={false}
         loading={active ? "eager" : "lazy"}
+        onError={handleError}
         className={cn(
           "max-h-full max-w-full select-none object-contain transition-transform duration-300 ease-out",
           zoomed ? "scale-[2] cursor-zoom-out" : "scale-100 cursor-zoom-in",

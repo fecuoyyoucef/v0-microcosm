@@ -109,18 +109,27 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js').then(
-                    function(registration) {
-                      console.log('ServiceWorker registration successful');
-                    },
-                    function(err) {
-                      console.log('ServiceWorker registration failed: ', err);
-                    }
-                  );
-                });
-              }
+              (function () {
+                if (!('serviceWorker' in navigator)) return;
+                try {
+                  window.addEventListener('load', function () {
+                    navigator.serviceWorker
+                      .register('/sw.js')
+                      .then(function () {
+                        // success — no-op
+                      })
+                      .catch(function (err) {
+                        // Silenced: don't let SW registration failures
+                        // surface as unhandled rejections in the runtime overlay.
+                        if (typeof err === 'object' && err && 'message' in err) {
+                          console.warn('[SW] registration failed:', err.message);
+                        }
+                      });
+                  });
+                } catch (e) {
+                  // ignore — environment doesn't support SW
+                }
+              })();
             `,
           }}
         />
