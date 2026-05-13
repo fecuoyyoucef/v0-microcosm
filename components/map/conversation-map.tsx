@@ -39,12 +39,9 @@ const TOGGLE_GAP = 10 // gap between node edge and toggle button
 const LEVEL_GAP = 280 // horizontal distance between levels
 const SIBLING_GAP = 24 // vertical gap between siblings
 
-const NODE_FILL = "#2C3540" // dark slate, matches reference
-const NODE_FILL_ROOT = "#574F6E" // lavender root, matches reference
-const NODE_TEXT = "#FFFFFF"
-const LINK_COLOR = "#A8B5E8" // soft lavender-blue
-const BG_COLOR = "#FAFAF7" // warm off-white background
-const TOGGLE_FILL = "#2C3540"
+// Colors are theme-aware via CSS variables — values resolved at render time
+// from computed styles so SVG attributes get real color values.
+const MAX_DEPTH = 2 // root (group) → level 1 (parent) → level 2 (child) → level 3 (secondary). Beyond level 2 is not allowed.
 
 interface HierarchyNodeData {
   id: string
@@ -122,6 +119,15 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
 
   const createNode = async () => {
     if (!newNodeTitle.trim()) return
+    // Enforce depth limit: a new node attached to a parent at depth d will be at depth d+1.
+    // We allow at most MAX_DEPTH, so the parent must be at depth < MAX_DEPTH.
+    if (newNodeParent) {
+      const parentDepth = depthMap.get(newNodeParent) ?? 1
+      if (parentDepth >= MAX_DEPTH) {
+        console.error("Cannot create node: parent is already at max depth")
+        return
+      }
+    }
     setIsCreating(true)
     try {
       const { error } = await supabase.from("conversation_nodes").insert({
@@ -229,6 +235,28 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
     return map
   }, [localNodes])
 
+  // Depth of each node (root-level nodes are depth 1; their children are depth 2, etc.)
+  // The virtual group root is depth 0.
+  const depthMap = useMemo(() => {
+    const map = new Map<string, number>()
+    const visit = (id: string, depth: number) => {
+      map.set(id, depth)
+      localNodes
+        .filter((x) => x.parent_id === id)
+        .forEach((child) => visit(child.id, depth + 1))
+    }
+    localNodes.filter((n) => !n.parent_id).forEach((root) => visit(root.id, 1))
+    return map
+  }, [localNodes])
+
+  // Eligible parents for the create-node dialog: only nodes whose depth allows
+  // adding a child without exceeding MAX_DEPTH. depth=1 can host depth=2 children.
+  // depth=2 cannot host depth=3 children, so it's excluded.
+  const eligibleParents = useMemo(
+    () => localNodes.filter((n) => (depthMap.get(n.id) ?? 1) < MAX_DEPTH),
+    [localNodes, depthMap],
+  )
+
   const fitToScreen = useCallback(() => {
     if (!svgRef.current || !zoomRef.current || !gRef.current) return
     const svg = d3.select(svgRef.current)
@@ -251,6 +279,15 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
     d3.select(svgRef.current).transition().duration(250).call(zoomRef.current.scaleBy, 0.7)
   }, [])
 
+  // Track theme (light/dark) so SVG re-renders when the user toggles theme
+  const [themeVersion, setThemeVersion] = useState(0)
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const observer = new MutationObserver(() => setThemeVersion((v) => v + 1))
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] })
+    return () => observer.disconnect()
+  }, [])
+
   // Main render effect
   useEffect(() => {
     if (!svgRef.current || !hierarchyData) return
@@ -259,6 +296,20 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
     const height = containerSize.height
     const svgSel = d3.select(svgRef.current)
     svgSel.selectAll("*").remove()
+
+    // Resolve theme colors from CSS variables at render time
+    const css = getComputedStyle(document.documentElement)
+    const v = (name: string, fallback: string) => {
+      const val = css.getPropertyValue(name).trim()
+      return val || fallback
+    }
+    const NODE_FILL = v("--card", "#2C3540")
+    const NODE_TEXT = v("--card-foreground", "#FFFFFF")
+    const NODE_FILL_ROOT = v("--primary", "#574F6E")
+    const NODE_TEXT_ROOT = v("--primary-foreground", "#FFFFFF")
+    const LINK_COLOR = v("--border", "#A8B5E8")
+    const TOGGLE_FILL = NODE_FILL
+    const SHADOW_OPACITY = document.documentElement.classList.contains("dark") ? "0.4" : "0.12"
 
     // Filter definitions
     const defs = svgSel.append("defs")
@@ -272,7 +323,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
       .attr("dx", 0)
       .attr("dy", 2)
       .attr("stdDeviation", 3)
-      .attr("flood-color", "rgba(0,0,0,0.12)")
+      .attr("flood-color", `rgba(0,0,0,${SHADOW_OPACITY})`)
 
     svgSel.attr("width", width).attr("height", height)
 
@@ -384,7 +435,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
       .attr("dy", "0.35em")
       .attr("font-size", 14)
       .attr("font-weight", 500)
-      .attr("fill", NODE_TEXT)
+      .attr("fill", (d) => (d.data.id === "virtual-root" ? NODE_TEXT_ROOT : NODE_TEXT))
       .attr("pointer-events", "none")
       .style("font-family", "system-ui, -apple-system, sans-serif")
       .text((d) => {
@@ -458,7 +509,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
           .attr("pointer-events", "none")
           .text(text)
       })
-  }, [hierarchyData, containerSize, collapsedIds, selectedNode?.id, childCountMap, toggleCollapse])
+  }, [hierarchyData, containerSize, collapsedIds, selectedNode?.id, childCountMap, toggleCollapse, themeVersion])
 
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
@@ -526,12 +577,15 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
                     className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
                   >
                     <option value="">بدون (عقدة رئيسية)</option>
-                    {localNodes.map((node) => (
+                    {eligibleParents.map((node) => (
                       <option key={node.id} value={node.id}>
                         {node.title}
                       </option>
                     ))}
                   </select>
+                  <p className="text-xs text-muted-foreground">
+                    الحد الأقصى للتفرع: مستويان فقط تحت العقدة الرئيسية.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label>اللون</Label>
@@ -568,8 +622,7 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
       <div className="flex-1 flex overflow-hidden min-h-0">
         <div
           ref={containerRef}
-          className="flex-1 overflow-hidden relative"
-          style={{ background: BG_COLOR }}
+          className="flex-1 overflow-hidden relative bg-background"
           dir="ltr"
         >
           <svg ref={svgRef} className="w-full h-full" />
