@@ -228,5 +228,27 @@ async function syncNotifications() {
 self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SKIP_WAITING") {
     self.skipWaiting()
+    return
+  }
+
+  // Clear any tray notifications belonging to a given cell.
+  if (event.data && event.data.type === "clearCellNotifications") {
+    const groupId = event.data.groupId
+    if (!groupId) return
+    event.waitUntil(
+      (async () => {
+        try {
+          const tag = "notif-group-" + groupId
+          const byTag = await self.registration.getNotifications({ tag })
+          byTag.forEach((n) => n.close())
+          const all = await self.registration.getNotifications()
+          all.forEach((n) => {
+            if (n.data && n.data.groupId === groupId) n.close()
+          })
+        } catch (err) {
+          console.error("[SW] Failed to clear cell notifications:", err)
+        }
+      })(),
+    )
   }
 })

@@ -97,11 +97,20 @@ export function ChatContainer({
       }
 
       // Also clear any push notifications still showing in the system tray
-      // for this cell — otherwise Android keeps them until the user taps.
+      // for this cell. We broadcast to every registered SW because the page
+      // may be controlled by sw.js while notifications are owned by
+      // firebase-messaging-sw.js (or vice-versa) — `serviceWorker.ready` only
+      // returns one of them, so a single postMessage often misses the SW
+      // that's actually holding the notification.
       if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
         try {
-          const reg = await navigator.serviceWorker.ready
-          reg.active?.postMessage({ type: "clearCellNotifications", groupId })
+          const regs = await navigator.serviceWorker.getRegistrations()
+          const msg = { type: "clearCellNotifications", groupId }
+          for (const reg of regs) {
+            const target = reg.active || reg.waiting || reg.installing
+            target?.postMessage(msg)
+          }
+          navigator.serviceWorker.controller?.postMessage(msg)
         } catch {
           // SW not available; ignore.
         }
