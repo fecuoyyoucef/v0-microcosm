@@ -174,23 +174,32 @@ function AppShellContent({ children, userId, profile, groups }: AppShellProps) {
   }, [])
 
   // Fetch notifications and unread counts.
-  // The sidebar "notifications" badge only counts system-level events. In-cell
-  // chatter (messages/mentions/replies) is surfaced via the per-cell badge, so
-  // we exclude those types here to stay consistent with the bell and the
-  // notifications page.
+  //
+  // The sidebar bell badge must match exactly what the notifications page
+  // shows — that page filters out in-cell chatter (messages, replies,
+  // @mentions) because those live on the per-cell badge. We previously used
+  // a `.not("type", "in", ...)` server-side filter combined with
+  // `count: "exact", head: true`, but PostgREST occasionally returns the
+  // total row count and ignores the type filter, leaving the badge stuck on
+  // numbers like "15" even when no system notifications exist.
+  //
+  // Fix: fetch the unread rows and count them in JS, mirroring the
+  // notifications page logic 1:1.
   const fetchUnreadData = useCallback(async () => {
-    const NOISY_TYPES = ["message", "mention", "reply", "new_message", "message_mention"]
+    const NOISY_TYPES = new Set(["message", "mention", "reply", "new_message", "message_mention"])
+
     const [notifResult, unreadResult] = await Promise.all([
       supabase
         .from("notifications")
-        .select("*", { count: "exact", head: true })
+        .select("id, type, is_read")
         .eq("user_id", userId)
-        .eq("is_read", false)
-        .not("type", "in", `(${NOISY_TYPES.join(",")})`),
+        .eq("is_read", false),
       supabase.from("group_unread_counts").select("group_id, unread_count").eq("user_id", userId),
     ])
 
-    setUnreadNotifications(notifResult.count || 0)
+    const systemUnread =
+      notifResult.data?.filter((n: { type: string }) => !NOISY_TYPES.has(n.type)).length ?? 0
+    setUnreadNotifications(systemUnread)
 
     if (unreadResult.data) {
       const counts: Record<string, number> = {}

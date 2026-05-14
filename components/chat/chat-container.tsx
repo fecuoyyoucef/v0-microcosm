@@ -95,6 +95,17 @@ export function ChatContainer({
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("notifications:refresh"))
       }
+
+      // Also clear any push notifications still showing in the system tray
+      // for this cell — otherwise Android keeps them until the user taps.
+      if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+        try {
+          const reg = await navigator.serviceWorker.ready
+          reg.active?.postMessage({ type: "clearCellNotifications", groupId })
+        } catch {
+          // SW not available; ignore.
+        }
+      }
     } catch (error) {
       console.error("Error marking cell notifications as read:", error)
     }
