@@ -219,8 +219,16 @@ function AppShellContent({ children, userId, profile, groups }: AppShellProps) {
       )
       .subscribe()
 
+    // Listen for the manual refresh signal dispatched by chat-container after
+    // it marks a cell's notifications as read. Realtime UPDATE events on the
+    // notifications table are often missed (WS reconnects, REPLICA IDENTITY
+    // not set to FULL), so we don't rely on them alone.
+    const handleRefresh = () => fetchUnreadData()
+    window.addEventListener("notifications:refresh", handleRefresh)
+
     return () => {
       supabase.removeChannel(channel)
+      window.removeEventListener("notifications:refresh", handleRefresh)
     }
   }, [userId, supabase, fetchUnreadData])
 
