@@ -491,6 +491,15 @@ export function ChatContainer({
           })
           setTimeout(scrollToBottom, 100)
           fetchNodes()
+
+          // The user is actively viewing this cell, so any unread counter / notification
+          // produced by the DB trigger for this incoming message must be cleared right
+          // away — otherwise the cell badge and the bell stay stuck until the page is
+          // refreshed or the user leaves and re-opens the cell.
+          if (document.visibilityState === "visible") {
+            resetUnreadCount()
+            markCellNotificationsAsRead()
+          }
         },
       )
       .on(

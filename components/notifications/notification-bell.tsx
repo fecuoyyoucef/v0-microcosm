@@ -17,6 +17,18 @@ interface NotificationBellProps {
   userId: string
 }
 
+// In-cell chatter (regular messages, replies, @mentions) is surfaced via the
+// per-cell unread badge in the sidebar, not the global bell. Keep the bell
+// focused on system-level events: decisions, memory digests, achievements,
+// invitations, announcements, etc.
+const NOISY_NOTIFICATION_TYPES = new Set([
+  "message",
+  "mention",
+  "reply",
+  "new_message",
+  "message_mention",
+])
+
 const translations = {
   ar: {
     notifications: "الإشعارات",
@@ -158,7 +170,9 @@ export function NotificationBell({ userId }: NotificationBellProps) {
     }
 
     if (data) {
-      const mapped = (data as EnrichedRow[]).map(rowToNotification)
+      const mapped = (data as EnrichedRow[])
+        .map(rowToNotification)
+        .filter((n) => !NOISY_NOTIFICATION_TYPES.has(n.type))
       setNotifications(mapped)
       setUnreadCount(mapped.filter((n) => !n.is_read).length)
     }
@@ -205,6 +219,10 @@ export function NotificationBell({ userId }: NotificationBellProps) {
               .eq("id", raw.id)
             return
           }
+
+          // The bell only surfaces system-level events. In-cell chatter
+          // (messages/mentions/replies) lives on the per-cell badge.
+          if (NOISY_NOTIFICATION_TYPES.has(raw.type)) return
 
           const enriched = await fetchEnrichedById(raw.id)
           if (!enriched) return
