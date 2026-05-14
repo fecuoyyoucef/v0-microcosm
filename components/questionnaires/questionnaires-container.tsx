@@ -11,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Plus, Send, BarChart3, Loader2, ArrowLeft, Trash2 } from "lucide-react"
-import { useSettings } from "@/hooks/use-settings"
+import { useSettings } from "@/components/settings-provider"
 import { cn } from "@/lib/utils"
 
 const translations = {
