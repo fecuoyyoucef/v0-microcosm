@@ -53,6 +53,14 @@ export async function GET() {
 
     if (!convError && conversations) {
       conversations.forEach((conv: any) => {
+        // Skip inquiry-only conversations (no escalation and no detected issue).
+        // These are pure Q&A and shouldn't pollute the bug ticket queue.
+        // Report-mode conversations create a structured row in user_issue_reports
+        // which is included separately below — so we only surface a conversation
+        // here if it carries an issue signal but wasn't successfully escalated.
+        if (!conv.escalated_to_admin && !conv.issue_detected) {
+          return
+        }
         // استخراج أول رسالة من المستخدم كعنوان
         let title = "محادثة دعم"
         let description = ""

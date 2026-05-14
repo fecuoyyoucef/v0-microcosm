@@ -76,6 +76,16 @@ const translations = {
     sendMessage: "إرسال",
     typeMessage: "اكتب رسالتك...",
     supportTitle: "دعم العملاء",
+    supportChooseMode: "كيف يمكنني مساعدتك؟",
+    supportModeInquiry: "استفسار",
+    supportModeInquiryDesc: "أسأل عن ميزة أو كيفية استخدام التطبيق",
+    supportModeReport: "إبلاغ عن مشكلة",
+    supportModeReportDesc: "واجهت خطأ أو مشكلة في التطبيق",
+    supportBack: "رجوع",
+    supportInquiryWelcome: "مرحباً! كيف أستطيع مساعدتك اليوم؟ اسألني عن أي ميزة أو كيفية استخدام التطبيق.",
+    supportReportWelcome:
+      "أهلاً بك. سأساعدك في الإبلاغ عن المشكلة. صف لي ما حدث بأكبر قدر من التفاصيل، وسأطرح عليك بعض الأسئلة لجمع المعلومات اللازمة.",
+    supportReportSubmitted: "تم استلام بلاغك بنجاح. سيراجعه فريق التطوير قريباً. شكراً لمساعدتنا في تحسين التطبيق.",
     joinByInvite: "انضم بدعوة",
     inviteLinkPlaceholder: "الصق رابط الدعوة هنا...",
     join: "انضم",
@@ -117,6 +127,16 @@ const translations = {
     sendMessage: "Send",
     typeMessage: "Type your message...",
     supportTitle: "Customer Support",
+    supportChooseMode: "How can I help you?",
+    supportModeInquiry: "Ask a question",
+    supportModeInquiryDesc: "Learn about a feature or how to use the app",
+    supportModeReport: "Report a problem",
+    supportModeReportDesc: "I encountered a bug or issue",
+    supportBack: "Back",
+    supportInquiryWelcome: "Hello! How can I help you today? Ask me about any feature or how to use the app.",
+    supportReportWelcome:
+      "Welcome. I'll help you report the issue. Describe what happened in as much detail as possible, and I'll ask follow-up questions.",
+    supportReportSubmitted: "Your report has been received. The development team will review it soon. Thank you for helping us improve.",
     joinByInvite: "Join by Invite",
     inviteLinkPlaceholder: "Paste invite link here...",
     join: "Join",
@@ -158,6 +178,16 @@ const translations = {
     sendMessage: "Envoyer",
     typeMessage: "Votre message...",
     supportTitle: "Support Client",
+    supportChooseMode: "Comment puis-je vous aider ?",
+    supportModeInquiry: "Poser une question",
+    supportModeInquiryDesc: "Découvrir une fonctionnalité ou comment utiliser l'app",
+    supportModeReport: "Signaler un problème",
+    supportModeReportDesc: "J'ai rencontré un bug ou un souci",
+    supportBack: "Retour",
+    supportInquiryWelcome: "Bonjour ! Comment puis-je vous aider aujourd'hui ?",
+    supportReportWelcome:
+      "Bienvenue. Je vais vous aider à signaler ce problème. Décrivez ce qui s'est passé en détail, je vous poserai quelques questions.",
+    supportReportSubmitted: "Votre signalement a été reçu. L'équipe le passera en revue prochainement. Merci de nous aider à améliorer.",
     joinByInvite: "Rejoindre par invitation",
     inviteLinkPlaceholder: "Collez le lien...",
     join: "Rejoindre",
@@ -194,14 +224,31 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
   const [memberCounts, setMemberCounts] = useState<Record<string, number>>({})
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
   const [showSupportDialog, setShowSupportDialog] = useState(false)
+  // null = the user hasn't picked a mode yet (the picker is shown). Otherwise
+  // the chat surface is rendered with mode-specific behaviour.
+  const [supportMode, setSupportMode] = useState<"inquiry" | "report" | null>(null)
   const [supportMessages, setSupportMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([])
   const [supportInput, setSupportInput] = useState("")
   const [isSendingSupport, setIsSendingSupport] = useState(false)
+  // When the AI finalises a report, lock the input and show a success state.
+  const [reportSubmitted, setReportSubmitted] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
   const [inviteLink, setInviteLink] = useState("")
   const [isJoining, setIsJoining] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
+
+  // Reset support dialog state when it opens or closes to ensure clean slates.
+  useEffect(() => {
+    if (!showSupportDialog) {
+      // Dialog just closed → reset everything for next time.
+      setSupportMode(null)
+      setSupportMessages([])
+      setSupportInput("")
+      setConversationId(null)
+      setReportSubmitted(false)
+    }
+  }, [showSupportDialog])
   const [isLoading, setIsLoading] = useState(true)
 
   // ----- Sort state -----
@@ -450,6 +497,10 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
           message: userMessage,
           conversationId,
           history: supportMessages,
+          mode: supportMode ?? "inquiry",
+          language,
+          pageUrl: typeof window !== "undefined" ? window.location.href : null,
+          userAgent: typeof navigator !== "undefined" ? navigator.userAgent : null,
         }),
       })
 
@@ -460,6 +511,12 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
         setSupportMessages((prev) => [...prev, { role: "assistant", content: cleanedResponse }])
         if (data.conversationId) {
           setConversationId(data.conversationId)
+        }
+        // In report mode, the API signals when it has enough info and created
+        // a structured ticket. Lock the input and append a success notice.
+        if (data.reportSubmitted) {
+          setReportSubmitted(true)
+          setSupportMessages((prev) => [...prev, { role: "assistant", content: t.supportReportSubmitted }])
         }
       } else if (data.error) {
         setSupportMessages((prev) => [...prev, { role: "assistant", content: "عذراً، حدث خطأ. حاول مرة أخرى." }])
@@ -904,55 +961,126 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
       {/* Support Dialog */}
       <Dialog open={showSupportDialog} onOpenChange={setShowSupportDialog}>
         <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col p-0 overflow-hidden">
-          <DialogHeader className="px-6 pt-6 pb-4 shrink-0">
-            <DialogTitle>{t.supportTitle}</DialogTitle>
-            <DialogDescription>{t.supportDesc}</DialogDescription>
-          </DialogHeader>
-          <div className="flex-1 min-h-0 overflow-y-auto px-6">
-            <div className="space-y-4 pb-4">
-              {supportMessages.length === 0 ? (
-                <div className="text-center text-muted-foreground py-8">
-                  <MessageCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">{t.supportDesc}</p>
-                </div>
-              ) : (
-                supportMessages.map((msg, idx) => (
-                  <div key={idx} className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}>
-                    <div
-                      className={cn(
-                        "p-3 rounded-xl max-w-[280px] break-words",
-                        msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted",
-                      )}
-                      style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}
-                    >
-                      <MarkdownRenderer
-                        content={msg.content}
-                        className={msg.role === "user" ? "prose-sm text-primary-foreground" : "prose-sm"}
-                      />
-                    </div>
+          {supportMode === null ? (
+            // Step 1: pick a mode before the chat opens.
+            <>
+              <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
+                <DialogTitle>{t.supportTitle}</DialogTitle>
+                <DialogDescription>{t.supportChooseMode}</DialogDescription>
+              </DialogHeader>
+              <div className="px-6 pb-6 pt-4 flex flex-col gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSupportMode("inquiry")
+                    setSupportMessages([{ role: "assistant", content: t.supportInquiryWelcome }])
+                  }}
+                  className="flex items-start gap-3 p-4 rounded-xl border border-border/60 hover:border-primary/50 hover:bg-primary/5 transition-colors text-start"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                    <MessageCircle className="w-5 h-5 text-primary" />
                   </div>
-                ))
-              )}
-            </div>
-          </div>
-          <div className="flex gap-2 px-6 pb-6 pt-4 shrink-0 border-t">
-            <Input
-              value={supportInput}
-              onChange={(e) => setSupportInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendSupportMessage()}
-              placeholder={t.typeMessage}
-              className="rounded-xl"
-              disabled={isSendingSupport}
-            />
-            <Button
-              onClick={sendSupportMessage}
-              disabled={!supportInput.trim() || isSendingSupport}
-              size="icon"
-              className="rounded-xl shrink-0"
-            >
-              {isSendingSupport ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
-            </Button>
-          </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium">{t.supportModeInquiry}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{t.supportModeInquiryDesc}</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSupportMode("report")
+                    setSupportMessages([{ role: "assistant", content: t.supportReportWelcome }])
+                  }}
+                  className="flex items-start gap-3 p-4 rounded-xl border border-border/60 hover:border-destructive/50 hover:bg-destructive/5 transition-colors text-start"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center shrink-0">
+                    <MessageCircle className="w-5 h-5 text-destructive" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium">{t.supportModeReport}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{t.supportModeReportDesc}</div>
+                  </div>
+                </button>
+              </div>
+            </>
+          ) : (
+            // Step 2: chat surface for the picked mode.
+            <>
+              <DialogHeader className="px-6 pt-6 pb-4 shrink-0">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <DialogTitle className="truncate">
+                      {supportMode === "report" ? t.supportModeReport : t.supportModeInquiry}
+                    </DialogTitle>
+                    <DialogDescription className="truncate">
+                      {supportMode === "report" ? t.supportModeReportDesc : t.supportModeInquiryDesc}
+                    </DialogDescription>
+                  </div>
+                  {!reportSubmitted && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        // Allow the user to switch mode mid-conversation; reset state.
+                        setSupportMode(null)
+                        setSupportMessages([])
+                        setConversationId(null)
+                      }}
+                      className="shrink-0 text-xs"
+                    >
+                      {t.supportBack}
+                    </Button>
+                  )}
+                </div>
+              </DialogHeader>
+              <div className="flex-1 min-h-0 overflow-y-auto px-6">
+                <div className="space-y-4 pb-4">
+                  {supportMessages.map((msg, idx) => (
+                    <div key={idx} className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}>
+                      <div
+                        className={cn(
+                          "p-3 rounded-xl max-w-[280px] break-words",
+                          msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted",
+                        )}
+                        style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}
+                      >
+                        <MarkdownRenderer
+                          content={msg.content}
+                          className={msg.role === "user" ? "prose-sm text-primary-foreground" : "prose-sm"}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  {isSendingSupport && (
+                    <div className="flex justify-start">
+                      <div className="p-3 rounded-xl bg-muted">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-2 px-6 pb-6 pt-4 shrink-0 border-t">
+                <Input
+                  value={supportInput}
+                  onChange={(e) => setSupportInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendSupportMessage()}
+                  placeholder={t.typeMessage}
+                  className="rounded-xl"
+                  disabled={isSendingSupport || reportSubmitted}
+                />
+                <Button
+                  onClick={sendSupportMessage}
+                  disabled={!supportInput.trim() || isSendingSupport || reportSubmitted}
+                  size="icon"
+                  className="rounded-xl shrink-0"
+                >
+                  {isSendingSupport ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
+                </Button>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
