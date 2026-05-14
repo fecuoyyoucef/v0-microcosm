@@ -173,14 +173,20 @@ function AppShellContent({ children, userId, profile, groups }: AppShellProps) {
     return () => document.removeEventListener("keydown", down)
   }, [])
 
-  // Fetch notifications and unread counts
+  // Fetch notifications and unread counts.
+  // The sidebar "notifications" badge only counts system-level events. In-cell
+  // chatter (messages/mentions/replies) is surfaced via the per-cell badge, so
+  // we exclude those types here to stay consistent with the bell and the
+  // notifications page.
   const fetchUnreadData = useCallback(async () => {
+    const NOISY_TYPES = ["message", "mention", "reply", "new_message", "message_mention"]
     const [notifResult, unreadResult] = await Promise.all([
       supabase
         .from("notifications")
         .select("*", { count: "exact", head: true })
         .eq("user_id", userId)
-        .eq("is_read", false),
+        .eq("is_read", false)
+        .not("type", "in", `(${NOISY_TYPES.join(",")})`),
       supabase.from("group_unread_counts").select("group_id, unread_count").eq("user_id", userId),
     ])
 
