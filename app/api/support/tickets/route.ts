@@ -1,9 +1,11 @@
-import { systemMonitor } from "@/lib/ai-agents/monitoring"
+import { monitorNewTicket } from "@/lib/agents/monitor"
 
 export async function POST(request: Request) {
-  const ticket = await request.json() // Declare the ticket variable
+  const ticket = await request.json()
 
-  if (ticket && ticket.category === "report") {
-    systemMonitor.monitorReport(ticket.id).catch(console.error)
+  if (ticket?.id) {
+    void monitorNewTicket(ticket.id)
   }
+
+  return new Response(null, { status: 204 })
 }

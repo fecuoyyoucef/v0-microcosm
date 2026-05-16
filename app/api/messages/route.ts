@@ -1,10 +1,12 @@
-import { systemMonitor } from "@/lib/ai-agents/monitoring"
+import { monitorNewMessage } from "@/lib/agents/monitor"
 
 export async function POST(request: Request) {
-  const newMessage = await request.json() // Assuming newMessage is obtained from the request body
+  const newMessage = await request.json()
 
-  if (newMessage) {
-    // Run monitoring in background
-    systemMonitor.monitorMessage(newMessage.id).catch(console.error)
+  if (newMessage?.id) {
+    // Fire and forget — the runtime handles its own errors.
+    void monitorNewMessage(newMessage.id)
   }
+
+  return new Response(null, { status: 204 })
 }
