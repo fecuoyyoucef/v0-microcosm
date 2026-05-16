@@ -1,45 +1,38 @@
 /**
- * Shared auth helper for the /api/agents/* routes.
+ * Auth gate for the /api/agents/* routes.
  *
- * Every agent endpoint must verify that the caller is an authenticated
- * admin. We return either a `userId` (admin authorized) or a `Response`
- * the route should return verbatim.
+ * The app uses a custom signed-cookie admin session (see lib/admin-auth.ts),
+ * NOT Supabase Auth — we go through `verifyAdmin()` which validates the
+ * cookie against the `admins` table.
+ *
+ * Returns either an `admin` payload or a `response` the route should send.
  */
 
-import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { verifyAdmin, verifySuperAdmin, type AdminSession } from "@/lib/admin-auth"
 
 export interface AdminAuthResult {
-  userId: string | null
+  admin: AdminSession | null
   response: Response | null
 }
 
 export async function requireAdmin(): Promise<AdminAuthResult> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  const admin = await verifyAdmin()
+  if (!admin) {
     return {
-      userId: null,
+      admin: null,
       response: Response.json({ error: "Unauthorized" }, { status: 401 }),
     }
   }
+  return { admin, response: null }
+}
 
-  // Use the service client for the role check so RLS can't hide the row.
-  const svc = createServiceClient()
-  const { data: profile, error } = await svc
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single()
-
-  if (error || profile?.role !== "admin") {
+export async function requireSuperAdmin(): Promise<AdminAuthResult> {
+  const admin = await verifySuperAdmin()
+  if (!admin) {
     return {
-      userId: user.id,
-      response: Response.json({ error: "Forbidden" }, { status: 403 }),
+      admin: null,
+      response: Response.json({ error: "Forbidden — owner access required" }, { status: 403 }),
     }
   }
-
-  return { userId: user.id, response: null }
+  return { admin, response: null }
 }

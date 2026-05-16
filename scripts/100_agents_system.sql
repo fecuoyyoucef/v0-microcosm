@@ -19,7 +19,9 @@ create table if not exists public.agents (
 create table if not exists public.agent_runs (
   id uuid primary key default gen_random_uuid(),
   agent_id text not null references public.agents(id) on delete cascade,
-  user_id uuid references auth.users(id) on delete set null,
+  -- text (not uuid + FK) because admins use a custom session system
+  -- managed in public.admins, not auth.users.
+  user_id text,
   trigger text not null,                     -- "manual" | "cron" | "event" | "user"
   input jsonb not null default '{}'::jsonb,
   output jsonb,
@@ -69,7 +71,7 @@ create table if not exists public.agent_approvals (
   reason text,
   requested_at timestamptz not null default now(),
   decided_at timestamptz,
-  decided_by uuid references auth.users(id) on delete set null,
+  decided_by text, -- public.admins.id, not auth.users.id
   expires_at timestamptz not null default (now() + interval '24 hours')
 );
 create index if not exists agent_approvals_pending_idx
@@ -120,7 +122,11 @@ on conflict (id) do update
       model = excluded.model,
       updated_at = now();
 
--- ---- RLS: admin-only access ------------------------------------------
+-- ---- RLS: service-role only ------------------------------------------
+-- The app uses a custom admin session (see lib/admin-auth.ts) that does NOT
+-- map to auth.uid(), so we deliberately enable RLS with no permissive
+-- policies. All reads/writes go through the service role on the server,
+-- gated by requireAdmin() in API routes.
 alter table public.agents              enable row level security;
 alter table public.agent_runs          enable row level security;
 alter table public.agent_tool_calls    enable row level security;
@@ -128,15 +134,7 @@ alter table public.agent_approvals     enable row level security;
 alter table public.agent_snapshots     enable row level security;
 alter table public.agent_memory        enable row level security;
 
--- Helper: is the current user an admin? Mirrors what the app already checks.
-create or replace function public.is_agent_admin() returns boolean
-language sql stable security definer set search_path = public as $$
-  select exists (
-    select 1 from public.profiles
-    where id = auth.uid() and role = 'admin'
-  );
-$$;
-
+-- Drop any legacy policies from earlier migrations just in case.
 do $$
 declare t text;
 begin
@@ -147,10 +145,5 @@ begin
     ])
   loop
     execute format('drop policy if exists %I_admin_all on public.%I', t, t);
-    execute format(
-      'create policy %I_admin_all on public.%I for all to authenticated '
-      'using (public.is_agent_admin()) with check (public.is_agent_admin())',
-      t, t
-    );
   end loop;
 end $$;

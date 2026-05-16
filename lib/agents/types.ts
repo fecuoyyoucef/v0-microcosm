@@ -90,6 +90,8 @@ export interface RunOptions {
   jsonMode?: boolean
   /** Forward identifying info for audit logs. */
   userId?: string | null
-  /** Free-form context stored on the agent_decisions row. */
+  /** Free-form context stored on the run row. */
   context?: string
+  /** What kicked off the run — defaults to "manual". */
+  trigger?: "manual" | "cron" | "event" | "user"
 }

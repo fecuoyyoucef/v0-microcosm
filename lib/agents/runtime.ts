@@ -17,7 +17,7 @@
 
 import { chatCompletion, GroqError } from "./groq-client"
 import { executeTool } from "./tools/executor"
-import { logRun, logToolExecution } from "./monitoring"
+import { finishRun, logToolExecution, startRun } from "./monitoring"
 import type {
   AgentRun,
   ChatMessage,
@@ -47,6 +47,18 @@ export async function runAgent(opts: RunOptions): Promise<AgentRun> {
   let finalText: string | null = null
   let iteration = 0
   let lastError: string | undefined
+
+  // Open the run row up front so it shows in the dashboard while in progress.
+  await startRun({
+    runId,
+    agentId: opts.agent,
+    trigger: opts.trigger ?? "manual",
+    inputData: {
+      messages: opts.messages,
+      context: opts.context ?? null,
+    },
+    userId: opts.userId ?? null,
+  }).catch((e) => console.error("[agents] startRun failed:", e))
 
   try {
     while (iteration < maxIterations) {
@@ -85,6 +97,7 @@ export async function runAgent(opts: RunOptions): Promise<AgentRun> {
         })
 
         for (const call of assistantMsg.tool_calls) {
+          const callStart = Date.now()
           const { name, args, result } = await executeOneCall(call)
           toolCallsLog.push({ name, args, result })
 
@@ -92,9 +105,11 @@ export async function runAgent(opts: RunOptions): Promise<AgentRun> {
           // logging fails we still continue the loop.
           await logToolExecution({
             runId,
+            agentId: opts.agent,
             toolName: name,
             args,
             result,
+            durationMs: Date.now() - callStart,
           }).catch((e) => console.error("[agents] tool log failed:", e))
 
           messages.push({
@@ -150,8 +165,8 @@ export async function runAgent(opts: RunOptions): Promise<AgentRun> {
     error: lastError,
   }
 
-  await logRun(run, opts.context).catch((e) =>
-    console.error("[agents] run log failed:", e),
+  await finishRun(run, opts.context).catch((e) =>
+    console.error("[agents] finishRun failed:", e),
   )
 
   return run

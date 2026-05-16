@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     .update({
       status: decision,
       decided_at: new Date().toISOString(),
-      decided_by: auth.userId,
+      decided_by: auth.admin!.id,
       reason: reason ?? null,
     })
     .eq("id", id)

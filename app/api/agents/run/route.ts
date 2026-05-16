@@ -45,7 +45,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const run = await dispatch(agent, input, auth.userId!, body.context)
+    const run = await dispatch(agent, input, auth.admin!.id, body.context)
     return Response.json({ run })
   } catch (err) {
     console.error("[agents:run] failed:", err)
