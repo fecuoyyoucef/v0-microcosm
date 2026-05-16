@@ -105,8 +105,27 @@ export async function GET(request: NextRequest) {
 
     const errorGroups = new Map<string, any>()
 
+    const toText = (v: unknown): string => {
+      if (v == null) return ""
+      if (typeof v === "string") return v
+      if (typeof v === "number" || typeof v === "boolean") return String(v)
+      if (typeof v === "object") {
+        const o = v as Record<string, unknown>
+        if (typeof o.message === "string") return o.message
+        try {
+          return JSON.stringify(v)
+        } catch {
+          return String(v)
+        }
+      }
+      return String(v)
+    }
+
     events?.forEach((event: any) => {
-      const errorMessage = event.event_data?.error || event.event_data?.message || "Unknown Error"
+      const errorMessage =
+        toText(event.event_data?.error) ||
+        toText(event.event_data?.message) ||
+        "Unknown Error"
       const key = errorMessage.substring(0, 100)
 
       if (errorGroups.has(key)) {
@@ -119,8 +138,8 @@ export async function GET(request: NextRequest) {
         errorGroups.set(key, {
           id: event.id,
           title: errorMessage,
-          culprit: event.event_data?.location || "Unknown",
-          level: event.event_data?.level || "error",
+          culprit: toText(event.event_data?.location) || "Unknown",
+          level: toText(event.event_data?.level) || "error",
           status: "unresolved",
           count: 1,
           userCount: 1,

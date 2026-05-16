@@ -99,7 +99,42 @@ export default function SentryErrorsPage() {
     info: { icon: AlertCircle, color: "text-blue-500", bg: "bg-blue-500/20", label: "معلومات" },
   }
 
-  const filteredErrors = errors.filter(
+  // Defensive coercion: Sentry / local fallback can occasionally return
+  // non-string values for `title`, `culprit`, or `metadata.value`. Rendering
+  // an object as a React child throws ("Objects are not valid as a React
+  // child..."), so we normalize everything to a string here before use.
+  const toStr = (v: unknown): string => {
+    if (v == null) return ""
+    if (typeof v === "string") return v
+    if (typeof v === "number" || typeof v === "boolean") return String(v)
+    if (typeof v === "object") {
+      const o = v as Record<string, unknown>
+      if (typeof o.message === "string") return o.message
+      if (typeof o.value === "string") return o.value
+      try {
+        return JSON.stringify(v)
+      } catch {
+        return String(v)
+      }
+    }
+    return String(v)
+  }
+
+  const normalizedErrors = errors.map((e) => ({
+    ...e,
+    title: toStr(e.title) || "Unknown Error",
+    culprit: toStr(e.culprit) || "Unknown",
+    count: toStr(e.count) || "0",
+    metadata: e.metadata
+      ? {
+          ...e.metadata,
+          value: e.metadata.value !== undefined ? toStr(e.metadata.value) : undefined,
+          type: e.metadata.type !== undefined ? toStr(e.metadata.type) : undefined,
+        }
+      : undefined,
+  }))
+
+  const filteredErrors = normalizedErrors.filter(
     (error) =>
       error.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       error.culprit.toLowerCase().includes(searchQuery.toLowerCase()),
