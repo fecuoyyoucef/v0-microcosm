@@ -5,8 +5,11 @@
  */
 
 import { Octokit } from "@octokit/rest"
-import { CHIEF_AGENT_CONFIG } from "../config"
 import type { ToolResult } from "../types"
+
+// GitHub repository configuration. Override via env when needed.
+const GITHUB_OWNER = process.env.GITHUB_REPO_OWNER ?? "alfa28x"
+const GITHUB_REPO = process.env.GITHUB_REPO_NAME ?? "synaptic"
 
 export class GitHubTools {
   private octokit: Octokit
@@ -22,8 +25,8 @@ export class GitHubTools {
       auth: process.env.GITHUB_TOKEN,
     })
 
-    this.owner = CHIEF_AGENT_CONFIG.github.owner
-    this.repo = CHIEF_AGENT_CONFIG.github.repo
+    this.owner = GITHUB_OWNER
+    this.repo = GITHUB_REPO
   }
 
   /**
