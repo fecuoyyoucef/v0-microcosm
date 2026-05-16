@@ -1,116 +1,97 @@
 import { createServiceClient } from "@/lib/supabase/server"
 
 /**
- * Undo system: every reversible agent action is logged into `agent_actions`
- * with a `before_snapshot` so an admin can roll it back later.
+ * Undo system — every reversible agent action snapshots the affected row into
+ * `agent_snapshots.before_state` before mutating. An admin can later replay the
+ * snapshot to restore the original state.
  */
 
 const SUPABASE = () => createServiceClient()
 
-export async function recordAction(params: {
+export async function recordSnapshot(params: {
+  run_id?: string | null
   agent_id: string
-  action_type: string
-  target_id: string | null
-  before_snapshot: Record<string, unknown> | null
-  reasoning: string | null
-  confidence: number | null
-  severity: "low" | "medium" | "high" | "critical"
-  context: Record<string, unknown> | null
+  resource_type: string
+  resource_id: string
+  before_state: Record<string, unknown>
 }): Promise<string | null> {
   const { data, error } = await SUPABASE()
-    .from("agent_actions")
+    .from("agent_snapshots")
     .insert({
-      ...params,
-      status: "completed",
+      run_id: params.run_id ?? null,
+      agent_id: params.agent_id,
+      resource_type: params.resource_type,
+      resource_id: params.resource_id,
+      before_state: params.before_state,
+      reverted: false,
     })
     .select("id")
     .single()
+
   if (error) {
-    console.error("[agents/undo] recordAction failed:", error)
+    console.error("[agents/undo] recordSnapshot failed:", error.message)
     return null
   }
   return data.id
 }
 
-export async function undoAction(actionId: string, ownerId: string): Promise<boolean> {
+/**
+ * Revert a snapshot. Maps `resource_type` to the table to update; the entire
+ * `before_state` JSON is written back as the new row contents.
+ */
+export async function undoAction(snapshotId: string, _adminId: string): Promise<boolean> {
   const supabase = SUPABASE()
-  const { data: action, error } = await supabase
-    .from("agent_actions")
+
+  const { data: snap, error } = await supabase
+    .from("agent_snapshots")
     .select("*")
-    .eq("id", actionId)
+    .eq("id", snapshotId)
     .single()
 
-  if (error || !action) return false
-  if (action.status === "undone") return true
+  if (error || !snap) return false
+  if (snap.reverted) return true
 
-  let ok = false
-  switch (action.action_type) {
-    case "delete_message":
-      ok = !(await supabase
-        .from("messages")
-        .update({ deleted_at: null, deleted_by: null, deletion_reason: null })
-        .eq("id", action.target_id)).error
-      break
-    case "ban_user":
-      ok = !(await supabase
-        .from("profiles")
-        .update({ banned_at: null, banned_by: null, ban_reason: null })
-        .eq("id", action.target_id)).error
-      break
-    case "freeze_cell":
-      ok = !(await supabase
-        .from("groups")
-        .update({ is_frozen: false, frozen_reason: null, frozen_by: null })
-        .eq("id", action.target_id)).error
-      break
-    case "delete_cell": {
-      const snap = (action.before_snapshot ?? {}) as { message_ids?: string[] }
-      const r1 = await supabase
-        .from("groups")
-        .update({ deleted_at: null, deleted_by: null, deletion_reason: null })
-        .eq("id", action.target_id)
-      ok = !r1.error
-      if (ok && snap.message_ids?.length) {
-        await supabase
-          .from("messages")
-          .update({ deleted_at: null, deleted_by: null, deletion_reason: null })
-          .in("id", snap.message_ids)
-      }
-      break
-    }
-    case "warn_user":
-      ok = !(await supabase
-        .from("notifications")
-        .delete()
-        .eq("user_id", action.target_id)
-        .eq("type", "system")
-        .gte("created_at", action.created_at)).error
-      break
-    default:
-      console.warn("[agents/undo] unknown action_type:", action.action_type)
-      return false
+  const table = TABLE_FOR_RESOURCE[snap.resource_type as keyof typeof TABLE_FOR_RESOURCE]
+  if (!table) {
+    console.warn("[agents/undo] unsupported resource_type:", snap.resource_type)
+    return false
   }
 
-  if (!ok) return false
+  const before = (snap.before_state ?? {}) as Record<string, unknown>
+  // Drop the primary key from the update payload — it's used in the WHERE.
+  const { id: _ignored, ...payload } = before
+
+  const { error: updErr } = await supabase
+    .from(table)
+    .update(payload)
+    .eq("id", snap.resource_id)
+
+  if (updErr) {
+    console.error("[agents/undo] revert failed:", updErr.message)
+    return false
+  }
 
   await supabase
-    .from("agent_actions")
-    .update({
-      status: "undone",
-      undone_at: new Date().toISOString(),
-      undone_by: ownerId,
-    })
-    .eq("id", actionId)
+    .from("agent_snapshots")
+    .update({ reverted: true })
+    .eq("id", snapshotId)
 
   return true
 }
 
 export async function listUndoable(limit = 50) {
   const { data } = await SUPABASE()
-    .from("agent_actions")
-    .select("*")
-    .eq("status", "completed")
+    .from("agent_snapshots")
+    .select("id, agent_id, resource_type, resource_id, created_at, reverted")
+    .eq("reverted", false)
     .order("created_at", { ascending: false })
     .limit(limit)
   return data ?? []
 }
+
+const TABLE_FOR_RESOURCE = {
+  message: "messages",
+  profile: "profiles",
+  group: "groups",
+  notification: "notifications",
+} as const
