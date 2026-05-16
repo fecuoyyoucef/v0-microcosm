@@ -1,42 +1,66 @@
-import { NextResponse } from "next/server"
-import { approve, reject, listPendingApprovals, executeApprovedAction } from "@/lib/agents/approvals"
-import { requireAdmin } from "@/lib/auth/require-admin"
+/**
+ * GET  /api/agents/approvals          → pending approvals
+ * POST /api/agents/approvals          → { id, decision: "approved"|"rejected", reason? }
+ */
+
+import { requireAdmin } from "@/lib/agents/auth"
+import { createServiceClient } from "@/lib/supabase/server"
 
 export async function GET() {
-  const guard = await requireAdmin()
-  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
+  const auth = await requireAdmin()
+  if (auth.response) return auth.response
 
-  const pending = await listPendingApprovals()
-  return NextResponse.json({ pending })
+  const svc = createServiceClient()
+  const { data, error } = await svc
+    .from("agent_approvals")
+    .select("*")
+    .eq("status", "pending")
+    .order("requested_at", { ascending: false })
+    .limit(100)
+
+  if (error) return Response.json({ error: error.message }, { status: 500 })
+  return Response.json({ approvals: data ?? [] })
 }
 
 export async function POST(req: Request) {
-  const guard = await requireAdmin()
-  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
+  const auth = await requireAdmin()
+  if (auth.response) return auth.response
 
-  const body = await req.json().catch(() => null)
-  if (!body || typeof body.request_id !== "string" || typeof body.action !== "string") {
-    return NextResponse.json({ error: "request_id and action are required" }, { status: 400 })
+  let body: { id?: string; decision?: string; reason?: string }
+  try {
+    body = await req.json()
+  } catch {
+    return Response.json({ error: "Invalid JSON" }, { status: 400 })
   }
 
-  if (body.action === "approve") {
-    await approve(body.request_id, guard.userId)
-    if (body.execute_now) {
-      const result = await executeApprovedAction(body.request_id, guard.userId)
-      return NextResponse.json({ approved: true, executed: true, result })
-    }
-    return NextResponse.json({ approved: true })
+  const { id, decision, reason } = body
+  if (!id || (decision !== "approved" && decision !== "rejected")) {
+    return Response.json(
+      { error: "id and decision ('approved'|'rejected') required" },
+      { status: 400 },
+    )
   }
 
-  if (body.action === "reject") {
-    await reject(body.request_id, guard.userId)
-    return NextResponse.json({ rejected: true })
-  }
+  const svc = createServiceClient()
+  const { data, error } = await svc
+    .from("agent_approvals")
+    .update({
+      status: decision,
+      decided_at: new Date().toISOString(),
+      decided_by: auth.userId,
+      reason: reason ?? null,
+    })
+    .eq("id", id)
+    .eq("status", "pending")
+    .select()
+    .single()
 
-  if (body.action === "execute") {
-    const result = await executeApprovedAction(body.request_id, guard.userId)
-    return NextResponse.json({ executed: true, result })
+  if (error) return Response.json({ error: error.message }, { status: 500 })
+  if (!data) {
+    return Response.json(
+      { error: "Approval not found or already decided" },
+      { status: 404 },
+    )
   }
-
-  return NextResponse.json({ error: `Unknown action: ${body.action}` }, { status: 400 })
+  return Response.json({ approval: data })
 }

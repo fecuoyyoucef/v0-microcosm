@@ -7,24 +7,6 @@
  */
 
 export type AgentKind = "chief" | "moderator" | "support" | "analyst" | "developer"
-/** Alias used by API routes — same set, friendlier name. */
-export type AgentId = AgentKind
-
-/** Approval request shape (matches `approval_requests` table). */
-export interface ApprovalRequest {
-  id: string
-  action: string
-  description: string
-  risk_level: RiskLevel
-  requested_by: string
-  details: Record<string, unknown>
-  status: "pending" | "approved" | "rejected"
-  approved_by?: string | null
-  approved_at?: string | null
-  executed_at?: string | null
-  execution_result?: unknown
-  created_at: string
-}
 
 export type RiskLevel = "low" | "medium" | "high" | "critical"
 

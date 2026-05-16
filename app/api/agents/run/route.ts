@@ -1,33 +1,77 @@
-import { NextResponse } from "next/server"
-import { runAgent } from "@/lib/agents/runtime"
-import type { AgentId } from "@/lib/agents/types"
-import { listAgents } from "@/lib/agents/registry"
-import { requireAdmin } from "@/lib/auth/require-admin"
+/**
+ * POST /api/agents/run
+ *
+ * Body: { agent: AgentKind, input: string, context?: Record<string, unknown> }
+ *
+ * Dispatches to the correct agent's entry function and returns the full
+ * AgentRun (tool calls, tokens, duration, success/error).
+ */
 
-const VALID: AgentId[] = ["chief", "moderator", "support", "analyst", "developer"]
+import { requireAdmin } from "@/lib/agents/auth"
+import {
+  askChief,
+  moderate,
+  support as supportAgent,
+  analyze,
+  diagnose,
+  AGENTS,
+  type AgentKind,
+} from "@/lib/agents"
+
+const VALID_AGENTS = Object.keys(AGENTS) as AgentKind[]
 
 export async function POST(req: Request) {
-  const guard = await requireAdmin()
-  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
+  const auth = await requireAdmin()
+  if (auth.response) return auth.response
 
-  const body = await req.json().catch(() => null)
-  if (!body || typeof body.scenario !== "string") {
-    return NextResponse.json({ error: "scenario is required" }, { status: 400 })
+  let body: { agent?: string; input?: string; context?: Record<string, unknown> }
+  try {
+    body = await req.json()
+  } catch {
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 })
   }
 
-  const agentId = (body.agent ?? "chief") as AgentId
-  if (!VALID.includes(agentId)) {
-    return NextResponse.json({ error: `Unknown agent: ${agentId}` }, { status: 400 })
+  const agent = body.agent as AgentKind | undefined
+  const input = (body.input ?? "").trim()
+
+  if (!agent || !VALID_AGENTS.includes(agent)) {
+    return Response.json(
+      { error: `Unknown agent. Valid: ${VALID_AGENTS.join(", ")}` },
+      { status: 400 },
+    )
+  }
+  if (!input) {
+    return Response.json({ error: "Input is required" }, { status: 400 })
   }
 
-  const result = await runAgent(agentId, body.scenario, body.context ?? {}, {
-    actorId: guard.userId,
-    maxSteps: typeof body.max_steps === "number" ? body.max_steps : undefined,
-  })
-
-  return NextResponse.json(result)
+  try {
+    const run = await dispatch(agent, input, auth.userId!, body.context)
+    return Response.json({ run })
+  } catch (err) {
+    console.error("[agents:run] failed:", err)
+    return Response.json(
+      { error: err instanceof Error ? err.message : "Agent run failed" },
+      { status: 500 },
+    )
+  }
 }
 
-export async function GET() {
-  return NextResponse.json({ agents: listAgents() })
+async function dispatch(
+  agent: AgentKind,
+  input: string,
+  userId: string,
+  context?: Record<string, unknown>,
+) {
+  switch (agent) {
+    case "chief":
+      return askChief({ input, userId, context })
+    case "moderator":
+      return moderate({ input, userId, context })
+    case "support":
+      return supportAgent({ input, userId, context })
+    case "analyst":
+      return analyze({ input, userId, context })
+    case "developer":
+      return diagnose({ input, userId, context })
+  }
 }
