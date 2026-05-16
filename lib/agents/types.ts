@@ -75,6 +75,16 @@ export interface AgentRun {
   error?: string
 }
 
+/** Public input shape for every agent entry function. */
+export interface AgentInput {
+  /** Admin id or end-user id; null when run by cron. */
+  userId?: string | null
+  /** The user's actual request / scenario text. */
+  input: string
+  /** Free-form context — string is appended to system prompt; object is JSON-stringified. */
+  context?: string | Record<string, unknown>
+}
+
 /** Configuration for a single run of the agent loop. */
 export interface RunOptions {
   agent: AgentKind

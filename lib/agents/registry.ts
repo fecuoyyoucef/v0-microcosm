@@ -112,3 +112,29 @@ export function toolsForAgent(kind: AgentKind): ToolDefinition[] {
   const spec = getAgent(kind)
   return spec.tools.flatMap((c) => schemasByCategory[c])
 }
+
+/** True if the agent is enabled in the `agents` DB row. Defaults to true if the row doesn't exist yet. */
+export async function isAgentEnabled(kind: AgentKind): Promise<boolean> {
+  try {
+    // Lazy import to avoid pulling in Supabase on the client.
+    const { createServiceClient } = await import("@/lib/supabase/server")
+    const { data, error } = await createServiceClient()
+      .from("agents")
+      .select("enabled")
+      .eq("id", kind)
+      .maybeSingle()
+    if (error) {
+      console.error("[agents/registry] isAgentEnabled query failed:", error.message)
+      return true
+    }
+    return data?.enabled ?? true
+  } catch (err) {
+    console.error("[agents/registry] isAgentEnabled crashed:", err)
+    return true
+  }
+}
+
+/** Convenience: list every registered agent for /api/agents/list. */
+export function listAgents() {
+  return Object.values(AGENTS)
+}

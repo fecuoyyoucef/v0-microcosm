@@ -1,10 +1,19 @@
+/**
+ * GET /api/agents/decisions
+ *
+ * Returns recent agent runs (the unified replacement for the old
+ * `agent_decisions` table). Optional `agent` and `limit` query params.
+ */
+
 import { NextResponse } from "next/server"
+import { requireAdmin } from "@/lib/agents/auth"
 import { createServiceClient } from "@/lib/supabase/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
+
+export const runtime = "nodejs"
 
 export async function GET(req: Request) {
-  const guard = await requireAdmin()
-  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
+  const auth = await requireAdmin()
+  if (!auth.ok) return auth.response
 
   const { searchParams } = new URL(req.url)
   const limit = Math.min(Number(searchParams.get("limit") ?? 50), 200)
@@ -12,13 +21,15 @@ export async function GET(req: Request) {
 
   const supabase = createServiceClient()
   let q = supabase
-    .from("agent_decisions")
-    .select("*")
-    .order("created_at", { ascending: false })
+    .from("agent_runs")
+    .select(
+      "id, agent_id, trigger, status, steps, tokens_used, duration_ms, started_at, finished_at, output, error",
+    )
+    .order("started_at", { ascending: false })
     .limit(limit)
   if (agentId) q = q.eq("agent_id", agentId)
 
   const { data, error } = await q
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ decisions: data })
+  return NextResponse.json({ runs: data ?? [] })
 }

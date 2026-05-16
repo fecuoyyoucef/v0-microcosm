@@ -1,48 +1,64 @@
+/**
+ * GET    /api/agents/settings  → list all agents and their state
+ * PATCH  /api/agents/settings  → update one agent (enabled/model/config)
+ *
+ * The `agents` table is the source of truth; the runtime reads enabled +
+ * model from it on every dispatch. Updates here take effect immediately
+ * for the next run.
+ */
+
 import { NextResponse } from "next/server"
+import { requireAdmin } from "@/lib/agents/auth"
 import { createServiceClient } from "@/lib/supabase/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
-import { listAgents } from "@/lib/agents/registry"
+
+export const runtime = "nodejs"
+
+const ALLOWED_MODELS = new Set([
+  "llama-3.3-70b-versatile",
+  "llama-3.1-8b-instant",
+  "mixtral-8x7b-32768",
+  "gemma2-9b-it",
+])
 
 export async function GET() {
-  const guard = await requireAdmin()
-  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
+  const auth = await requireAdmin()
+  if (!auth.ok) return auth.response
 
-  const supabase = createServiceClient()
-  const { data } = await supabase.from("agent_settings").select("*")
-  const settings = Object.fromEntries((data ?? []).map((row) => [row.agent_id, row]))
-
-  const merged = listAgents().map((agent) => ({
-    ...agent,
-    enabled: settings[agent.id]?.enabled ?? true,
-    auto_execute: settings[agent.id]?.auto_execute ?? false,
-  }))
-
-  return NextResponse.json({ agents: merged })
-}
-
-export async function POST(req: Request) {
-  const guard = await requireAdmin()
-  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
-
-  const body = await req.json().catch(() => null)
-  if (!body || typeof body.agent_id !== "string") {
-    return NextResponse.json({ error: "agent_id is required" }, { status: 400 })
-  }
-
-  const supabase = createServiceClient()
-  const { error } = await supabase
-    .from("agent_settings")
-    .upsert(
-      {
-        agent_id: body.agent_id,
-        enabled: body.enabled ?? true,
-        auto_execute: body.auto_execute ?? false,
-        updated_at: new Date().toISOString(),
-        updated_by: guard.userId,
-      },
-      { onConflict: "agent_id" },
-    )
+  const { data, error } = await createServiceClient()
+    .from("agents")
+    .select("id, name, description, model, enabled, config, updated_at")
+    .order("id")
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ agents: data ?? [] })
+}
+
+export async function PATCH(request: Request) {
+  const auth = await requireAdmin()
+  if (!auth.ok) return auth.response
+
+  const body = await request.json().catch(() => null)
+  if (!body?.id || typeof body.id !== "string") {
+    return NextResponse.json({ error: "id is required" }, { status: 400 })
+  }
+
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  if (typeof body.enabled === "boolean") patch.enabled = body.enabled
+  if (typeof body.model === "string") {
+    if (!ALLOWED_MODELS.has(body.model)) {
+      return NextResponse.json({ error: "Unsupported model" }, { status: 400 })
+    }
+    patch.model = body.model
+  }
+  if (body.config && typeof body.config === "object") patch.config = body.config
+
+  const { data, error } = await createServiceClient()
+    .from("agents")
+    .update(patch)
+    .eq("id", body.id)
+    .select()
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ agent: data })
 }

@@ -1,12 +1,13 @@
-import { createServiceClient } from "@/lib/supabase/server"
-import { runAgent } from "./runtime"
-import { isAgentEnabled } from "./registry"
-
 /**
- * Lightweight hooks that other API routes (messages, tickets) call when new
- * content arrives. They fire-and-forget the chief agent so user-facing
+ * Lightweight hooks that other API routes (or cron jobs) can call when new
+ * content arrives. They fire-and-forget the right specialized agent so user
  * requests don't slow down.
  */
+
+import { createServiceClient } from "@/lib/supabase/server"
+import { isAgentEnabled } from "./registry"
+import { moderate } from "./agents/moderator"
+import { support } from "./agents/support"
 
 export async function monitorNewMessage(messageId: string): Promise<void> {
   try {
@@ -15,26 +16,27 @@ export async function monitorNewMessage(messageId: string): Promise<void> {
     const supabase = createServiceClient()
     const { data: message } = await supabase
       .from("messages")
-      .select("id, content, sender_id, group_id, profiles:sender_id(display_name, username)")
+      .select("id, content, sender_id, group_id")
       .eq("id", messageId)
       .single()
 
-    if (!message || !message.content) return
-
-    // Quick heuristic pre-filter to avoid wasting tokens on harmless content.
+    if (!message?.content) return
     if (!looksSuspicious(message.content)) return
 
-    const scenario = `رسالة جديدة قد تحتاج إشرافاً.
-المعرّف: ${message.id}
-الخلية: ${message.group_id}
-المرسل: ${message.sender_id}
-المحتوى: ${message.content.slice(0, 1000)}`
+    const scenario =
+      `رسالة جديدة قد تحتاج إشرافاً.\n` +
+      `المعرّف: ${message.id}\n` +
+      `الخلية: ${message.group_id}\n` +
+      `المرسل: ${message.sender_id}\n` +
+      `المحتوى: ${message.content.slice(0, 1000)}`
 
-    // Fire and forget; failures are logged by the runtime.
-    void runAgent("moderator", scenario, {
-      message_id: message.id,
-      sender_id: message.sender_id,
-      group_id: message.group_id,
+    void moderate({
+      input: scenario,
+      context: {
+        message_id: message.id,
+        sender_id: message.sender_id,
+        group_id: message.group_id,
+      },
     }).catch((err) => console.error("[agents/monitor] moderator failed:", err))
   } catch (err) {
     console.error("[agents/monitor] monitorNewMessage failed:", err)
@@ -54,16 +56,18 @@ export async function monitorNewTicket(ticketId: string): Promise<void> {
 
     if (!ticket) return
 
-    const scenario = `تذكرة دعم جديدة.
-المعرّف: ${ticket.id}
-المستخدم: ${ticket.user_id}
-الفئة: ${ticket.category}
-العنوان: ${ticket.title}
-الرسالة: ${(ticket.message ?? "").slice(0, 1500)}`
+    const scenario =
+      `تذكرة دعم جديدة.\n` +
+      `المعرّف: ${ticket.id}\n` +
+      `المستخدم: ${ticket.user_id}\n` +
+      `الفئة: ${ticket.category}\n` +
+      `العنوان: ${ticket.title}\n` +
+      `الرسالة: ${(ticket.message ?? "").slice(0, 1500)}`
 
-    void runAgent("support", scenario, {
-      ticket_id: ticket.id,
-      user_id: ticket.user_id,
+    void support({
+      userId: ticket.user_id,
+      input: scenario,
+      context: { ticket_id: ticket.id },
     }).catch((err) => console.error("[agents/monitor] support failed:", err))
   } catch (err) {
     console.error("[agents/monitor] monitorNewTicket failed:", err)
@@ -72,14 +76,11 @@ export async function monitorNewTicket(ticketId: string): Promise<void> {
 
 function looksSuspicious(text: string): boolean {
   const lower = text.toLowerCase()
-  // Many URLs → potential spam
   if ((lower.match(/https?:\/\//g) ?? []).length >= 3) return true
-  // Excessive uppercase
   if (text.length > 30) {
     const caps = (text.match(/[A-Z]/g) ?? []).length
     if (caps / text.length > 0.7) return true
   }
-  // Common abuse markers (keep list short; agent does the real work)
-  const markers = ["كس", "نيك", "زبي", "fuck", "bitch", "nigg", "porn"]
+  const markers = ["spam", "scam", "fuck", "bitch", "nigg", "porn"]
   return markers.some((m) => lower.includes(m))
 }

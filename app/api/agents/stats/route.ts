@@ -1,32 +1,54 @@
+/**
+ * GET /api/agents/stats
+ *
+ * Aggregate counters for the admin dashboard, all queried with
+ * count-only requests (head: true) so we never pull row data.
+ */
+
 import { NextResponse } from "next/server"
+import { requireAdmin } from "@/lib/agents/auth"
 import { createServiceClient } from "@/lib/supabase/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
+
+export const runtime = "nodejs"
 
 export async function GET() {
-  const guard = await requireAdmin()
-  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
+  const auth = await requireAdmin()
+  if (!auth.ok) return auth.response
 
   const supabase = createServiceClient()
-  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-  const [decisions, approvals, actions, errors] = await Promise.all([
-    supabase
-      .from("agent_decisions")
-      .select("agent_id, severity, confidence, created_at")
-      .gte("created_at", since),
-    supabase.from("approval_requests").select("status, risk_level, created_at").gte("created_at", since),
-    supabase.from("agent_actions").select("action_type, status, created_at").gte("created_at", since),
+  const [total, last24, failed24, pending, running] = await Promise.all([
+    supabase.from("agent_runs").select("id", { count: "exact", head: true }),
     supabase
       .from("agent_runs")
-      .select("agent_id, ok, total_tokens, duration_ms, created_at")
-      .gte("created_at", since),
+      .select("id", { count: "exact", head: true })
+      .gte("started_at", since24h),
+    supabase
+      .from("agent_runs")
+      .select("id", { count: "exact", head: true })
+      .gte("started_at", since24h)
+      .eq("status", "failed"),
+    supabase
+      .from("agent_approvals")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending"),
+    supabase
+      .from("agent_runs")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "running"),
   ])
 
+  const runs24h = last24.count ?? 0
+  const failures24h = failed24.count ?? 0
+
   return NextResponse.json({
-    range: { since, until: new Date().toISOString() },
-    decisions: decisions.data ?? [],
-    approvals: approvals.data ?? [],
-    actions: actions.data ?? [],
-    runs: errors.data ?? [],
+    total_runs: total.count ?? 0,
+    runs_24h: runs24h,
+    failed_24h: failures24h,
+    in_progress: running.count ?? 0,
+    pending_approvals: pending.count ?? 0,
+    success_rate_24h:
+      runs24h > 0 ? Math.round(((runs24h - failures24h) / runs24h) * 100) : null,
   })
 }
