@@ -5,7 +5,28 @@
  */
 
 import { createServiceClient } from "@/lib/supabase/server"
+import { suggestTables } from "../schema-introspect"
 import type { ToolResult } from "../types"
+
+/**
+ * Format a Postgres error from a SELECT/INSERT/... that referenced an
+ * unknown table. Includes the closest matching real tables, which the
+ * agent can use to retry instead of giving up.
+ */
+async function formatDbError(table: string, baseError: string): Promise<string> {
+  const looksLikeMissing =
+    baseError.toLowerCase().includes("could not find the table") ||
+    baseError.toLowerCase().includes("does not exist") ||
+    baseError.toLowerCase().includes("schema cache")
+
+  if (!looksLikeMissing) return baseError
+
+  const suggestions = await suggestTables(table)
+  if (suggestions.length === 0) {
+    return `${baseError} | الجدول "${table}" غير موجود في قاعدة البيانات. راجع قائمة الجداول المتاحة في تعليمات النظام.`
+  }
+  return `${baseError} | الجدول "${table}" غير موجود. هل قصدت أحد هذه: ${suggestions.join(", ")}؟`
+}
 
 export class SupabaseTools {
   private getClient() {
@@ -54,7 +75,7 @@ export class SupabaseTools {
       if (error) {
         return {
           success: false,
-          error: `Database query failed: ${error.message}`,
+          error: await formatDbError(params.table, `Database query failed: ${error.message}`),
         }
       }
 

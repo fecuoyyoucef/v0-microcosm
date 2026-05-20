@@ -8,6 +8,7 @@
 import { runAgent } from "../runtime"
 import { getAgent, toolsForAgent } from "../registry"
 import { loadConversation, saveConversation } from "../memory"
+import { schemaPromptFragment } from "../schema-introspect"
 import type { AgentInput, AgentRun, ChatMessage } from "../types"
 
 export async function askChief({ userId, input, context }: AgentInput): Promise<AgentRun> {
@@ -16,10 +17,16 @@ export async function askChief({ userId, input, context }: AgentInput): Promise<
   const history: ChatMessage[] = convo?.history ?? []
   history.push({ role: "user", content: input })
 
+  // Inject the real public-schema table list so the model never invents
+  // names. Without this we've seen calls like database_query({ table: "بلاغات" })
+  // which obviously fail.
+  const schemaFragment = await schemaPromptFragment()
   const contextLine = stringifyContext(context)
-  const system = contextLine
-    ? `${spec.systemPrompt}\n\n[سياق]\n${contextLine}`
-    : spec.systemPrompt
+
+  const systemParts = [spec.systemPrompt]
+  if (schemaFragment) systemParts.push(schemaFragment)
+  if (contextLine) systemParts.push(`[سياق]\n${contextLine}`)
+  const system = systemParts.join("\n\n")
 
   const run = await runAgent({
     agent: "chief",
