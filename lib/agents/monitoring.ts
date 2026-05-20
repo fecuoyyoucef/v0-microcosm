@@ -43,6 +43,8 @@ export async function finishRun(run: AgentRun, context?: string): Promise<void> 
       status: run.success ? "completed" : "failed",
       steps: run.iterations,
       tokens_used: run.tokens_in + run.tokens_out,
+      tokens_in: run.tokens_in,
+      tokens_out: run.tokens_out,
       duration_ms: run.duration_ms,
       error: run.error ?? null,
       finished_at: new Date().toISOString(),

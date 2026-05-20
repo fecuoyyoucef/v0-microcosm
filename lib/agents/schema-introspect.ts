@@ -40,15 +40,19 @@ export async function listPublicTables(): Promise<string[]> {
 /**
  * Return a system-prompt fragment listing every available public table.
  * Used by chief/analyst/support so the model never invents table names.
+ *
+ * NOTE: We intentionally render the list as a single comma-separated line
+ * instead of a bulleted list. The bullet form was costing us ~600 input
+ * tokens on every Groq call (and we have ~80 tables); the inline form
+ * fits in ~150 tokens with no loss of information for the model.
  */
 export async function schemaPromptFragment(): Promise<string> {
   const tables = await listPublicTables()
   if (tables.length === 0) return ""
   return [
-    "[الجداول المتاحة في قاعدة البيانات]",
-    "استخدم فقط الأسماء التالية مع database_query/database_insert/...:",
-    tables.map((t) => `- ${t}`).join("\n"),
-    "إذا لم يكن الجدول الذي تحتاجه في القائمة، أبلغ المستخدم بذلك بدل تخمين اسم آخر.",
+    "[الجداول المتاحة]",
+    `استخدم فقط أحد هذه الأسماء مع database_*: ${tables.join(", ")}.`,
+    "إن لم يكن الجدول المطلوب موجوداً، أبلغ المستخدم بدل اختراع اسم.",
   ].join("\n")
 }
 

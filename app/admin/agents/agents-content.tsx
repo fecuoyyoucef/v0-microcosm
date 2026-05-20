@@ -89,11 +89,17 @@ interface Metrics {
     failed_runs: number
     success_rate: number
     tokens: number
+    tokens_in: number
+    tokens_out: number
     avg_duration_ms: number
     pending_approvals: number
   }
-  by_agent: Record<string, { total: number; failed: number; tokens: number }>
+  by_agent: Record<
+    string,
+    { total: number; failed: number; tokens: number; tokens_in: number; tokens_out: number }
+  >
   by_tool: Record<string, { total: number; failed: number }>
+  tokens_per_hour: Array<{ hour: string; tokens_in: number; tokens_out: number }>
 }
 
 export default function ChiefAgentContent() {
@@ -587,54 +593,131 @@ function MetricsPanel({ metrics }: { metrics?: Metrics }) {
 
   if (!metrics) return <Skeleton className="h-64 w-full" />
 
+  const totals = metrics.totals
+  const hourly = metrics.tokens_per_hour ?? []
+  const maxHourTokens = Math.max(
+    1,
+    ...hourly.map((h) => h.tokens_in + h.tokens_out),
+  )
+
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="space-y-4">
+      {/* Token consumption summary — input vs output for the last 24h. */}
       <Card className="border-border/60">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm">حسب الوكيل (24س)</CardTitle>
+          <CardTitle className="text-sm">استهلاك التوكنز (آخر 24س)</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 p-3">
-          {byAgent.length === 0 && (
-            <div className="py-4 text-center text-xs text-muted-foreground">لا بيانات</div>
-          )}
-          {byAgent.map(([agent, stats]) => (
-            <div
-              key={agent}
-              className="flex items-center justify-between rounded-md bg-muted/40 px-3 py-2 text-sm"
-            >
-              <span className="font-medium">{agent}</span>
-              <div className="flex gap-3 text-xs text-muted-foreground">
-                <span>{stats.total} تشغيل</span>
-                <span className="text-destructive">{stats.failed} فشل</span>
-                <span>{stats.tokens} رمز</span>
+        <CardContent className="space-y-4 p-3">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-md bg-muted/40 p-3">
+              <div className="text-xs text-muted-foreground">الإدخال</div>
+              <div className="font-mono text-lg font-semibold text-emerald-500">
+                {totals.tokens_in.toLocaleString("ar")}
               </div>
             </div>
-          ))}
+            <div className="rounded-md bg-muted/40 p-3">
+              <div className="text-xs text-muted-foreground">الإخراج</div>
+              <div className="font-mono text-lg font-semibold text-sky-500">
+                {totals.tokens_out.toLocaleString("ar")}
+              </div>
+            </div>
+            <div className="rounded-md bg-muted/40 p-3">
+              <div className="text-xs text-muted-foreground">المجموع</div>
+              <div className="font-mono text-lg font-semibold">
+                {totals.tokens.toLocaleString("ar")}
+              </div>
+            </div>
+          </div>
+
+          {/* Hourly stacked bars: emerald for input, sky for output. */}
+          <div className="flex h-32 items-end gap-px">
+            {hourly.map((h, i) => {
+              const totalH = h.tokens_in + h.tokens_out
+              const pct = (totalH / maxHourTokens) * 100
+              const inPct = totalH === 0 ? 0 : (h.tokens_in / totalH) * 100
+              return (
+                <div
+                  key={i}
+                  className="flex flex-1 flex-col justify-end"
+                  title={`${h.hour} — إدخال ${h.tokens_in} / إخراج ${h.tokens_out}`}
+                >
+                  <div
+                    className="w-full rounded-t-sm bg-sky-500/70"
+                    style={{ height: `${pct}%` }}
+                  >
+                    <div
+                      className="w-full rounded-t-sm bg-emerald-500/70"
+                      style={{ height: `${inPct}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <div className="flex justify-between text-[10px] text-muted-foreground">
+            <span>{hourly[0]?.hour ?? ""}</span>
+            <span>{hourly[Math.floor(hourly.length / 2)]?.hour ?? ""}</span>
+            <span>{hourly[hourly.length - 1]?.hour ?? ""}</span>
+          </div>
         </CardContent>
       </Card>
 
-      <Card className="border-border/60">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm">حسب الأداة (24س)</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 p-3">
-          {byTool.length === 0 && (
-            <div className="py-4 text-center text-xs text-muted-foreground">لا بيانات</div>
-          )}
-          {byTool.map(([tool, stats]) => (
-            <div
-              key={tool}
-              className="flex items-center justify-between rounded-md bg-muted/40 px-3 py-2 text-sm"
-            >
-              <span className="font-mono text-xs">{tool}</span>
-              <div className="flex gap-3 text-xs text-muted-foreground">
-                <span>{stats.total}</span>
-                <span className="text-destructive">{stats.failed} فشل</span>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card className="border-border/60">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm">حسب الوكيل (24س)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 p-3">
+            {byAgent.length === 0 && (
+              <div className="py-4 text-center text-xs text-muted-foreground">لا بيانات</div>
+            )}
+            {byAgent.map(([agent, stats]) => (
+              <div
+                key={agent}
+                className="space-y-1 rounded-md bg-muted/40 px-3 py-2 text-sm"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{agent}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {stats.total} تشغيل • {stats.failed} فشل
+                  </span>
+                </div>
+                <div className="flex gap-3 text-[11px] text-muted-foreground">
+                  <span className="text-emerald-500">
+                    إدخال {stats.tokens_in.toLocaleString("ar")}
+                  </span>
+                  <span className="text-sky-500">
+                    إخراج {stats.tokens_out.toLocaleString("ar")}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/60">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm">حسب الأداة (24س)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 p-3">
+            {byTool.length === 0 && (
+              <div className="py-4 text-center text-xs text-muted-foreground">لا بيانات</div>
+            )}
+            {byTool.map(([tool, stats]) => (
+              <div
+                key={tool}
+                className="flex items-center justify-between rounded-md bg-muted/40 px-3 py-2 text-sm"
+              >
+                <span className="font-mono text-xs">{tool}</span>
+                <div className="flex gap-3 text-xs text-muted-foreground">
+                  <span>{stats.total}</span>
+                  <span className="text-destructive">{stats.failed} فشل</span>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

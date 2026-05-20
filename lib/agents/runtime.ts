@@ -18,6 +18,11 @@
 import { chatCompletion, GroqError } from "./groq-client"
 import { executeTool } from "./tools/executor"
 import { finishRun, logToolExecution, startRun } from "./monitoring"
+import {
+  approxTokens,
+  groqTpm,
+  truncateToolResultForModel,
+} from "./token-budget"
 import type {
   AgentRun,
   ChatMessage,
@@ -28,6 +33,26 @@ import type {
 
 const DEFAULT_MAX_ITERATIONS = 6
 const DEFAULT_MODEL = "llama-3.3-70b-versatile" as const
+
+/** Hard cap on output tokens per Groq call. Prevents 2000-token monologues. */
+const DEFAULT_MAX_OUTPUT_TOKENS = 700
+
+/** Per-tool-result cap before feeding back to the model. */
+const TOOL_RESULT_MAX_TOKENS = 800
+
+/** Max prior conversation messages we keep (system + last N user/assistant/tool). */
+const MAX_HISTORY_MESSAGES = 12
+
+/**
+ * Trim conversation history to the last N messages while keeping the
+ * very first system message intact. This keeps each Groq call's input
+ * within the 12k TPM budget when a chat has lots of back-and-forth.
+ */
+function trimHistory(messages: ChatMessage[]): ChatMessage[] {
+  if (messages.length <= MAX_HISTORY_MESSAGES + 1) return messages
+  const [system, ...rest] = messages
+  return [system, ...rest.slice(-MAX_HISTORY_MESSAGES)]
+}
 
 export async function runAgent(opts: RunOptions): Promise<AgentRun> {
   const runId = crypto.randomUUID()
@@ -64,12 +89,22 @@ export async function runAgent(opts: RunOptions): Promise<AgentRun> {
     while (iteration < maxIterations) {
       iteration++
 
+      // Trim history before every call so a long chat never busts the budget.
+      const trimmed = trimHistory(messages)
+
+      // Reserve our share of the TPM budget up-front. If we'd blow past
+      // 12k tokens/minute we throw a friendly error instead of getting a 429.
+      const inputBudget =
+        approxTokens(JSON.stringify(trimmed)) + DEFAULT_MAX_OUTPUT_TOKENS
+      groqTpm.reserve(inputBudget)
+
       const response = await chatCompletion({
         model,
-        messages,
+        messages: trimmed,
         tools: opts.tools && !opts.jsonMode ? opts.tools : undefined,
         tool_choice: opts.tools && !opts.jsonMode ? "auto" : undefined,
         temperature: opts.temperature ?? 0.3,
+        max_tokens: DEFAULT_MAX_OUTPUT_TOKENS,
         response_format: opts.jsonMode ? { type: "json_object" } : undefined,
       })
 
@@ -116,7 +151,13 @@ export async function runAgent(opts: RunOptions): Promise<AgentRun> {
             role: "tool",
             tool_call_id: call.id,
             name,
-            content: JSON.stringify(result),
+            // Truncate before sending back to the model. The full result is
+            // already persisted to `tool_executions` for the dashboard, so
+            // the audit trail stays intact.
+            content: truncateToolResultForModel(
+              JSON.stringify(result),
+              TOOL_RESULT_MAX_TOKENS,
+            ),
           })
 
           // If a critical tool failed (e.g. destructive db op), bail out so

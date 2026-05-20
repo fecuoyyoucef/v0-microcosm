@@ -65,10 +65,11 @@ export class SupabaseTools {
         })
       }
 
-      // Apply limit
-      if (params.limit) {
-        query = query.limit(params.limit)
-      }
+      // Apply limit. We force a hard cap (50) when the agent doesn't specify
+      // one — it has no instinct for "how many rows is too many" and a SELECT
+      // * with no limit can easily blow our 12k TPM budget on big tables.
+      const safeLimit = Math.min(params.limit ?? 25, 50)
+      query = query.limit(safeLimit)
 
       const { data, error } = await query
 
