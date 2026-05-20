@@ -375,15 +375,15 @@ export default function AdminDashboard() {
           </Card>
         </Link>
 
-        <Link href="/admin/ai">
+        <Link href="/admin/agents">
           <Card className="bg-gradient-to-br from-purple-500/10 to-purple-600/10 border-purple-500/20 hover:border-purple-500/40 transition-all cursor-pointer hover:scale-105 h-full">
             <CardContent className="p-3 md:p-4 flex flex-col items-center md:flex-row md:items-center gap-2 md:gap-3">
               <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
                 <Sparkles className="w-5 h-5 md:w-6 md:h-6 text-purple-400" />
               </div>
               <div className="text-center md:text-left">
-                <span className="font-medium text-white block text-xs md:text-sm">مساعد AI</span>
-                <span className="text-xs text-slate-400">تحليل ذكي</span>
+                <span className="font-medium text-white block text-xs md:text-sm">الوكلاء الذكيون</span>
+                <span className="text-xs text-slate-400">تشغيل ومراقبة</span>
               </div>
             </CardContent>
           </Card>

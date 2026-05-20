@@ -14,7 +14,6 @@ import {
   Settings,
   TrendingUp,
   LogOut,
-  Sparkles,
   Activity,
   HelpCircle,
   ArrowLeft,
@@ -28,7 +27,7 @@ import { useState } from "react"
 
 const menuItems = [
   { href: "/admin", icon: LayoutDashboard, label: "لوحة التحكم", exact: true },
-  { href: "/admin/chief-agent", icon: Bot, label: "الوكيل الرئيسي", highlight: true },
+  { href: "/admin/agents", icon: Bot, label: "الوكلاء الذكيون", highlight: true },
   { href: "/admin/users", icon: Users, label: "المستخدمين" },
   { href: "/admin/cells", icon: FolderOpen, label: "الخلايا" },
   { href: "/admin/features", icon: Layers, label: "الميزات" },
@@ -36,7 +35,6 @@ const menuItems = [
   { href: "/admin/notifications", icon: Bell, label: "الإشعارات" },
   { href: "/admin/support", icon: HelpCircle, label: "الدعم" },
   { href: "/admin/errors", icon: AlertTriangle, label: "الأخطاء" },
-  { href: "/admin/ai", icon: Sparkles, label: "الذكاء الاصطناعي" },
   { href: "/admin/logs", icon: Activity, label: "السجلات" },
   { href: "/admin/settings", icon: Settings, label: "الإعدادات" },
 ]
