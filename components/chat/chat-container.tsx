@@ -177,12 +177,18 @@ export function ChatContainer({
       const senderIds = [...new Set(messagesData.map((m) => m.sender_id as string))]
       const messageIds = messagesData.map((m) => m.id as string)
 
-      // Run profile, reply-target, and reaction queries in parallel
-      const [profilesRes, reactionsRes] = await Promise.all([
+      // Run profile, reaction, and read-receipt queries in parallel.
+      // We pull message_reads so own messages can show single vs double tick
+      // (delivered vs read by at least one other member).
+      const [profilesRes, reactionsRes, readsRes] = await Promise.all([
         supabase.from("profiles").select("id, display_name, avatar_url").in("id", senderIds),
         supabase
           .from("message_reactions")
           .select("id, message_id, user_id, reaction, created_at")
+          .in("message_id", messageIds),
+        supabase
+          .from("message_reads")
+          .select("message_id, user_id")
           .in("message_id", messageIds),
       ])
 
@@ -214,13 +220,29 @@ export function ChatContainer({
         })
       }
 
-      return messagesData.map((m) => ({
-        ...m,
-        sender: profileMap.get(m.sender_id as string) || null,
-        read_count: 0,
-        reactions: reactionsByMessage[m.id as string] || [],
-        reply_to_message: m.reply_to ? replyMessagesMap[m.reply_to as string] ?? null : null,
-      })) as Message[]
+      // Build a set of "(message_id) read by someone other than the sender"
+      // so we can compute is_read per own message in one pass.
+      const readByOthersByMsg: Record<string, Set<string>> = {}
+      readsRes.data?.forEach((r) => {
+        const set = readByOthersByMsg[r.message_id] || (readByOthersByMsg[r.message_id] = new Set())
+        set.add(r.user_id)
+      })
+
+      return messagesData.map((m) => {
+        const senderId = m.sender_id as string
+        const readers = readByOthersByMsg[m.id as string]
+        // is_read for this row from the sender's perspective: at least one
+        // OTHER member has acknowledged the message.
+        const isRead = !!readers && [...readers].some((uid) => uid !== senderId)
+        return {
+          ...m,
+          sender: profileMap.get(senderId) || null,
+          read_count: readers ? readers.size : 0,
+          is_read: isRead,
+          reactions: reactionsByMessage[m.id as string] || [],
+          reply_to_message: m.reply_to ? replyMessagesMap[m.reply_to as string] ?? null : null,
+        }
+      }) as Message[]
     },
     [supabase],
   )
@@ -593,6 +615,28 @@ export function ChatContainer({
       )
       .subscribe()
 
+    // Read receipts: when another member acknowledges a message, flip our
+    // local copy of that message to is_read = true so the second tick lights
+    // up without a refetch.
+    const readsChannel = supabase
+      .channel(`reads-${groupId}-${Date.now()}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "message_reads" },
+        (payload) => {
+          if (!isMounted.current) return
+          const row = payload.new as { message_id: string; user_id: string }
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === row.message_id && m.sender_id !== row.user_id && !m.is_read
+                ? { ...m, is_read: true }
+                : m,
+            ),
+          )
+        },
+      )
+      .subscribe()
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible" && isMounted.current) {
         resetUnreadCount()
@@ -632,6 +676,7 @@ export function ChatContainer({
       supabase.removeChannel(channel)
       supabase.removeChannel(membersChannel)
       supabase.removeChannel(nodesChannel)
+      supabase.removeChannel(readsChannel)
       document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
   }, [groupId, fetchMessages, fetchMembers, fetchNodes, supabase, currentUserId, resetUnreadCount, markCellNotificationsAsRead])
