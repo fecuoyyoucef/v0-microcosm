@@ -14,6 +14,7 @@ import { ImportantMessageToast } from "./important-message-toast"
 import type { Group, GroupMember, Message, MessageLayer, ConversationNode, GroupSettings } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { useSettings } from "@/components/settings-provider"
+import { playNotificationSound } from "@/lib/sounds/notification-sounds"
 
 interface ChatContainerProps {
   groupId: string
@@ -495,6 +496,15 @@ export function ChatContainer({
 
           setMessages((prev) => {
             if (prev.some((m) => m.id === newMsg.id)) return prev
+
+            // Audible feedback for incoming messages from other users.
+            // If the message @-mentions me, use the higher-pitched mention
+            // tone; otherwise the soft default. Playing for the active cell
+            // is fine — it's a short, quiet blip that confirms delivery.
+            const mentionsMe =
+              typeof newMsg.content === "string" &&
+              newMsg.content.includes(`@${currentUserId}`)
+            playNotificationSound(mentionsMe ? "mention" : "message")
 
             supabase
               .from("profiles")

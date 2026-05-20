@@ -12,6 +12,7 @@ import type { Notification } from "@/lib/types"
 import Link from "next/link"
 import { useSettings } from "@/components/settings-provider"
 import { usePathname } from "next/navigation"
+import { playNotificationSound } from "@/lib/sounds/notification-sounds"
 
 interface NotificationBellProps {
   userId: string
@@ -226,6 +227,28 @@ export function NotificationBell({ userId }: NotificationBellProps) {
 
           const enriched = await fetchEnrichedById(raw.id)
           if (!enriched) return
+
+          // Pick a sound preset that matches the notification's nature.
+          // System / announcement / role events get the formal "system" tone;
+          // decisions and votes get the achievement chime; urgent owner
+          // pushes get the attention-grabbing one. Anything else falls back
+          // to the soft default.
+          const t = enriched.type as string
+          if (t === "urgent" || t === "owner_announcement" || t === "critical") {
+            playNotificationSound("urgent")
+          } else if (t === "decision" || t === "vote" || t === "achievement") {
+            playNotificationSound("decision")
+          } else if (
+            t === "system" ||
+            t === "role_changed" ||
+            t === "joined_group" ||
+            t === "left_group" ||
+            t === "kicked"
+          ) {
+            playNotificationSound("system")
+          } else {
+            playNotificationSound("message")
+          }
 
           setNotifications((prev) => {
             if (prev.some((n) => n.id === enriched.id)) return prev
