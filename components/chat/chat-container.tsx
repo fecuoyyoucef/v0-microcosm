@@ -300,14 +300,22 @@ export function ChatContainer({
 
     // Mark unread in chunks to stay within API limits
     const unreadIds = enriched.filter((m) => m.sender_id !== currentUserId).map((m) => m.id as string)
-    if (unreadIds.length > 0) {
-      // Use a single batch request instead of multiple to avoid overwhelming the API
-      fetch("/api/messages/mark-read-bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messageIds: unreadIds.slice(0, 100) }),
-      }).catch((err) => console.error("Failed to mark messages as read:", err))
-    }
+  if (unreadIds.length > 0) {
+  // Use a single batch request instead of multiple to avoid overwhelming the API
+  // IMPORTANT: credentials: "include" ensures auth cookies are sent with the request
+  fetch("/api/messages/mark-read-bulk", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  credentials: "include",
+  body: JSON.stringify({ messageIds: unreadIds.slice(0, 100) }),
+  })
+    .then((res) => {
+      if (!res.ok) {
+        console.error("[v0] mark-read-bulk failed:", res.status, res.statusText)
+      }
+    })
+    .catch((err) => console.error("[v0] Failed to mark messages as read:", err))
+  }
 
     setIsLoading(false)
     setTimeout(scrollToBottom, 100)
