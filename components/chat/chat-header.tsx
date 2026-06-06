@@ -446,22 +446,6 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
           {/* Translation Language Selector (per-user preference) */}
           <TranslationLanguageToolbar />
 
-          {/* Discussion Quality Assessment Button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 rounded-xl hover:bg-primary/10 hover:text-primary transition-colors"
-            onClick={handleAssessQuality}
-            disabled={isAssessingQuality}
-            title="تقييم جودة النقاش"
-          >
-            {isAssessingQuality ? (
-              <Loader2Icon className="h-4 w-4 animate-spin" />
-            ) : (
-              <GaugeIconHero className="h-4 w-4" />
-            )}
-          </Button>
-
           {canInstall && (
             <Button
               variant="ghost"
