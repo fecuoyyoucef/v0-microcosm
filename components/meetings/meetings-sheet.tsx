@@ -12,7 +12,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import type { Meeting } from "@/lib/types"
@@ -133,15 +132,17 @@ export function MeetingsSheet({
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden="true" />
                 </div>
               ) : meetings.length === 0 ? (
-                <Empty>
-                  <EmptyMedia>
-                    <CalendarClock className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
-                  </EmptyMedia>
-                  <EmptyTitle>لا توجد اجتماعات</EmptyTitle>
-                  <EmptyDescription>
-                    {isAdmin ? "ابدأ بتحديد موعد اجتماع جديد." : "لم يحدد المسؤول أي اجتماع بعد."}
-                  </EmptyDescription>
-                </Empty>
+                <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-4 rounded-lg border border-dashed p-10 text-center">
+                  <div className="flex size-12 items-center justify-center rounded-lg bg-muted">
+                    <CalendarClock className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-base font-medium tracking-tight">لا توجد اجتماعات</p>
+                    <p className="text-sm text-muted-foreground">
+                      {isAdmin ? "ابدأ بتحديد موعد اجتماع جديد." : "لم يحدد المسؤول أي اجتماع بعد."}
+                    </p>
+                  </div>
+                </div>
               ) : (
                 <>
                   {live.length > 0 && (
