@@ -724,11 +724,10 @@ export const MessageList = React.memo(function MessageList({
               {isPinned && <Pin className="h-2.5 w-2.5 fill-current" />}
               <span>{time}</span>
               {isOwn && (
-                // Two-state read receipt:
-                //  - single tick = delivered (row exists, not yet read by recipient)
-                //  - double tick = read (recipient marked is_read = true)
-                // Previously this SVG always drew BOTH paths so every outgoing
-                // message looked "read" the instant it was sent.
+                // Two-state read receipt driven by message.is_read, which the
+                // container derives from the other members' read cursor:
+                //  - single tick  = delivered (no one has read up to here yet)
+                //  - double tick  = seen (a recipient's cursor passed this msg)
                 <svg
                   width={message.is_read ? 14 : 10}
                   height="10"
