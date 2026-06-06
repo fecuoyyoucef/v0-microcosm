@@ -306,6 +306,9 @@ export type NotificationType =
   | "system"
   | "join_request" // Added new notification types
   | "secondary_created"
+  | "meeting_reminder" // 5 minutes before a scheduled meeting (repeating alarm)
+  | "meeting_started" // meeting start time reached
+  | "meeting_ended" // meeting duration elapsed
 
 export interface Notification {
   id: string
@@ -322,6 +325,22 @@ export interface Notification {
   created_at: string
   sender?: Profile | null
   group?: Group | null
+}
+
+export type MeetingStatus = "scheduled" | "active" | "ended" | "cancelled"
+
+export interface Meeting {
+  id: string
+  group_id: string
+  created_by: string
+  title: string
+  starts_at: string
+  duration_min: number | null
+  status: MeetingStatus
+  reminder_sent_at: string | null
+  started_sent_at: string | null
+  ended_sent_at: string | null
+  created_at: string
 }
 
 // إضافة أنواع نظام الوكلاء الذكاء
