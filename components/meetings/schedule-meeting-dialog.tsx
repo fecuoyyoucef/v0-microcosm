@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
 
@@ -110,9 +110,9 @@ export function ScheduleMeetingDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <FieldGroup>
-          <Field>
-            <FieldLabel htmlFor="meeting-title">عنوان الاجتماع</FieldLabel>
+        <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="meeting-title">عنوان الاجتماع</Label>
             <Input
               id="meeting-title"
               value={title}
@@ -120,10 +120,10 @@ export function ScheduleMeetingDialog({
               placeholder="اجتماع الفريق"
               maxLength={120}
             />
-          </Field>
+          </div>
 
-          <Field>
-            <FieldLabel htmlFor="meeting-time">وقت البدء</FieldLabel>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="meeting-time">وقت البدء</Label>
             <Input
               id="meeting-time"
               type="datetime-local"
@@ -131,10 +131,10 @@ export function ScheduleMeetingDialog({
               min={minLocal}
               onChange={(e) => setStartsAtLocal(e.target.value)}
             />
-          </Field>
+          </div>
 
-          <Field>
-            <FieldLabel htmlFor="meeting-duration">المدة بالدقائق (اختياري)</FieldLabel>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="meeting-duration">المدة بالدقائق (اختياري)</Label>
             <Input
               id="meeting-duration"
               type="number"
@@ -144,8 +144,8 @@ export function ScheduleMeetingDialog({
               onChange={(e) => setDuration(e.target.value)}
               placeholder="مثال: 30"
             />
-          </Field>
-        </FieldGroup>
+          </div>
+        </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
