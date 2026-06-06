@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { ChatHeader } from "./chat-header"
+import { MeetingBanner } from "@/components/meetings/meeting-banner"
+import { useMeetingAlarm } from "@/components/meetings/meeting-alarm-provider"
 import { MessageList } from "./message-list"
 import { MessageInput } from "./message-input"
 import { LayerFilter } from "./layer-filter"
@@ -69,6 +71,13 @@ export function ChatContainer({
   const otherReadCursorRef = useRef<string | null>(null)
   const pendingMessageIds = useRef<Set<string>>(new Set())
   const { translationLanguage } = useSettings()
+  const { acknowledgeMeetingsForGroup } = useMeetingAlarm()
+
+  // Entering a cell silences any active meeting alarm for that cell — this is
+  // the "open from the notification to stop the alarm" behavior.
+  useEffect(() => {
+    acknowledgeMeetingsForGroup(groupId)
+  }, [groupId, acknowledgeMeetingsForGroup])
 
   const resetUnreadCount = useCallback(async () => {
     try {
@@ -942,6 +951,8 @@ export function ChatContainer({
   onMembersUpdate={fetchMembers}
   onlineUserIds={onlineUserIds}
   />
+
+        <MeetingBanner groupId={group.id} isAdmin={currentUserRole === "admin"} />
 
         <LayerFilter
           activeLayer={activeLayer}

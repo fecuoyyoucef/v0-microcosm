@@ -33,6 +33,7 @@ import { useSettings } from "@/components/settings-provider"
 import { FirebasePushProvider } from "@/components/notifications/firebase-push-provider"
 import { ScrollProvider } from "@/lib/contexts/scroll-context"
 import { TutorialShell } from "@/components/tutorial/tutorial-shell"
+import { MeetingAlarmProvider } from "@/components/meetings/meeting-alarm-provider"
 
 interface AppShellProps {
   children: React.ReactNode
@@ -597,9 +598,11 @@ export function AppShell(props: AppShellProps) {
   return (
     <ScrollProvider>
       <FirebasePushProvider userId={props.userId}>
-        <TutorialShell>
-          <AppShellContent {...props} />
-        </TutorialShell>
+        <MeetingAlarmProvider userId={props.userId}>
+          <TutorialShell>
+            <AppShellContent {...props} />
+          </TutorialShell>
+        </MeetingAlarmProvider>
       </FirebasePushProvider>
     </ScrollProvider>
   )
