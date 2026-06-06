@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
             body: m.title,
             groupId: m.group_id,
             data: { meeting_id: m.id, meeting_event: "ended" },
+            useServiceClient: true,
           })
           ends++
           continue
@@ -73,6 +74,7 @@ export async function POST(request: NextRequest) {
           body: m.title,
           groupId: m.group_id,
           data: { meeting_id: m.id, meeting_event: "started" },
+          useServiceClient: true,
         })
         starts++
         continue
@@ -88,6 +90,7 @@ export async function POST(request: NextRequest) {
           body: m.title,
           groupId: m.group_id,
           data: { meeting_id: m.id, meeting_event: "reminder", starts_at: m.starts_at },
+          useServiceClient: true,
         })
         reminders++
       }
