@@ -27,7 +27,7 @@ export function TablePage({ page, members: _members, currentUserId: _currentUser
   const supabase = createClient()
 
   useEffect(() => {
-    const pageContent = page.content as TableContent
+    const pageContent = page.content as unknown as TableContent
     setContent({
       columns: pageContent.columns || ["العمود 1", "العمود 2", "العمود 3"],
       rows: pageContent.rows || [],

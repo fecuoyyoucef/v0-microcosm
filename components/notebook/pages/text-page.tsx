@@ -73,15 +73,13 @@ export function TextPage({ page, members, currentUserId }: TextPageProps) {
     setAddError(null)
 
     try {
-      const nextPosition = contributions.length
-
       const { error } = await supabase
         .from("notebook_contributions")
         .insert({
           page_id: page.id,
           user_id: currentUserId,
           content: { text: newText.trim() },
-          position: nextPosition,
+          // position متروك للقيمة الافتراضية على الخادم؛ نعتمد على created_at للترتيب
         })
         .select()
         .single()
@@ -92,7 +90,7 @@ export function TextPage({ page, members, currentUserId }: TextPageProps) {
       }
 
       setNewText("")
-      fetchContributions()
+      // الـ realtime subscription سيُحدّث القائمة تلقائياً
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "خطأ غير معروف"
       setAddError(`خطأ غير متوقع: ${msg}`)

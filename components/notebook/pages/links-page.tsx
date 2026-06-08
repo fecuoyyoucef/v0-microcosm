@@ -105,7 +105,7 @@ export function LinksPage({ page, members, currentUserId }: LinksPageProps) {
           url: normalized,
           title: newTitle.trim() || normalized,
         },
-        position: contributions.length,
+        // position متروك للقيمة الافتراضية؛ الترتيب يعتمد على created_at
       })
 
       if (error) {
@@ -151,7 +151,7 @@ export function LinksPage({ page, members, currentUserId }: LinksPageProps) {
   const uniqueDomains = useMemo(() => {
     const set = new Set<string>()
     contributions.forEach((c) => {
-      const url = (c.content as LinkItem).url
+      const url = (c.content as unknown as LinkItem).url
       try {
         set.add(new URL(url).hostname)
       } catch {
@@ -217,7 +217,7 @@ export function LinksPage({ page, members, currentUserId }: LinksPageProps) {
           ) : (
             <div className="space-y-2.5">
               {contributions.map((contribution) => {
-                const content = contribution.content as LinkItem
+                const content = contribution.content as unknown as LinkItem
                 const member = getMember(contribution.user_id)
                 const domain = getDomain(content.url)
                 const faviconUrl = getFaviconUrl(content.url)
