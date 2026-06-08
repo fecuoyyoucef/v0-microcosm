@@ -45,6 +45,20 @@ export async function POST(request: NextRequest) {
       if (Number.isNaN(start)) continue
       const minsToStart = (start - now) / 60000
 
+      // Cell (group) name + avatar so the push shows useful context and the
+      // cell image as its large icon instead of the generic app icon.
+      const cell = await groupInfo(svc, m.group_id)
+      // Shared data passed to every meeting push: marks it as a meeting "alert"
+      // so the service worker renders it prominently with the cell image.
+      const meetingData = {
+        meeting_id: m.id,
+        cellName: cell.name,
+        cellAvatar: cell.avatarUrl,
+        is_alert: "true",
+        priority: "high",
+        action_url: `/chat/${m.group_id}`,
+      }
+
       // 3) END: duration elapsed.
       if (m.duration_min && m.status === "active" && !m.ended_sent_at) {
         const end = start + m.duration_min * 60000
@@ -53,10 +67,10 @@ export async function POST(request: NextRequest) {
           await sendNotification({
             userIds: await groupUserIds(svc, m.group_id),
             type: "meeting_ended",
-            title: "انتهى الاجتماع",
+            title: `انتهى الاجتماع في ${cell.name}`,
             body: m.title,
             groupId: m.group_id,
-            data: { meeting_id: m.id, meeting_event: "ended" },
+            data: { ...meetingData, meeting_event: "ended" },
             useServiceClient: true,
           })
           ends++
@@ -70,10 +84,10 @@ export async function POST(request: NextRequest) {
         await sendNotification({
           userIds: await groupUserIds(svc, m.group_id),
           type: "meeting_started",
-          title: "بدأ الاجتماع الآن",
+          title: `بدأ الاجتماع الآن في ${cell.name}`,
           body: m.title,
           groupId: m.group_id,
-          data: { meeting_id: m.id, meeting_event: "started" },
+          data: { ...meetingData, meeting_event: "started" },
           useServiceClient: true,
         })
         starts++
@@ -86,10 +100,10 @@ export async function POST(request: NextRequest) {
         await sendNotification({
           userIds: await groupUserIds(svc, m.group_id),
           type: "meeting_reminder",
-          title: "اجتماع بعد 5 دقائق",
+          title: `اجتماع بعد 5 دقائق في ${cell.name}`,
           body: m.title,
           groupId: m.group_id,
-          data: { meeting_id: m.id, meeting_event: "reminder", starts_at: m.starts_at },
+          data: { ...meetingData, meeting_event: "reminder", starts_at: m.starts_at },
           useServiceClient: true,
         })
         reminders++
@@ -109,4 +123,17 @@ async function groupUserIds(
 ): Promise<string[]> {
   const { data } = await svc.from("group_members").select("user_id").eq("group_id", groupId)
   return (data ?? []).map((r) => r.user_id as string)
+}
+
+// Fetch the cell's display name + avatar so meeting notifications can show the
+// cell name in the title and the cell image as the large notification icon.
+async function groupInfo(
+  svc: ReturnType<typeof createServiceClient>,
+  groupId: string,
+): Promise<{ name: string; avatarUrl: string }> {
+  const { data } = await svc.from("groups").select("name, avatar_url").eq("id", groupId).single()
+  return {
+    name: (data?.name as string) || "الخلية",
+    avatarUrl: (data?.avatar_url as string) || "",
+  }
 }
