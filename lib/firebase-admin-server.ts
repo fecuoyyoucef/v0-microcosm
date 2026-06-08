@@ -165,6 +165,10 @@ export async function sendPushNotificationToMany(
         const message = {
           token,
           data: {
+            // Pass through every custom field (cellName, is_alert, meeting_id,
+            // etc.) so the service worker has full context, then enforce the
+            // core fields below.
+            ...(data || {}),
             // Send as data-only message so the SW has full control
             title,
             body,

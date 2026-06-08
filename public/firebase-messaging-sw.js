@@ -79,12 +79,52 @@ async function showNotificationFromPayload(payload) {
   const senderName = payload.data?.senderName || ""
   const senderAvatar = payload.data?.senderAvatar || ""
   const cellAvatar = payload.data?.cellAvatar || ""
+  const cellName = payload.data?.cellName || ""
+  // Meeting lifecycle pushes are flagged as alerts: they must stand out, stay
+  // on screen, and never get merged into the cell's chat-message notification.
+  const isAlert = payload.data?.is_alert === "true" || payload.data?.is_alert === true
 
-  // Check if user is currently viewing this cell - skip notification if so
-  const activeCellId = await getActiveCellId()
-  if (activeCellId && groupId && activeCellId === groupId) {
-    console.log("[SW] Skipping notification - user is viewing this cell:", groupId)
-    return
+  // Alerts (meetings) are important even while the user is in the cell, so we
+  // only suppress *chat* notifications when the user is viewing that cell.
+  if (!isAlert) {
+    const activeCellId = await getActiveCellId()
+    if (activeCellId && groupId && activeCellId === groupId) {
+      console.log("[SW] Skipping notification - user is viewing this cell:", groupId)
+      return
+    }
+  }
+
+  // ---- Meeting alert: prominent, standalone, never aggregated ----
+  if (isAlert) {
+    // Use the cell image as the large icon; fall back to the app icon.
+    const alertIcon = cellAvatar || "/icons/notification-icon.png"
+    const alertTag = "meeting-alert-" + (payload.data?.meeting_id || groupId || notificationType)
+
+    const alertOptions = {
+      body: cellName ? cellName + "\n" + notificationBody : notificationBody,
+      icon: alertIcon,
+      badge: "/notification-icon.png",
+      // Stronger, attention-grabbing vibration pattern for an alarm-style alert.
+      vibrate: [400, 150, 400, 150, 400],
+      // Keep the alert on screen until the user acts on it.
+      requireInteraction: true,
+      renotify: true,
+      tag: alertTag,
+      silent: false,
+      data: {
+        url: payload.fcmOptions?.link || payload.data?.action_url || payload.data?.url || "/chat/notifications",
+        type: notificationType,
+        groupId: groupId,
+        isAlert: true,
+        ...payload.data,
+      },
+      actions: [
+        { action: "open", title: "الدخول إلى الخلية" },
+      ],
+    }
+
+    console.log("[SW] Showing meeting alert:", notificationTitle, "cell:", cellName)
+    return self.registration.showNotification(notificationTitle, alertOptions)
   }
 
   // Use a stable tag per group so notifications replace (not stack)
