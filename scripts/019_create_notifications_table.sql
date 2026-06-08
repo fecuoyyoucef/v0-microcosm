@@ -12,7 +12,12 @@ CREATE TABLE IF NOT EXISTS notifications (
     'decision_created',
     'decision_closed',
     'memory_generated',
-    'system'
+    'system',
+    'join_request',
+    'secondary_created',
+    'meeting_reminder',
+    'meeting_started',
+    'meeting_ended'
   )),
   title TEXT NOT NULL,
   body TEXT,
