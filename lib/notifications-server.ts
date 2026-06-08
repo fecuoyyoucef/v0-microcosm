@@ -20,6 +20,14 @@ interface SendNotificationParams {
   groupId?: string
   senderId?: string
   messageId?: string
+  /**
+   * When true, use the service-role client for the notifications insert and
+   * token cleanup instead of the session client. Required for sessionless
+   * callers (e.g. cron / the meeting dispatcher) whose requests have no
+   * auth.uid(), which would otherwise be rejected by RLS and silently skip
+   * the push step.
+   */
+  useServiceClient?: boolean
 }
 
 /**
@@ -61,7 +69,9 @@ async function loadPreferencesForUsers(
 }
 
 export async function sendNotification(params: SendNotificationParams) {
-  const supabase = await createClient()
+  // Sessionless callers (cron / meeting dispatch) must bypass RLS, otherwise
+  // the notifications insert below fails and we never reach the push step.
+  const supabase = params.useServiceClient ? createServiceClient() : await createClient()
 
   const recipients = params.senderId ? params.userIds.filter((id) => id !== params.senderId) : params.userIds
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -67,58 +67,29 @@ const translations = {
   },
 }
 
+// Notification types that represent in-cell chatter (regular messages, replies
+// and @mentions). These are surfaced via the per-cell unread badge — not here,
+// to keep the notifications page focused on system-level events
+// (decisions, memory digests, achievements, invitations, announcements, ...).
+const NOISY_NOTIFICATION_TYPES = new Set([
+  "message",
+  "mention",
+  "reply",
+  "new_message",
+  "message_mention",
+])
+
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [userId, setUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState("grouped")
+  const [activeTab, setActiveTab] = useState("all")
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>("default")
   const router = useRouter()
   const supabase = createClient()
   const { language } = useSettings()
   const t = translations[language]
   const isRTL = language === "ar"
-
-  // Group notifications by cell
-  const { groupedNotifications, systemNotifications } = useMemo(() => {
-    const grouped: Record<string, { groupInfo: { name: string; avatar: string | null }; notifications: Notification[] }> = {}
-    const system: Notification[] = []
-
-    notifications.forEach((notif) => {
-      if (!notif.group_id || notif.type === "system") {
-        system.push(notif)
-      } else {
-        if (!grouped[notif.group_id]) {
-          grouped[notif.group_id] = {
-            groupInfo: {
-              name: notif.group?.name || "Unknown",
-              avatar: notif.group?.avatar_url || null,
-            },
-            notifications: [],
-          }
-        }
-        grouped[notif.group_id].notifications.push(notif)
-      }
-    })
-
-    // Sort each group's notifications by created_at descending
-    Object.values(grouped).forEach((group) => {
-      group.notifications.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    })
-
-    return { groupedNotifications: grouped, systemNotifications: system }
-  }, [notifications])
-
-  // Sort grouped notifications by latest message time
-  const sortedGroupIds = useMemo(() => {
-    return Object.entries(groupedNotifications)
-      .sort((a, b) => {
-        const aLatest = a[1].notifications[0]?.created_at || ""
-        const bLatest = b[1].notifications[0]?.created_at || ""
-        return new Date(bLatest).getTime() - new Date(aLatest).getTime()
-      })
-      .map(([groupId]) => groupId)
-  }, [groupedNotifications])
 
   useEffect(() => {
     checkUser()
@@ -154,9 +125,14 @@ export default function NotificationsPage() {
     }
 
     if (data) {
+      // Filter out in-cell chatter (messages, replies, mentions) — those live
+      // on the cell unread badge. The notifications page only shows
+      // system-level events.
+      const filtered = data.filter((n: any) => !NOISY_NOTIFICATION_TYPES.has(n.type))
+
       // Fetch related data separately to handle nulls
       const notificationsWithRelations = await Promise.all(
-        data.map(async (notif) => {
+        filtered.map(async (notif) => {
           let sender = null
           let group = null
 

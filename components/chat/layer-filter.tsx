@@ -11,6 +11,7 @@ import {
   MagnifyingGlassIcon,
   ChartBarIcon,
   ArrowTrendingUpIcon,
+  ClipboardDocumentListIcon,
 } from "@heroicons/react/24/solid"
 import type { MessageLayer, ConversationNode } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -144,6 +145,13 @@ export function LayerFilter({
               <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-amber-500/10">
                 <CheckCircleIcon className="w-3.5 h-3.5 text-amber-600" />
                 القرارات
+              </Button>
+            </Link>
+
+            <Link href={`/chat/${groupId}/questionnaires`}>
+              <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 rounded-full hover:bg-rose-500/10">
+                <ClipboardDocumentListIcon className="w-3.5 h-3.5 text-rose-600" />
+                الاستبيانات
               </Button>
             </Link>
 

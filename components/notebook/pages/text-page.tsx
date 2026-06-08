@@ -27,12 +27,15 @@ export function TextPage({ page, members, currentUserId }: TextPageProps) {
   const supabase = createClient()
 
   const fetchContributions = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("notebook_contributions")
-      .select("*, contributor:profiles(*)")
+      .select("*")
       .eq("page_id", page.id)
       .order("position", { ascending: true })
 
+    if (error) {
+      console.log("[v0] text-page fetch error:", error.message)
+    }
     if (data) {
       setContributions(data)
     }

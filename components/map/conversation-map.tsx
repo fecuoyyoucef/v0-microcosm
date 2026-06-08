@@ -1,6 +1,7 @@
 "use client"
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import * as d3 from "d3"
+import { useTheme } from "next-themes"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,7 +17,21 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Plus, ChevronLeft, Hash, Loader2, Search, X, ChevronDown, ChevronRight } from "lucide-react"
+import {
+  Plus,
+  ChevronLeft,
+  Hash,
+  Loader2,
+  Search,
+  X,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  Pencil,
+  Trash2,
+  GitMerge,
+  AlertTriangle,
+} from "lucide-react"
 import Link from "next/link"
 import type { ConversationNode, Group, Message } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -30,14 +45,58 @@ interface ConversationMapProps {
 
 const NODE_COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#06B6D4"]
 
-interface TreeNode extends d3.HierarchyNode<ConversationNode> {
-  _children?: TreeNode[]
-  collapsed?: boolean
+// Visual constants matching the NotebookLM reference
+const NODE_WIDTH = 200
+const NODE_HEIGHT = 56
+const NODE_RADIUS = 14
+const TOGGLE_RADIUS = 14
+const TOGGLE_GAP = 10 // gap between node edge and toggle button
+const LEVEL_GAP = 280 // horizontal distance between levels
+const SIBLING_GAP = 24 // vertical gap between siblings
+
+// Maximum allowed depth in the tree (root nodes = level 1).
+// New child nodes can only be created if parent depth < MAX_DEPTH.
+const MAX_DEPTH = 6
+
+// Theme-aware palette. Light palette matches the NotebookLM reference,
+// dark palette uses the app's deep-navy surface tokens.
+const LIGHT_PALETTE = {
+  bg: "#FAFAF7",
+  nodeFill: "#2C3540",
+  nodeFillRoot: "#574F6E",
+  nodeText: "#FFFFFF",
+  link: "#A8B5E8",
+  toggleFill: "#2C3540",
+  toggleText: "#FFFFFF",
+  shadow: "rgba(0,0,0,0.12)",
+}
+
+const DARK_PALETTE = {
+  bg: "transparent", // let bg-background show through
+  nodeFill: "#1E2733", // slightly lighter than the deep-navy bg for contrast
+  nodeFillRoot: "#6B5FA0", // brighter lavender for dark mode
+  nodeText: "#F5F7FB",
+  link: "#8B9BD9", // brighter lavender-blue
+  toggleFill: "#2A3441",
+  toggleText: "#F5F7FB",
+  shadow: "rgba(0,0,0,0.5)",
+}
+
+interface HierarchyNodeData {
+  id: string
+  title: string
+  color?: string
+  messages_count?: number
+  description?: string | null
+  children?: HierarchyNodeData[]
+  _raw?: ConversationNode
 }
 
 export function ConversationMap({ groupId, group, nodes: initialNodes, currentUserId }: ConversationMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
+  const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null)
+  const gRef = useRef<SVGGElement | null>(null)
   const [selectedNode, setSelectedNode] = useState<ConversationNode | null>(null)
   const [nodeMessages, setNodeMessages] = useState<Message[]>([])
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
@@ -49,9 +108,39 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
   const [isCreating, setIsCreating] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [localNodes, setLocalNodes] = useState<ConversationNode[]>(initialNodes)
-  const [isHorizontal, setIsHorizontal] = useState(true)
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
   const supabase = createClient()
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 })
+
+  // Long-press action menu state.
+  // When set, a floating context menu is rendered near (x, y) for the given node.
+  const [actionMenuNode, setActionMenuNode] = useState<ConversationNode | null>(null)
+  const [actionMenuPos, setActionMenuPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+
+  // Edit dialog state
+  const [editOpen, setEditOpen] = useState(false)
+  const [editNode, setEditNode] = useState<ConversationNode | null>(null)
+  const [editTitle, setEditTitle] = useState("")
+  const [editDescription, setEditDescription] = useState("")
+  const [editColor, setEditColor] = useState(NODE_COLORS[0])
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
+
+  // Delete confirm dialog state
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteNode, setDeleteNode] = useState<ConversationNode | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  // Merge dialog state
+  const [mergeOpen, setMergeOpen] = useState(false)
+  const [mergeSource, setMergeSource] = useState<ConversationNode | null>(null)
+  const [mergeTargetId, setMergeTargetId] = useState<string>("")
+  const [mergeNewName, setMergeNewName] = useState("")
+  const [isMerging, setIsMerging] = useState(false)
+  const [mergeError, setMergeError] = useState<string | null>(null)
+
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === "dark"
+  const palette = isDark ? DARK_PALETTE : LIGHT_PALETTE
 
   useEffect(() => {
     const updateSize = () => {
@@ -62,7 +151,6 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
         })
       }
     }
-
     updateSize()
     window.addEventListener("resize", updateSize)
     return () => window.removeEventListener("resize", updateSize)
@@ -89,14 +177,10 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
             .select("*")
             .eq("group_id", groupId)
             .order("created_at", { ascending: true })
-
-          if (data) {
-            setLocalNodes(data)
-          }
+          if (data) setLocalNodes(data)
         },
       )
       .subscribe()
-
     return () => {
       supabase.removeChannel(channel)
     }
@@ -104,7 +188,6 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
 
   const createNode = async () => {
     if (!newNodeTitle.trim()) return
-
     setIsCreating(true)
     try {
       const { error } = await supabase.from("conversation_nodes").insert({
@@ -117,7 +200,6 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
         position_y: 0,
         created_by: currentUserId,
       })
-
       if (!error) {
         setNewNodeTitle("")
         setNewNodeDescription("")
@@ -132,18 +214,15 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
   const handleNodeClick = async (node: ConversationNode) => {
     setSelectedNode(node)
     setIsLoadingMessages(true)
-
     try {
       const { data: messagesData } = await supabase
         .from("messages")
         .select("*")
         .eq("node_id", node.id)
         .order("created_at", { ascending: true })
-
       if (messagesData && messagesData.length > 0) {
         const senderIds = [...new Set(messagesData.map((m) => m.sender_id))]
         const { data: profiles } = await supabase.from("profiles").select("*").in("id", senderIds)
-
         const profileMap = new Map(profiles?.map((p) => [p.id, p]) || [])
         const messagesWithSender = messagesData.map((m) => ({
           ...m,
@@ -161,210 +240,548 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
     }
   }
 
-  const buildHierarchy = (nodes: ConversationNode[]) => {
-    const rootNodes = nodes.filter((n) => !n.parent_id)
-    if (rootNodes.length === 0) return null
+  // ----- Long-press / action handlers -----
 
-    const nodeMap = new Map(nodes.map((n) => [n.id, { ...n, children: [] as any[] }]))
-
-    nodes.forEach((node) => {
-      if (node.parent_id) {
-        const parent = nodeMap.get(node.parent_id)
-        const child = nodeMap.get(node.id)
-        if (parent && child) {
-          parent.children.push(child)
-        }
-      }
+  // Open the floating action menu anchored near the given screen position.
+  const openActionMenu = useCallback((node: ConversationNode, screenX: number, screenY: number) => {
+    if (!containerRef.current) return
+    const rect = containerRef.current.getBoundingClientRect()
+    // Position relative to the canvas container so it scrolls/moves with it.
+    setActionMenuPos({
+      x: Math.max(8, Math.min(screenX - rect.left, rect.width - 200)),
+      y: Math.max(8, Math.min(screenY - rect.top, rect.height - 180)),
     })
+    setActionMenuNode(node)
+  }, [])
 
-    if (rootNodes.length === 1) {
-      return nodeMap.get(rootNodes[0].id)
+  const closeActionMenu = useCallback(() => setActionMenuNode(null), [])
+
+  // ----- Edit -----
+  const beginEdit = useCallback((node: ConversationNode) => {
+    setEditNode(node)
+    setEditTitle(node.title)
+    setEditDescription(node.description || "")
+    setEditColor(node.color || NODE_COLORS[0])
+    setEditOpen(true)
+    closeActionMenu()
+  }, [closeActionMenu])
+
+  const saveEdit = async () => {
+    if (!editNode || !editTitle.trim()) return
+    setIsSavingEdit(true)
+    try {
+      const { error } = await supabase
+        .from("conversation_nodes")
+        .update({
+          title: editTitle.trim(),
+          description: editDescription.trim() || null,
+          color: editColor,
+        })
+        .eq("id", editNode.id)
+      if (!error) {
+        // Optimistic local update (realtime will also refresh).
+        setLocalNodes((prev) =>
+          prev.map((n) =>
+            n.id === editNode.id
+              ? { ...n, title: editTitle.trim(), description: editDescription.trim() || null, color: editColor }
+              : n,
+          ),
+        )
+        setEditOpen(false)
+        setEditNode(null)
+      }
+    } finally {
+      setIsSavingEdit(false)
+    }
+  }
+
+  // ----- Delete -----
+  const beginDelete = useCallback((node: ConversationNode) => {
+    setDeleteNode(node)
+    setDeleteOpen(true)
+    closeActionMenu()
+  }, [closeActionMenu])
+
+  const confirmDelete = async () => {
+    if (!deleteNode) return
+    setIsDeleting(true)
+    try {
+      // Re-parent direct children to the deleted node's parent (could be null = roots).
+      await supabase
+        .from("conversation_nodes")
+        .update({ parent_id: deleteNode.parent_id })
+        .eq("parent_id", deleteNode.id)
+
+      // Detach messages from the deleted node (set node_id = null).
+      await supabase.from("messages").update({ node_id: null }).eq("node_id", deleteNode.id)
+
+      // Delete the node itself.
+      const { error } = await supabase.from("conversation_nodes").delete().eq("id", deleteNode.id)
+
+      if (!error) {
+        setLocalNodes((prev) =>
+          prev
+            .map((n) => (n.parent_id === deleteNode.id ? { ...n, parent_id: deleteNode.parent_id } : n))
+            .filter((n) => n.id !== deleteNode.id),
+        )
+        if (selectedNode?.id === deleteNode.id) setSelectedNode(null)
+        setDeleteOpen(false)
+        setDeleteNode(null)
+      }
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  // ----- Merge -----
+  const beginMerge = useCallback((node: ConversationNode) => {
+    setMergeSource(node)
+    setMergeTargetId("")
+    setMergeNewName(node.title)
+    setMergeError(null)
+    setMergeOpen(true)
+    closeActionMenu()
+  }, [closeActionMenu])
+
+  // Build the set of descendants for a given node id (used to prevent merging
+  // a node into its own descendant which would create a cycle).
+  const getDescendantIds = useCallback(
+    (rootId: string): Set<string> => {
+      const ids = new Set<string>()
+      const stack = [rootId]
+      while (stack.length) {
+        const cur = stack.pop()!
+        localNodes.forEach((n) => {
+          if (n.parent_id === cur && !ids.has(n.id)) {
+            ids.add(n.id)
+            stack.push(n.id)
+          }
+        })
+      }
+      return ids
+    },
+    [localNodes],
+  )
+
+  const confirmMerge = async () => {
+    if (!mergeSource || !mergeTargetId || !mergeNewName.trim()) return
+    if (mergeSource.id === mergeTargetId) {
+      setMergeError("لا يمكن دمج العقدة مع نفسها")
+      return
+    }
+    const descendants = getDescendantIds(mergeSource.id)
+    if (descendants.has(mergeTargetId)) {
+      setMergeError("لا يمكن الدمج مع عقدة من فروع نفس العقدة")
+      return
+    }
+    setIsMerging(true)
+    setMergeError(null)
+    try {
+      // 1) Move every message from source → target.
+      await supabase.from("messages").update({ node_id: mergeTargetId }).eq("node_id", mergeSource.id)
+
+      // 2) Re-parent source's direct children to the target node.
+      await supabase
+        .from("conversation_nodes")
+        .update({ parent_id: mergeTargetId })
+        .eq("parent_id", mergeSource.id)
+
+      // 3) Rename the target node to the new name.
+      await supabase.from("conversation_nodes").update({ title: mergeNewName.trim() }).eq("id", mergeTargetId)
+
+      // 4) Delete the source node.
+      const { error } = await supabase.from("conversation_nodes").delete().eq("id", mergeSource.id)
+
+      if (error) {
+        setMergeError(error.message)
+      } else {
+        setLocalNodes((prev) =>
+          prev
+            .map((n) => {
+              if (n.id === mergeTargetId) return { ...n, title: mergeNewName.trim() }
+              if (n.parent_id === mergeSource.id) return { ...n, parent_id: mergeTargetId }
+              return n
+            })
+            .filter((n) => n.id !== mergeSource.id),
+        )
+        if (selectedNode?.id === mergeSource.id) setSelectedNode(null)
+        setMergeOpen(false)
+        setMergeSource(null)
+      }
+    } catch (e: any) {
+      setMergeError(e?.message || "حدث خطأ أثناء الدمج")
+    } finally {
+      setIsMerging(false)
+    }
+  }
+
+  const toggleCollapse = useCallback((id: string) => {
+    setCollapsedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  // Build hierarchy, respecting collapsed state
+  const hierarchyData = useMemo<HierarchyNodeData | null>(() => {
+    if (localNodes.length === 0) return null
+
+    const rootNodes = localNodes.filter((n) => !n.parent_id)
+
+    const buildChildren = (parentId: string): HierarchyNodeData[] => {
+      return localNodes
+        .filter((n) => n.parent_id === parentId)
+        .map((n) => ({
+          id: n.id,
+          title: n.title,
+          color: n.color,
+          messages_count: n.messages_count,
+          description: n.description,
+          _raw: n,
+          children: collapsedIds.has(n.id) ? undefined : buildChildren(n.id),
+        }))
     }
 
     return {
+      // The render effect chooses the actual fill for "virtual-root" from the
+      // active palette, so we don't bake a theme-specific color in here.
       id: "virtual-root",
       title: group.name,
-      color: "#6366f1",
-      children: rootNodes.map((r) => nodeMap.get(r.id)).filter(Boolean),
+      children: rootNodes.map((r) => ({
+        id: r.id,
+        title: r.title,
+        color: r.color,
+        messages_count: r.messages_count,
+        description: r.description,
+        _raw: r,
+        children: collapsedIds.has(r.id) ? undefined : buildChildren(r.id),
+      })),
     }
-  }
+  }, [localNodes, collapsedIds, group.name])
 
-  const toggleNode = (d: TreeNode) => {
-    if (d.children) {
-      d._children = d.children
-      d.children = undefined as any
-      d.collapsed = true
-    } else if (d._children) {
-      d.children = d._children
-      d._children = undefined
-      d.collapsed = false
+  // Determine which nodes have hidden children (collapsed) vs visible children (expandable indicator)
+  const childCountMap = useMemo(() => {
+    const map = new Map<string, number>()
+    localNodes.forEach((n) => {
+      const count = localNodes.filter((x) => x.parent_id === n.id).length
+      map.set(n.id, count)
+    })
+    return map
+  }, [localNodes])
+
+  // Compute the depth (level) of every node. Root nodes (no parent) are at depth 1.
+  // Used to enforce MAX_DEPTH when picking a parent for a new node.
+  const depthMap = useMemo(() => {
+    const map = new Map<string, number>()
+    const byParent = new Map<string | null, ConversationNode[]>()
+    localNodes.forEach((n) => {
+      const key = n.parent_id || null
+      const arr = byParent.get(key) || []
+      arr.push(n)
+      byParent.set(key, arr)
+    })
+    const visit = (node: ConversationNode, depth: number) => {
+      map.set(node.id, depth)
+      const children = byParent.get(node.id) || []
+      children.forEach((c) => visit(c, depth + 1))
     }
-  }
+    ;(byParent.get(null) || []).forEach((root) => visit(root, 1))
+    return map
+  }, [localNodes])
 
+  const fitToScreen = useCallback(() => {
+    if (!svgRef.current || !zoomRef.current || !gRef.current) return
+    const svg = d3.select(svgRef.current)
+    const bounds = gRef.current.getBBox()
+    const width = containerSize.width
+    const height = containerSize.height
+    const scale = Math.min(width / (bounds.width + 100), height / (bounds.height + 100), 1.2)
+    const tx = width / 2 - (bounds.x + bounds.width / 2) * scale
+    const ty = height / 2 - (bounds.y + bounds.height / 2) * scale
+    svg.transition().duration(500).call(zoomRef.current.transform, d3.zoomIdentity.translate(tx, ty).scale(scale))
+  }, [containerSize])
+
+  const zoomIn = useCallback(() => {
+    if (!svgRef.current || !zoomRef.current) return
+    d3.select(svgRef.current).transition().duration(250).call(zoomRef.current.scaleBy, 1.3)
+  }, [])
+
+  const zoomOut = useCallback(() => {
+    if (!svgRef.current || !zoomRef.current) return
+    d3.select(svgRef.current).transition().duration(250).call(zoomRef.current.scaleBy, 0.7)
+  }, [])
+
+  // Main render effect
   useEffect(() => {
-    if (!svgRef.current || localNodes.length === 0) return
+    if (!svgRef.current || !hierarchyData) return
 
     const width = containerSize.width
     const height = containerSize.height
-    const margin = { top: 40, right: 120, bottom: 40, left: 120 }
+    const svgSel = d3.select(svgRef.current)
+    svgSel.selectAll("*").remove()
 
-    d3.select(svgRef.current).selectAll("*").remove()
+    // Filter definitions
+    const defs = svgSel.append("defs")
+    const filter = defs.append("filter")
+      .attr("id", "soft-shadow")
+      .attr("x", "-50%")
+      .attr("y", "-50%")
+      .attr("width", "200%")
+      .attr("height", "200%")
+    filter.append("feDropShadow")
+      .attr("dx", 0)
+      .attr("dy", 2)
+      .attr("stdDeviation", 3)
+      .attr("flood-color", palette.shadow)
 
-    const hierarchyData = buildHierarchy(localNodes)
-    if (!hierarchyData) return
+    svgSel.attr("width", width).attr("height", height)
 
-    const root = d3.hierarchy(hierarchyData as any) as TreeNode
+    const g = svgSel.append("g")
+    gRef.current = g.node()
 
-    const treeLayout = d3.tree<ConversationNode>().nodeSize(isHorizontal ? [80, 250] : [250, 80])
+    // Tree layout: LTR, root on left
+    const root = d3.hierarchy<HierarchyNodeData>(hierarchyData)
+    const treeLayout = d3
+      .tree<HierarchyNodeData>()
+      .nodeSize([NODE_HEIGHT + SIBLING_GAP, LEVEL_GAP])
+      .separation((a, b) => (a.parent === b.parent ? 1 : 1.3))
 
-    treeLayout(root as any)
+    treeLayout(root)
 
-    const svg = d3
-      .select(svgRef.current)
-      .attr("width", width)
-      .attr("height", height)
-      .attr("viewBox", `${-width / 2} ${-height / 2} ${width} ${height}`)
+    // After layout: d.x is vertical position, d.y is horizontal
+    // Compute bounds for centering
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+    root.descendants().forEach((d) => {
+      if (d.x < minX) minX = d.x
+      if (d.x > maxX) maxX = d.x
+      if (d.y < minY) minY = d.y
+      if (d.y > maxY) maxY = d.y
+    })
 
-    const g = svg.append("g").attr("transform", `translate(${margin.left}, ${height / 2})`)
+    const treeW = maxY - minY + NODE_WIDTH + TOGGLE_RADIUS * 2 + 40
+    const treeH = maxX - minX + NODE_HEIGHT + 40
+    const scale = Math.min(width / treeW, height / treeH, 1)
+    const tx = width / 2 - ((minY + maxY) / 2) * scale
+    const ty = height / 2 - ((minX + maxX) / 2) * scale
 
+    // Setup zoom
     const zoom = d3
-      .zoom()
-      .scaleExtent([0.3, 3])
+      .zoom<SVGSVGElement, unknown>()
+      .scaleExtent([0.15, 3])
       .on("zoom", (event) => {
-        g.attr("transform", event.transform)
+        g.attr("transform", event.transform.toString())
+      })
+    zoomRef.current = zoom
+    svgSel.call(zoom)
+    svgSel.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale))
+
+    // Draw links as smooth bezier curves
+    const linksLayer = g.append("g").attr("class", "links")
+    linksLayer
+      .selectAll("path")
+      .data(root.links())
+      .join("path")
+      .attr("d", (d) => {
+        // Source connection point: right edge of source node + toggle button
+        const sx = d.source.y + NODE_WIDTH / 2 + TOGGLE_GAP + TOGGLE_RADIUS
+        const sy = d.source.x
+        // Target connection point: left edge of target node
+        const tx2 = d.target.y - NODE_WIDTH / 2
+        const ty2 = d.target.x
+        const midX = (sx + tx2) / 2
+        return `M${sx},${sy} C${midX},${sy} ${midX},${ty2} ${tx2},${ty2}`
+      })
+      .attr("fill", "none")
+      .attr("stroke", palette.link)
+      .attr("stroke-width", 2)
+      .attr("stroke-linecap", "round")
+      .attr("opacity", 0)
+      .transition()
+      .duration(400)
+      .attr("opacity", 0.7)
+
+    // Draw nodes
+    const nodesLayer = g.append("g").attr("class", "nodes")
+    const nodeGroups = nodesLayer
+      .selectAll("g.node")
+      .data(root.descendants(), (d) => (d as d3.HierarchyNode<HierarchyNodeData>).data.id)
+      .join("g")
+      .attr("class", "node")
+      .attr("transform", (d) => `translate(${d.y},${d.x})`)
+      .style("opacity", 0)
+
+    nodeGroups.transition().duration(400).style("opacity", 1)
+
+    // Node rectangle
+    nodeGroups
+      .append("rect")
+      .attr("x", -NODE_WIDTH / 2)
+      .attr("y", -NODE_HEIGHT / 2)
+      .attr("width", NODE_WIDTH)
+      .attr("height", NODE_HEIGHT)
+      .attr("rx", NODE_RADIUS)
+      .attr("ry", NODE_RADIUS)
+      .attr("fill", (d) => (d.data.id === "virtual-root" ? palette.nodeFillRoot : palette.nodeFill))
+      .attr("stroke", (d) => (selectedNode?.id === d.data.id ? d.data.color || palette.link : "transparent"))
+      .attr("stroke-width", 3)
+      .attr("filter", "url(#soft-shadow)")
+      .style("cursor", "pointer")
+      .each(function (d) {
+        // Long-press detection per node.
+        // - tap (short press) opens the node sidebar (existing behavior)
+        // - long press (>= 500ms without significant movement) opens the action menu
+        // The virtual root is excluded since it isn't a real node.
+        if (d.data.id === "virtual-root" || !d.data._raw) return
+        const node = d.data._raw
+        const sel = d3.select(this)
+        let timer: ReturnType<typeof setTimeout> | null = null
+        let longPressFired = false
+        let startX = 0
+        let startY = 0
+        const LONG_PRESS_MS = 450
+        const MOVE_THRESHOLD = 6 // pixels
+
+        const clearTimer = () => {
+          if (timer) {
+            clearTimeout(timer)
+            timer = null
+          }
+        }
+
+        sel.on("pointerdown", (event: PointerEvent) => {
+          event.stopPropagation()
+          longPressFired = false
+          startX = event.clientX
+          startY = event.clientY
+          clearTimer()
+          timer = setTimeout(() => {
+            longPressFired = true
+            openActionMenu(node, event.clientX, event.clientY)
+          }, LONG_PRESS_MS)
+        })
+
+        sel.on("pointermove", (event: PointerEvent) => {
+          if (!timer) return
+          if (
+            Math.abs(event.clientX - startX) > MOVE_THRESHOLD ||
+            Math.abs(event.clientY - startY) > MOVE_THRESHOLD
+          ) {
+            clearTimer()
+          }
+        })
+
+        sel.on("pointerup", (event: PointerEvent) => {
+          event.stopPropagation()
+          clearTimer()
+          if (!longPressFired) {
+            handleNodeClick(node)
+          }
+        })
+
+        sel.on("pointercancel pointerleave", () => {
+          clearTimer()
+        })
+      })
+      .on("mouseenter", function () {
+        d3.select(this).transition().duration(120).attr("transform", "scale(1.03)")
+      })
+      .on("mouseleave", function () {
+        d3.select(this).transition().duration(120).attr("transform", "scale(1)")
       })
 
-    svg.call(zoom as any)
+    // Node title text
+    nodeGroups
+      .append("text")
+      .attr("text-anchor", "middle")
+      .attr("dy", "0.35em")
+      .attr("font-size", 14)
+      .attr("font-weight", 500)
+      .attr("fill", palette.nodeText)
+      .attr("pointer-events", "none")
+      .style("font-family", "system-ui, -apple-system, sans-serif")
+      .text((d) => {
+        const t = d.data.title || ""
+        return t.length > 22 ? t.substring(0, 20) + "…" : t
+      })
 
-    const update = (source: TreeNode) => {
-      const nodes = root.descendants()
-      const links = root.links()
-
-      const linkPath = (d: any) => {
-        if (isHorizontal) {
-          return `M${d.source.y},${d.source.x}
-                  C${(d.source.y + d.target.y) / 2},${d.source.x}
-                   ${(d.source.y + d.target.y) / 2},${d.target.x}
-                   ${d.target.y},${d.target.x}`
-        } else {
-          return `M${d.source.x},${d.source.y}
-                  C${d.source.x},${(d.source.y + d.target.y) / 2}
-                   ${d.target.x},${(d.source.y + d.target.y) / 2}
-                   ${d.target.x},${d.target.y}`
-        }
-      }
-
-      const link = g
-        .selectAll(".link")
-        .data(links, (d: any) => d.target.data.id)
-        .join("path")
-        .attr("class", "link")
-        .attr("d", linkPath as any)
-        .attr("fill", "none")
-        .attr("stroke", (d: any) => d.target.data.color || "#64748b")
-        .attr("stroke-width", 2)
-        .attr("stroke-opacity", 0.4)
-
-      const node = g
-        .selectAll(".node")
-        .data(nodes, (d: any) => d.data.id)
-        .join("g")
-        .attr("class", "node")
-        .attr("transform", (d: any) => (isHorizontal ? `translate(${d.y},${d.x})` : `translate(${d.x},${d.y})`))
-        .attr("cursor", "pointer")
-        .on("click", (event: any, d: any) => {
-          event.stopPropagation()
-          if (d.data.id !== "virtual-root") {
-            handleNodeClick(d.data)
-          }
-          if (d.children || d._children) {
-            toggleNode(d)
-            update(d)
-          }
-        })
-
-      node
-        .append("rect")
-        .attr("width", 180)
-        .attr("height", 60)
-        .attr("x", -90)
-        .attr("y", -30)
-        .attr("rx", 8)
-        .attr("fill", (d: any) => d.data.color || "#3b82f6")
-        .attr("fill-opacity", 0.15)
-        .attr("stroke", (d: any) => d.data.color || "#3b82f6")
-        .attr("stroke-width", 2)
-        .style("filter", (d: any) => (selectedNode?.id === d.data.id ? "drop-shadow(0 0 8px rgba(0,0,0,0.3))" : "none"))
-
-      node
-        .append("text")
-        .attr("dy", -5)
-        .attr("text-anchor", "middle")
-        .attr("font-size", 13)
-        .attr("font-weight", "600")
-        .attr("fill", (d: any) => d.data.color || "#3b82f6")
-        .text((d: any) => {
-          const title = d.data.title || ""
-          return title.length > 20 ? title.substring(0, 18) + "..." : title
-        })
-
-      node
-        .filter((d: any) => d.data.messages_count > 0)
-        .append("circle")
-        .attr("cx", 70)
-        .attr("cy", -20)
-        .attr("r", 12)
-        .attr("fill", (d: any) => d.data.color || "#3b82f6")
-
-      node
-        .filter((d: any) => d.data.messages_count > 0)
-        .append("text")
-        .attr("x", 70)
-        .attr("y", -20)
-        .attr("dy", 4)
-        .attr("text-anchor", "middle")
-        .attr("font-size", 10)
-        .attr("font-weight", "bold")
-        .attr("fill", "white")
-        .text((d: any) => d.data.messages_count)
-
-      node
-        .filter((d: any) => d.children || d._children)
-        .append("circle")
-        .attr("cx", isHorizontal ? 90 : 0)
-        .attr("cy", isHorizontal ? 0 : 30)
-        .attr("r", 10)
-        .attr("fill", (d: any) => d.data.color || "#3b82f6")
-        .attr("stroke", "white")
-        .attr("stroke-width", 2)
-
-      node
-        .filter((d: any) => d.children || d._children)
-        .append("text")
-        .attr("x", isHorizontal ? 90 : 0)
-        .attr("y", isHorizontal ? 0 : 30)
-        .attr("dy", 4)
-        .attr("text-anchor", "middle")
-        .attr("font-size", 12)
-        .attr("fill", "white")
-        .attr("font-weight", "bold")
-        .text((d: any) => (d.collapsed ? "+" : "-"))
-    }
-
-    update(root)
-
-    return () => {
-      svg.selectAll("*").remove()
-    }
-  }, [localNodes, selectedNode?.id, containerSize, isHorizontal, group.name])
-
-  const filteredNodes = searchQuery
-    ? localNodes.filter(
-        (n) =>
-          n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          n.description?.toLowerCase().includes(searchQuery.toLowerCase()),
+    // Toggle indicator on the right of each node that has children
+    const togglesLayer = g.append("g").attr("class", "toggles")
+    const toggleGroups = togglesLayer
+      .selectAll("g.toggle")
+      .data(
+        root.descendants().filter((d) => {
+          if (d.data.id === "virtual-root") return (d.children?.length || 0) > 0
+          const realCount = childCountMap.get(d.data.id) || 0
+          return realCount > 0
+        }),
       )
-    : localNodes
+      .join("g")
+      .attr("class", "toggle")
+      .attr("transform", (d) => `translate(${d.y + NODE_WIDTH / 2 + TOGGLE_GAP + TOGGLE_RADIUS},${d.x})`)
+      .style("cursor", "pointer")
+      .on("click", (event, d) => {
+        event.stopPropagation()
+        if (d.data.id !== "virtual-root") toggleCollapse(d.data.id)
+      })
+
+    toggleGroups
+      .append("circle")
+      .attr("r", TOGGLE_RADIUS)
+      .attr("fill", palette.toggleFill)
+      .attr("filter", "url(#soft-shadow)")
+
+    toggleGroups
+      .append("text")
+      .attr("text-anchor", "middle")
+      .attr("dy", "0.35em")
+      .attr("font-size", 16)
+      .attr("font-weight", 600)
+      .attr("fill", palette.toggleText)
+      .attr("pointer-events", "none")
+      .text((d) => {
+        const isCollapsed = collapsedIds.has(d.data.id)
+        // `<` indicates expanded (showing children), `>` indicates collapsed (can expand)
+        return isCollapsed ? ">" : "<"
+      })
+
+    // Message count badge (small pill below title, only if has messages)
+    nodeGroups
+      .filter((d) => (d.data.messages_count || 0) > 0)
+      .each(function (d) {
+        const sel = d3.select(this)
+        const count = d.data.messages_count || 0
+        const text = `${count}`
+        const badgeR = 9
+        sel
+          .append("circle")
+          .attr("cx", NODE_WIDTH / 2 - 14)
+          .attr("cy", -NODE_HEIGHT / 2 + 14)
+          .attr("r", badgeR)
+          .attr("fill", d.data.color || palette.link)
+        sel
+          .append("text")
+          .attr("x", NODE_WIDTH / 2 - 14)
+          .attr("y", -NODE_HEIGHT / 2 + 14)
+          .attr("text-anchor", "middle")
+          .attr("dy", "0.35em")
+          .attr("font-size", 10)
+          .attr("font-weight", 700)
+          .attr("fill", "#FFFFFF")
+          .attr("pointer-events", "none")
+          .text(text)
+      })
+  }, [
+    hierarchyData,
+    containerSize,
+    collapsedIds,
+    selectedNode?.id,
+    childCountMap,
+    toggleCollapse,
+    palette,
+    openActionMenu,
+  ])
 
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
@@ -378,8 +795,6 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
           <div className="flex items-center gap-2 min-w-0">
             <Hash className="w-4 h-4 text-primary shrink-0" />
             <span className="font-medium truncate">{group.name}</span>
-            <span className="text-muted-foreground hidden sm:inline">/</span>
-            <span className="text-muted-foreground hidden sm:inline">خريطة المحادثة</span>
           </div>
         </div>
 
@@ -393,16 +808,6 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
               className="w-48 pr-9 h-8 bg-background"
             />
           </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 hidden md:flex bg-transparent"
-            onClick={() => setIsHorizontal(!isHorizontal)}
-          >
-            {isHorizontal ? <ChevronRight className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
-            <span className="text-xs">{isHorizontal ? "أفقي" : "عمودي"}</span>
-          </Button>
 
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
@@ -444,12 +849,22 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
                     className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
                   >
                     <option value="">بدون (عقدة رئيسية)</option>
-                    {localNodes.map((node) => (
-                      <option key={node.id} value={node.id}>
-                        {node.title}
-                      </option>
-                    ))}
+                    {localNodes.map((node) => {
+                      const depth = depthMap.get(node.id) || 1
+                      // A node can be a parent only if its depth < MAX_DEPTH,
+                      // because the new child will be at depth + 1.
+                      const disabled = depth >= MAX_DEPTH
+                      return (
+                        <option key={node.id} value={node.id} disabled={disabled}>
+                          {node.title}
+                          {disabled ? "  (وصلت للحد الأقصى)" : ""}
+                        </option>
+                      )
+                    })}
                   </select>
+                  <p className="text-xs text-muted-foreground">
+                    الحد الأقصى للتسلسل هو {MAX_DEPTH} مستويات.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label>اللون</Label>
@@ -486,9 +901,82 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
       <div className="flex-1 flex overflow-hidden min-h-0">
         <div
           ref={containerRef}
-          className="flex-1 overflow-hidden relative bg-gradient-to-br from-background to-muted/20"
+          className="flex-1 overflow-hidden relative bg-background"
+          style={isDark ? undefined : { background: palette.bg }}
+          dir="ltr"
         >
-          <svg ref={svgRef} className="w-full h-full" />
+          {/* Disable text selection + iOS callout so long-press behaves like Telegram (no text-select). */}
+          <svg
+            ref={svgRef}
+            className="w-full h-full select-none"
+            style={{
+              WebkitUserSelect: "none",
+              userSelect: "none",
+              WebkitTouchCallout: "none",
+              touchAction: "none",
+            }}
+          />
+
+          <div className="absolute bottom-4 left-4 flex flex-col gap-1 bg-card/95 backdrop-blur-sm rounded-lg border border-border p-1 shadow-md">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={zoomIn} aria-label="تكبير">
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={zoomOut} aria-label="تصغير">
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <div className="h-px bg-border my-1" />
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={fitToScreen} aria-label="ملء الشاشة">
+              <Maximize2 className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Floating action menu (long-press context menu) */}
+          {actionMenuNode && (
+            <>
+              {/* Backdrop to close menu on outside click */}
+              <div
+                className="absolute inset-0 z-40"
+                style={{ pointerEvents: "auto" }}
+                onClick={closeActionMenu}
+                onContextMenu={(e) => {
+                  e.preventDefault()
+                  closeActionMenu()
+                }}
+              />
+              <div
+                className="absolute z-50 bg-card border border-border rounded-lg shadow-lg overflow-hidden"
+                style={{
+                  left: actionMenuPos.x,
+                  top: actionMenuPos.y,
+                  minWidth: 180,
+                  pointerEvents: "auto",
+                }}
+              >
+                <button
+                  onClick={() => beginEdit(actionMenuNode)}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-sm hover:bg-accent transition-colors"
+                >
+                  <Pencil className="h-4 w-4 text-blue-500" />
+                  <span>تعديل العقدة</span>
+                </button>
+                <button
+                  onClick={() => beginMerge(actionMenuNode)}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-sm hover:bg-accent transition-colors"
+                >
+                  <GitMerge className="h-4 w-4 text-purple-500" />
+                  <span>دمج مع عقدة أخرى</span>
+                </button>
+                <div className="h-px bg-border" />
+                <button
+                  onClick={() => beginDelete(actionMenuNode)}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-sm hover:bg-accent transition-colors text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>حذف العقدة</span>
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         {selectedNode && (
@@ -553,6 +1041,171 @@ export function ConversationMap({ groupId, group, nodes: initialNodes, currentUs
           </div>
         )}
       </div>
+
+      {/* ----- Edit dialog ----- */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>تعديل العقدة</DialogTitle>
+            <DialogDescription>عدّل عنوان أو وصف أو لون العقدة</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label>العنوان</Label>
+              <Input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="عنوان العقدة"
+                className="bg-background"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>الوصف (اختياري)</Label>
+              <Textarea
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="وصف مختصر للموضوع..."
+                className="bg-background resize-none"
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>اللون</Label>
+              <div className="flex gap-2 flex-wrap">
+                {NODE_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    onClick={() => setEditColor(color)}
+                    className={cn(
+                      "w-8 h-8 rounded-full transition-transform",
+                      editColor === color && "ring-2 ring-offset-2 ring-primary scale-110",
+                    )}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+            </div>
+            <Button onClick={saveEdit} disabled={!editTitle.trim() || isSavingEdit} className="w-full">
+              {isSavingEdit ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                  جاري الحفظ...
+                </>
+              ) : (
+                "حفظ التغييرات"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ----- Delete confirm dialog ----- */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              حذف العقدة
+            </DialogTitle>
+            <DialogDescription>
+              هل أنت متأكد من حذف العقدة <span className="font-bold">{deleteNode?.title}</span>؟
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-2 text-sm text-muted-foreground space-y-1">
+            <p>• ستُنقل العقد الفرعية لتصبح أبناء العقدة الأب الحالية.</p>
+            <p>• ستُفصل الرسائل المرتبطة عن هذه العقدة (لن تُحذف).</p>
+          </div>
+          <div className="flex gap-2 mt-4">
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={isDeleting} className="flex-1">
+              إلغاء
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete} disabled={isDeleting} className="flex-1">
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                  جاري الحذف...
+                </>
+              ) : (
+                "حذف"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ----- Merge dialog ----- */}
+      <Dialog open={mergeOpen} onOpenChange={setMergeOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GitMerge className="h-5 w-5 text-purple-500" />
+              دمج العقدة
+            </DialogTitle>
+            <DialogDescription>
+              اختر عقدة لدمجها مع <span className="font-bold">{mergeSource?.title}</span>. سيتم نقل كل الرسائل
+              والعقد الفرعية إلى العقدة المختارة.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label>العقدة الهدف</Label>
+              <select
+                value={mergeTargetId}
+                onChange={(e) => setMergeTargetId(e.target.value)}
+                className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">اختر عقدة...</option>
+                {localNodes
+                  .filter((n) => {
+                    if (!mergeSource) return false
+                    if (n.id === mergeSource.id) return false
+                    // Block descendants of the source to avoid creating a cycle.
+                    return !getDescendantIds(mergeSource.id).has(n.id)
+                  })
+                  .map((node) => (
+                    <option key={node.id} value={node.id}>
+                      {node.title}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label>الاسم الجديد للعقدة المدموجة</Label>
+              <Input
+                value={mergeNewName}
+                onChange={(e) => setMergeNewName(e.target.value)}
+                placeholder="الاسم الجديد"
+                className="bg-background"
+              />
+            </div>
+            {mergeError && (
+              <p className="text-sm text-destructive flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                {mergeError}
+              </p>
+            )}
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setMergeOpen(false)} disabled={isMerging} className="flex-1">
+                إلغاء
+              </Button>
+              <Button
+                onClick={confirmMerge}
+                disabled={!mergeTargetId || !mergeNewName.trim() || isMerging}
+                className="flex-1"
+              >
+                {isMerging ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                    جاري الدمج...
+                  </>
+                ) : (
+                  "تنفيذ الدمج"
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

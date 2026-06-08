@@ -724,16 +724,27 @@ export const MessageList = React.memo(function MessageList({
               {isPinned && <Pin className="h-2.5 w-2.5 fill-current" />}
               <span>{time}</span>
               {isOwn && (
+                // Two-state read receipt driven by message.is_read, which the
+                // container derives from the other members' read cursor:
+                //  - single tick  = delivered (no one has read up to here yet)
+                //  - double tick  = seen (a recipient's cursor passed this msg)
                 <svg
-                  width="14"
+                  width={message.is_read ? 14 : 10}
                   height="10"
-                  viewBox="0 0 14 10"
+                  viewBox={message.is_read ? "0 0 14 10" : "0 0 10 10"}
                   fill="none"
-                  className="opacity-90"
-                  aria-label="مرسلة"
+                  className={cn(
+                    "transition-colors",
+                    message.is_read ? "text-sky-300 opacity-100" : "opacity-70",
+                  )}
+                  aria-label={message.is_read ? "مقروءة" : "مرسلة"}
                 >
                   <path
-                    d="M1 5l3 3 5-7M6 8l5-7"
+                    d={
+                      message.is_read
+                        ? "M1 5l3 3 5-7M6 8l5-7"
+                        : "M1 5l3 3 5-7"
+                    }
                     stroke="currentColor"
                     strokeWidth="1.5"
                     strokeLinecap="round"

@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { ChatHeader } from "./chat-header"
+import { MeetingBanner } from "@/components/meetings/meeting-banner"
+import { useMeetingAlarm } from "@/components/meetings/meeting-alarm-provider"
 import { MessageList } from "./message-list"
 import { MessageInput } from "./message-input"
 import { LayerFilter } from "./layer-filter"
@@ -14,6 +16,7 @@ import { ImportantMessageToast } from "./important-message-toast"
 import type { Group, GroupMember, Message, MessageLayer, ConversationNode, GroupSettings } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { useSettings } from "@/components/settings-provider"
+import { playNotificationSound } from "@/lib/sounds/notification-sounds"
 
 interface ChatContainerProps {
   groupId: string
@@ -61,8 +64,20 @@ export function ChatContainer({
   const lastScrollYRef = useRef(0)
   const supabase = createClient()
   const isMounted = useRef(true)
+  // Latest read cursor (max last_read_at) across all OTHER members of this
+  // group. A message authored by me is "seen" when this cursor >= its
+  // created_at. Kept in a ref so enrichMessages reads the freshest value
+  // without needing it in the dependency array.
+  const otherReadCursorRef = useRef<string | null>(null)
   const pendingMessageIds = useRef<Set<string>>(new Set())
   const { translationLanguage } = useSettings()
+  const { acknowledgeMeetingsForGroup } = useMeetingAlarm()
+
+  // Entering a cell silences any active meeting alarm for that cell — this is
+  // the "open from the notification to stop the alarm" behavior.
+  useEffect(() => {
+    acknowledgeMeetingsForGroup(groupId)
+  }, [groupId, acknowledgeMeetingsForGroup])
 
   const resetUnreadCount = useCallback(async () => {
     try {
@@ -88,6 +103,33 @@ export function ChatContainer({
         .eq("user_id", currentUserId)
         .eq("group_id", groupId)
         .eq("is_read", false)
+
+      // Notify the bell to refresh immediately (don't rely solely on realtime
+      // UPDATE events, which can be missed if the WS reconnected or replica
+      // identity isn't FULL on the notifications table)
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("notifications:refresh"))
+      }
+
+      // Also clear any push notifications still showing in the system tray
+      // for this cell. We broadcast to every registered SW because the page
+      // may be controlled by sw.js while notifications are owned by
+      // firebase-messaging-sw.js (or vice-versa) — `serviceWorker.ready` only
+      // returns one of them, so a single postMessage often misses the SW
+      // that's actually holding the notification.
+      if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+        try {
+          const regs = await navigator.serviceWorker.getRegistrations()
+          const msg = { type: "clearCellNotifications", groupId }
+          for (const reg of regs) {
+            const target = reg.active || reg.waiting || reg.installing
+            target?.postMessage(msg)
+          }
+          navigator.serviceWorker.controller?.postMessage(msg)
+        } catch {
+          // SW not available; ignore.
+        }
+      }
     } catch (error) {
       console.error("Error marking cell notifications as read:", error)
     }
@@ -139,23 +181,36 @@ export function ChatContainer({
     }
   }, [groupId, supabase])
 
-  // Enriches a batch of raw messages with sender profiles and reply previews.
-  // Optimized: skips read counts and reactions on initial load for performance.
-  // Reactions are handled via realtime subscriptions and local state.
+  // Enriches a batch of raw messages with sender profiles, reply previews, and reactions.
+  // Reactions are fetched in a single query for all messages, then merged per message_id
+  // so they persist across reloads (not just during the live session).
   const enrichMessages = useCallback(
     async (messagesData: Record<string, unknown>[]) => {
       if (!messagesData.length) return []
 
       const senderIds = [...new Set(messagesData.map((m) => m.sender_id as string))]
+      const messageIds = messagesData.map((m) => m.id as string)
 
-      // Fetch profiles for all unique senders in a single query (max ~50 senders)
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, display_name, avatar_url")
-        .in("id", senderIds)
-      
+      // Run profile and reaction queries in parallel. Read state is derived
+      // from a single per-group cursor (see otherReadCursorRef) rather than a
+      // per-message table, so no read query is needed here.
+      const [profilesRes, reactionsRes] = await Promise.all([
+        supabase.from("profiles").select("id, display_name, avatar_url").in("id", senderIds),
+        supabase
+          .from("message_reactions")
+          .select("id, message_id, user_id, reaction, created_at")
+          .in("message_id", messageIds),
+      ])
+
       const profileMap = new Map<string, { id: string; display_name: string; avatar_url: string | null }>()
-      profiles?.forEach((p) => profileMap.set(p.id, p))
+      profilesRes.data?.forEach((p) => profileMap.set(p.id, p))
+
+      // Group reactions by message_id
+      const reactionsByMessage: Record<string, Array<{ id: string; user_id: string; reaction: string; created_at: string }>> = {}
+      reactionsRes.data?.forEach((r) => {
+        const list = reactionsByMessage[r.message_id] || (reactionsByMessage[r.message_id] = [])
+        list.push({ id: r.id, user_id: r.user_id, reaction: r.reaction, created_at: r.created_at })
+      })
 
       // Fetch reply-to previews — only unique IDs
       const replyMessagesMap: Record<string, { content: string; sender?: { display_name: string } }> = {}
@@ -165,7 +220,7 @@ export function ChatContainer({
           .from("messages")
           .select("id, content, sender_id")
           .in("id", replyToIds)
-        
+
         replyMsgs?.forEach((rm) => {
           const senderProfile = profileMap.get(rm.sender_id)
           replyMessagesMap[rm.id] = {
@@ -175,16 +230,41 @@ export function ChatContainer({
         })
       }
 
-      return messagesData.map((m) => ({
-        ...m,
-        sender: profileMap.get(m.sender_id as string) || null,
-        read_count: 0,
-        reactions: [],
-        reply_to_message: m.reply_to ? replyMessagesMap[m.reply_to as string] ?? null : null,
-      })) as Message[]
+      // Build a set of "(message_id) read by someone other than the sender"
+      // so we can compute is_read per own message in one pass.
+      const cursor = otherReadCursorRef.current
+      return messagesData.map((m) => {
+        const senderId = m.sender_id as string
+        const createdAt = m.created_at as string
+        // A message is "read" once any OTHER member's read cursor has advanced
+        // to or past this message's timestamp.
+        const isRead = !!cursor && !!createdAt && cursor >= createdAt
+        return {
+          ...m,
+          sender: profileMap.get(senderId) || null,
+          is_read: isRead,
+          reactions: reactionsByMessage[m.id as string] || [],
+          reply_to_message: m.reply_to ? replyMessagesMap[m.reply_to as string] ?? null : null,
+        }
+      }) as Message[]
     },
     [supabase],
   )
+
+  // Advances MY read cursor for this group to "now". Call whenever the chat is
+  // actively being viewed (on load, on new incoming message, on tab focus).
+  // The other members' clients receive this via the message_read_state
+  // realtime subscription and light up their second tick.
+  const markRead = useCallback(() => {
+    fetch("/api/messages/mark-read", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ groupId }),
+    }).catch(() => {
+      // Non-fatal: a missed cursor update will be corrected on the next call.
+    })
+  }, [groupId])
 
   // Fetches ALL messages page by page to bypass the PostgREST 1000-row default cap.
   // Stores only the latest PAGE_SIZE*5 (500) messages in state for performance,
@@ -237,20 +317,12 @@ export function ChatContainer({
     setHasMoreMessages(hasMore)
     setOldestMessageDate(hasMore ? (allMessages[0]?.created_at as string) ?? null : null)
 
-    // Mark unread in chunks to stay within API limits
-    const unreadIds = enriched.filter((m) => m.sender_id !== currentUserId).map((m) => m.id as string)
-    if (unreadIds.length > 0) {
-      // Use a single batch request instead of multiple to avoid overwhelming the API
-      fetch("/api/messages/mark-read-bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messageIds: unreadIds.slice(0, 100) }),
-      }).catch((err) => console.error("Failed to mark messages as read:", err))
-    }
+    // Advance my read cursor — I'm now viewing the latest messages.
+    markRead()
 
     setIsLoading(false)
     setTimeout(scrollToBottom, 100)
-  }, [groupId, supabase, currentUserId, enrichMessages])
+  }, [groupId, supabase, currentUserId, enrichMessages, markRead])
 
   // Loads older messages when user scrolls to the top.
   // Fetches LOAD_MORE_WINDOW messages before oldestMessageDate in a single query.
@@ -368,7 +440,25 @@ export function ChatContainer({
 
   useEffect(() => {
     isMounted.current = true
-    fetchMessages()
+
+    // Load the initial read cursor (max last_read_at among other members)
+    // BEFORE fetching messages, so the first render already shows correct
+    // single/double ticks instead of waiting for a realtime event.
+    const loadInitialCursor = async () => {
+      const { data } = await supabase
+        .from("message_read_state")
+        .select("user_id, last_read_at")
+        .eq("group_id", groupId)
+        .neq("user_id", currentUserId)
+        .order("last_read_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (isMounted.current && data?.last_read_at) {
+        otherReadCursorRef.current = data.last_read_at
+      }
+      fetchMessages()
+    }
+    loadInitialCursor()
     fetchMembers()
     fetchNodes()
     resetUnreadCount()
@@ -458,6 +548,15 @@ export function ChatContainer({
           setMessages((prev) => {
             if (prev.some((m) => m.id === newMsg.id)) return prev
 
+            // Audible feedback for incoming messages from other users.
+            // If the message @-mentions me, use the higher-pitched mention
+            // tone; otherwise the soft default. Playing for the active cell
+            // is fine — it's a short, quiet blip that confirms delivery.
+            const mentionsMe =
+              typeof newMsg.content === "string" &&
+              newMsg.content.includes(`@${currentUserId}`)
+            playNotificationSound(mentionsMe ? "mention" : "message")
+
             supabase
               .from("profiles")
               .select("id, display_name, avatar_url")
@@ -473,6 +572,18 @@ export function ChatContainer({
           })
           setTimeout(scrollToBottom, 100)
           fetchNodes()
+
+          // The user is actively viewing this cell, so any unread counter / notification
+          // produced by the DB trigger for this incoming message must be cleared right
+          // away — otherwise the cell badge and the bell stay stuck until the page is
+          // refreshed or the user leaves and re-opens the cell.
+          if (document.visibilityState === "visible") {
+            resetUnreadCount()
+            markCellNotificationsAsRead()
+            // I'm viewing this cell as the message arrives, so advance my read
+            // cursor immediately — the sender should see their second tick.
+            markRead()
+          }
         },
       )
       .on(
@@ -536,9 +647,51 @@ export function ChatContainer({
       )
       .subscribe()
 
+    // Read receipts: when another member's read cursor advances, update our
+    // local cursor and flip every own-message at/under that timestamp to
+    // is_read = true. Listens on message_read_state, which IS published for
+    // realtime (the old message_reads table was not, which broke this).
+    const readsChannel = supabase
+      .channel(`reads-${groupId}-${Date.now()}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "message_read_state",
+          filter: `group_id=eq.${groupId}`,
+        },
+        (payload) => {
+          if (!isMounted.current) return
+          const row = payload.new as { user_id: string; last_read_at: string }
+          // Ignore my own cursor — I only care when OTHERS have read.
+          if (!row || row.user_id === currentUserId) return
+
+          const prevCursor = otherReadCursorRef.current
+          if (!prevCursor || row.last_read_at > prevCursor) {
+            otherReadCursorRef.current = row.last_read_at
+          }
+          const cursor = otherReadCursorRef.current
+
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.sender_id === currentUserId &&
+              !m.is_read &&
+              cursor &&
+              (m.created_at as string) <= cursor
+                ? { ...m, is_read: true }
+                : m,
+            ),
+          )
+        },
+      )
+      .subscribe()
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible" && isMounted.current) {
         resetUnreadCount()
+        // Coming back to the foreground means I'm seeing the messages again.
+        markRead()
         // Restore active cell when app comes back to foreground
         try {
           if ('indexedDB' in window) {
@@ -575,9 +728,10 @@ export function ChatContainer({
       supabase.removeChannel(channel)
       supabase.removeChannel(membersChannel)
       supabase.removeChannel(nodesChannel)
+      supabase.removeChannel(readsChannel)
       document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
-  }, [groupId, fetchMessages, fetchMembers, fetchNodes, supabase, currentUserId, resetUnreadCount, markCellNotificationsAsRead])
+  }, [groupId, fetchMessages, fetchMembers, fetchNodes, supabase, currentUserId, resetUnreadCount, markCellNotificationsAsRead, markRead])
 
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current
@@ -797,6 +951,8 @@ export function ChatContainer({
   onMembersUpdate={fetchMembers}
   onlineUserIds={onlineUserIds}
   />
+
+        <MeetingBanner groupId={group.id} isAdmin={currentUserRole === "admin"} />
 
         <LayerFilter
           activeLayer={activeLayer}

@@ -37,12 +37,15 @@ export function ListPage({ page, members, currentUserId }: ListPageProps) {
   const supabase = createClient()
 
   const fetchContributions = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("notebook_contributions")
-      .select("*, contributor:profiles(*)")
+      .select("*")
       .eq("page_id", page.id)
       .order("position", { ascending: true })
 
+    if (error) {
+      console.log("[v0] list-page fetch error:", error.message)
+    }
     if (data) {
       setContributions(data)
     }
@@ -73,24 +76,36 @@ export function ListPage({ page, members, currentUserId }: ListPageProps) {
     }
   }, [page.id, fetchContributions, supabase])
 
-  const addItem = async () => {
-    if (!newItem.trim() || page.is_locked) return
+const addItem = async () => {
+  if (!newItem.trim() || page.is_locked) return
 
-    setIsAdding(true)
-    try {
-      await supabase.from("notebook_contributions").insert({
-        page_id: page.id,
-        user_id: currentUserId,
-        content: { text: newItem.trim(), completed: false, votes: [] },
-        // الترتيب يعتمد على created_at — نتجنّب إسناد position يدوياً لمنع التضارب
-      })
+  setIsAdding(true)
 
-      setNewItem("")
-    } finally {
-      setIsAdding(false)
+  try {
+    const nextPosition = contributions.length
+
+    const { error } = await supabase.from("notebook_contributions").insert({
+      page_id: page.id,
+      user_id: currentUserId,
+      content: {
+        text: newItem.trim(),
+        completed: false,
+        votes: [],
+      },
+      position: nextPosition,
+    })
+
+    if (error) {
+      console.log("[v0] list-page insert error:", error.message)
+      return
     }
-  }
 
+    setNewItem("")
+    fetchContributions()
+  } finally {
+    setIsAdding(false)
+  }
+}
   // قراءة-تعديل-كتابة آمنة: نجلب أحدث محتوى قبل التحديث
   // لتقليل ضياع الأصوات/حالة الإكمال عند التحرير المتزامن
   const toggleComplete = async (contribution: NotebookContribution) => {

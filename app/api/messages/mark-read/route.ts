@@ -1,11 +1,19 @@
-import { createServiceClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 
+/**
+ * Rebuilt read-receipt endpoint.
+ *
+ * Instead of writing one row per message, we upsert a single per-group cursor
+ * (message_read_state.last_read_at = now()). A message is "seen" by a member
+ * when their cursor is >= the message's created_at. This change is published
+ * over realtime, so the sender's subscription lights up the second tick live.
+ */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createServiceClient()
-    const { messageId } = await request.json()
-
+    // Auth must use the cookie-bound client; the service client never sees
+    // session cookies.
+    const supabase = await createClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -14,23 +22,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Insert read record
-    const { error } = await supabase.from("message_reads").upsert(
+    const { groupId } = await request.json()
+    if (!groupId) {
+      return NextResponse.json({ error: "groupId required" }, { status: 400 })
+    }
+
+    // Service client for the write (RLS already satisfied by verified identity).
+    const svc = createServiceClient()
+    const { error } = await svc.from("message_read_state").upsert(
       {
-        message_id: messageId,
+        group_id: groupId,
         user_id: user.id,
-        read_at: new Date().toISOString(),
+        last_read_at: new Date().toISOString(),
       },
-      {
-        onConflict: "message_id,user_id",
-      },
+      { onConflict: "group_id,user_id" },
     )
 
     if (error) throw error
-
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Error marking message as read:", error)
-    return NextResponse.json({ error: "Failed to mark message as read" }, { status: 500 })
+    console.error("Error updating read state:", error)
+    return NextResponse.json({ error: "Failed to update read state" }, { status: 500 })
   }
 }

@@ -36,12 +36,15 @@ export function LinksPage({ page, members, currentUserId }: LinksPageProps) {
   const supabase = createClient()
 
   const fetchContributions = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("notebook_contributions")
-      .select("*, contributor:profiles(*)")
+      .select("*")
       .eq("page_id", page.id)
       .order("created_at", { ascending: false })
 
+    if (error) {
+      console.log("[v0] links-page fetch error:", error.message)
+    }
     if (data) {
       setContributions(data)
     }
@@ -112,6 +115,7 @@ export function LinksPage({ page, members, currentUserId }: LinksPageProps) {
 
       setNewUrl("")
       setNewTitle("")
+      fetchContributions()
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "خطأ غير معروف"
       setAddError(`خطأ غير متوقع: ${msg}`)

@@ -12,10 +12,23 @@ import type { Notification } from "@/lib/types"
 import Link from "next/link"
 import { useSettings } from "@/components/settings-provider"
 import { usePathname } from "next/navigation"
+import { playNotificationSound } from "@/lib/sounds/notification-sounds"
 
 interface NotificationBellProps {
   userId: string
 }
+
+// In-cell chatter (regular messages, replies, @mentions) is surfaced via the
+// per-cell unread badge in the sidebar, not the global bell. Keep the bell
+// focused on system-level events: decisions, memory digests, achievements,
+// invitations, announcements, etc.
+const NOISY_NOTIFICATION_TYPES = new Set([
+  "message",
+  "mention",
+  "reply",
+  "new_message",
+  "message_mention",
+])
 
 const translations = {
   ar: {
@@ -158,7 +171,9 @@ export function NotificationBell({ userId }: NotificationBellProps) {
     }
 
     if (data) {
-      const mapped = (data as EnrichedRow[]).map(rowToNotification)
+      const mapped = (data as EnrichedRow[])
+        .map(rowToNotification)
+        .filter((n) => !NOISY_NOTIFICATION_TYPES.has(n.type))
       setNotifications(mapped)
       setUnreadCount(mapped.filter((n) => !n.is_read).length)
     }
@@ -206,8 +221,34 @@ export function NotificationBell({ userId }: NotificationBellProps) {
             return
           }
 
+          // The bell only surfaces system-level events. In-cell chatter
+          // (messages/mentions/replies) lives on the per-cell badge.
+          if (NOISY_NOTIFICATION_TYPES.has(raw.type)) return
+
           const enriched = await fetchEnrichedById(raw.id)
           if (!enriched) return
+
+          // Pick a sound preset that matches the notification's nature.
+          // System / announcement / role events get the formal "system" tone;
+          // decisions and votes get the achievement chime; urgent owner
+          // pushes get the attention-grabbing one. Anything else falls back
+          // to the soft default.
+          const t = enriched.type as string
+          if (t === "urgent" || t === "owner_announcement" || t === "critical") {
+            playNotificationSound("urgent")
+          } else if (t === "decision" || t === "vote" || t === "achievement") {
+            playNotificationSound("decision")
+          } else if (
+            t === "system" ||
+            t === "role_changed" ||
+            t === "joined_group" ||
+            t === "left_group" ||
+            t === "kicked"
+          ) {
+            playNotificationSound("system")
+          } else {
+            playNotificationSound("message")
+          }
 
           setNotifications((prev) => {
             if (prev.some((n) => n.id === enriched.id)) return prev
@@ -226,18 +267,35 @@ export function NotificationBell({ userId }: NotificationBellProps) {
         },
         (payload) => {
           const updated = payload.new as Notification
-          setNotifications((prev) =>
-            prev.map((n) => (n.id === updated.id ? { ...n, ...updated } : n)),
-          )
-          if (updated.is_read) {
-            setUnreadCount((prev) => Math.max(0, prev - 1))
-          }
+          setNotifications((prev) => {
+            const next = prev.map((n) => (n.id === updated.id ? { ...n, ...updated } : n))
+            // Recompute unread count from the source of truth instead of guessing.
+            // This avoids double-decrement on idempotent updates and stays correct
+            // even when payload.old isn't available (REPLICA IDENTITY != FULL).
+            setUnreadCount(next.filter((n) => !n.is_read).length)
+            return next
+          })
         },
       )
       .subscribe()
 
+    // Refetch on custom event (fired after bulk mark-as-read from elsewhere)
+    // and when the tab becomes visible again (mobile/PWA wake-up).
+    const handleExternalRefresh = () => {
+      fetchNotifications()
+    }
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchNotifications()
+      }
+    }
+    window.addEventListener("notifications:refresh", handleExternalRefresh)
+    document.addEventListener("visibilitychange", handleVisibility)
+
     return () => {
       supabase.removeChannel(channel)
+      window.removeEventListener("notifications:refresh", handleExternalRefresh)
+      document.removeEventListener("visibilitychange", handleVisibility)
     }
   }, [userId, supabase, fetchNotifications, fetchEnrichedById])
 

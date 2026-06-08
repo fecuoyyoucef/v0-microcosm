@@ -209,6 +209,38 @@ self.addEventListener("notificationclick", (event) => {
   }
 })
 
+// Close any push notifications that are still showing in the system tray
+// for a given cell. Called by the web app when the user opens that cell so
+// stale notifications get cleared without requiring the user to tap them.
+self.addEventListener("message", (event) => {
+  const data = event.data
+  if (!data || data.type !== "clearCellNotifications") return
+
+  const groupId = data.groupId
+  if (!groupId) return
+
+  event.waitUntil(
+    (async () => {
+      try {
+        // Notifications posted by this SW use a stable per-cell tag.
+        const tag = "notif-group-" + groupId
+        const byTag = await self.registration.getNotifications({ tag })
+        byTag.forEach((n) => n.close())
+
+        // Fallback: scan everything in case an older notification was posted
+        // before the stable-tag scheme existed, or by Firebase's default
+        // handler (which uses its own auto-generated tag).
+        const all = await self.registration.getNotifications()
+        all.forEach((n) => {
+          if (n.data && n.data.groupId === groupId) n.close()
+        })
+      } catch (err) {
+        console.error("[SW] Failed to clear cell notifications:", err)
+      }
+    })(),
+  )
+})
+
 // Handle push events
 self.addEventListener("push", (event) => {
   if (!event.data) {

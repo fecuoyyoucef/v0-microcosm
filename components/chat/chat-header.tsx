@@ -34,6 +34,7 @@ import {
   ArrowDownTrayIcon as DownloadIcon,
   ChartBarIcon as GaugeIconHero,
   ArrowPathIcon as Loader2Icon,
+  CalendarDaysIcon as CalendarClockIcon,
 } from "@heroicons/react/24/outline"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -41,6 +42,7 @@ import type { Group, GroupMember } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { MetricCard } from "@/components/ui/metric-card"
 import { TranslationLanguageToolbar } from "./translation-language-toolbar"
+import { MeetingsSheet } from "@/components/meetings/meetings-sheet"
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -61,6 +63,7 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
   const [copied, setCopied] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
   const [isMembersOpen, setIsMembersOpen] = useState(false)
+  const [isMeetingsOpen, setIsMeetingsOpen] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [canInstall, setCanInstall] = useState(false)
   const [selectedMetric, setSelectedMetric] = useState<"responsibility" | "progress" | null>(null)
@@ -443,22 +446,6 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
           {/* Translation Language Selector (per-user preference) */}
           <TranslationLanguageToolbar />
 
-          {/* Discussion Quality Assessment Button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 rounded-xl hover:bg-primary/10 hover:text-primary transition-colors"
-            onClick={handleAssessQuality}
-            disabled={isAssessingQuality}
-            title="تقييم جودة النقاش"
-          >
-            {isAssessingQuality ? (
-              <Loader2Icon className="h-4 w-4 animate-spin" />
-            ) : (
-              <GaugeIconHero className="h-4 w-4" />
-            )}
-          </Button>
-
           {canInstall && (
             <Button
               variant="ghost"
@@ -470,6 +457,24 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
               <DownloadIcon className="h-4 w-4" />
             </Button>
           )}
+
+          {/* Meetings (everyone): members see scheduled meetings, admins manage them */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-xl hover:bg-primary/10 hover:text-primary transition-colors"
+            onClick={() => setIsMeetingsOpen(true)}
+            title={currentUserRole === "admin" ? "إدارة الاجتماعات" : "الاجتماعات المجدولة"}
+          >
+            <CalendarClockIcon className="h-4 w-4" />
+          </Button>
+
+          <MeetingsSheet
+            groupId={group.id}
+            isAdmin={currentUserRole === "admin"}
+            open={isMeetingsOpen}
+            onOpenChange={setIsMeetingsOpen}
+          />
 
           {/* Members Sheet */}
           <Sheet open={isMembersOpen} onOpenChange={setIsMembersOpen}>

@@ -15,6 +15,32 @@ body {
   min-height: 100dvh;
 }
 
+/* Suppress the mobile browser's long-press context menu (copy link, save
+   image, share...) on interactive surfaces so the app feels native.
+   Text inputs, textareas, contenteditable regions and elements explicitly
+   opted into selection still allow normal copy / context behaviour. */
+a,
+button,
+img,
+video,
+[role="button"] {
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input,
+textarea,
+[contenteditable="true"],
+.allow-select,
+.allow-select * {
+  -webkit-touch-callout: default;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 /* Synaptic Space - Brand Color System
  * Primary: Deep Synaptic Teal (intellectual + alive)
  * Accent: Warm Saffron (Arabic warmth)
@@ -218,6 +244,31 @@ body {
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-sans);
+
+    /* Telegram-like behavior: long-press never starts text selection.
+     * Disable selection app-wide by default, then re-enable it for inputs,
+     * textareas, contenteditable, and any element explicitly opted-in
+     * (via the .selectable utility or [data-selectable="true"]). */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Re-enable selection where the user actually needs to type or copy. */
+  input,
+  textarea,
+  [contenteditable="true"],
+  [contenteditable=""],
+  .selectable,
+  [data-selectable="true"] {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
   }
 
   /* Apply heading font to all headings */

@@ -83,6 +83,12 @@ export function channelForType(type: NotificationType): NotificationChannel {
     case "decision_created":
     case "decision_closed":
       return "decision"
+    case "meeting_reminder":
+    case "meeting_started":
+    case "meeting_ended":
+      // Meetings ride the "decision" channel: important, push-on by default,
+      // and surfaced in the "important" preset.
+      return "decision"
     default:
       return "system"
   }

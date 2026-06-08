@@ -1,0 +1,240 @@
+/**
+ * Agent runtime loop.
+ *
+ * This is the heart of the system: a faithful implementation of the
+ * OpenAI/Groq tool-calling loop.
+ *
+ *   1. Send the conversation (plus tool catalog) to the model.
+ *   2. If the model emits tool_calls, execute each one server-side,
+ *      append the results back into the conversation as `role: "tool"`
+ *      messages, and loop.
+ *   3. Stop when the model returns a plain text/JSON answer, the
+ *      iteration cap is hit, or a tool fails critically.
+ *
+ * Every step is persisted to `agent_decisions` / `tool_executions` for
+ * full auditability.
+ */
+
+import { chatCompletion, GroqError } from "./groq-client"
+import { executeTool } from "./tools/executor"
+import { finishRun, logToolExecution, startRun } from "./monitoring"
+import {
+  approxTokens,
+  groqTpm,
+  truncateToolResultForModel,
+} from "./token-budget"
+import type {
+  AgentRun,
+  ChatMessage,
+  RunOptions,
+  ToolCall,
+  ToolResult,
+} from "./types"
+
+const DEFAULT_MAX_ITERATIONS = 6
+const DEFAULT_MODEL = "llama-3.3-70b-versatile" as const
+
+/** Hard cap on output tokens per Groq call. Prevents 2000-token monologues. */
+const DEFAULT_MAX_OUTPUT_TOKENS = 700
+
+/** Per-tool-result cap before feeding back to the model. */
+const TOOL_RESULT_MAX_TOKENS = 800
+
+/** Max prior conversation messages we keep (system + last N user/assistant/tool). */
+const MAX_HISTORY_MESSAGES = 12
+
+/**
+ * Trim conversation history to the last N messages while keeping the
+ * very first system message intact. This keeps each Groq call's input
+ * within the 12k TPM budget when a chat has lots of back-and-forth.
+ */
+function trimHistory(messages: ChatMessage[]): ChatMessage[] {
+  if (messages.length <= MAX_HISTORY_MESSAGES + 1) return messages
+  const [system, ...rest] = messages
+  return [system, ...rest.slice(-MAX_HISTORY_MESSAGES)]
+}
+
+export async function runAgent(opts: RunOptions): Promise<AgentRun> {
+  const runId = crypto.randomUUID()
+  const startedAt = Date.now()
+  const model = opts.model ?? DEFAULT_MODEL
+  const maxIterations = opts.maxIterations ?? DEFAULT_MAX_ITERATIONS
+
+  // Build the rolling message list. We always inject the system prompt first.
+  const messages: ChatMessage[] = [
+    { role: "system", content: opts.system },
+    ...opts.messages,
+  ]
+
+  const toolCallsLog: AgentRun["tool_calls"] = []
+  let tokensIn = 0
+  let tokensOut = 0
+  let finalText: string | null = null
+  let iteration = 0
+  let lastError: string | undefined
+
+  // Open the run row up front so it shows in the dashboard while in progress.
+  await startRun({
+    runId,
+    agentId: opts.agent,
+    trigger: opts.trigger ?? "manual",
+    inputData: {
+      messages: opts.messages,
+      context: opts.context ?? null,
+    },
+    userId: opts.userId ?? null,
+  }).catch((e) => console.error("[agents] startRun failed:", e))
+
+  try {
+    while (iteration < maxIterations) {
+      iteration++
+
+      // Trim history before every call so a long chat never busts the budget.
+      const trimmed = trimHistory(messages)
+
+      // Reserve our share of the TPM budget up-front. If we'd blow past
+      // 12k tokens/minute we throw a friendly error instead of getting a 429.
+      const inputBudget =
+        approxTokens(JSON.stringify(trimmed)) + DEFAULT_MAX_OUTPUT_TOKENS
+      groqTpm.reserve(inputBudget)
+
+      const response = await chatCompletion({
+        model,
+        messages: trimmed,
+        tools: opts.tools && !opts.jsonMode ? opts.tools : undefined,
+        tool_choice: opts.tools && !opts.jsonMode ? "auto" : undefined,
+        temperature: opts.temperature ?? 0.3,
+        max_tokens: DEFAULT_MAX_OUTPUT_TOKENS,
+        response_format: opts.jsonMode ? { type: "json_object" } : undefined,
+      })
+
+      tokensIn += response.usage.prompt_tokens
+      tokensOut += response.usage.completion_tokens
+
+      const choice = response.choices[0]
+      if (!choice) {
+        throw new Error("Groq returned no choices")
+      }
+
+      const assistantMsg = choice.message
+
+      // Case 1: Model wants to call tools.
+      if (
+        choice.finish_reason === "tool_calls" &&
+        assistantMsg.tool_calls &&
+        assistantMsg.tool_calls.length > 0
+      ) {
+        // Push the assistant turn (with tool_calls) before responding to each.
+        messages.push({
+          role: "assistant",
+          content: assistantMsg.content ?? null,
+          tool_calls: assistantMsg.tool_calls,
+        })
+
+        for (const call of assistantMsg.tool_calls) {
+          const callStart = Date.now()
+          const { name, args, result } = await executeOneCall(call)
+          toolCallsLog.push({ name, args, result })
+
+          // Persist each tool execution row independently. Best-effort: if
+          // logging fails we still continue the loop.
+          await logToolExecution({
+            runId,
+            agentId: opts.agent,
+            toolName: name,
+            args,
+            result,
+            durationMs: Date.now() - callStart,
+          }).catch((e) => console.error("[agents] tool log failed:", e))
+
+          messages.push({
+            role: "tool",
+            tool_call_id: call.id,
+            name,
+            // Truncate before sending back to the model. The full result is
+            // already persisted to `tool_executions` for the dashboard, so
+            // the audit trail stays intact.
+            content: truncateToolResultForModel(
+              JSON.stringify(result),
+              TOOL_RESULT_MAX_TOKENS,
+            ),
+          })
+
+          // If a critical tool failed (e.g. destructive db op), bail out so
+          // the model doesn't compound the mistake.
+          if (!result.success && isCritical(name)) {
+            lastError = `Critical tool ${name} failed: ${result.error}`
+            finalText = null
+            break
+          }
+        }
+
+        if (lastError) break
+        continue // loop again so the model can react to tool results
+      }
+
+      // Case 2: Model produced its final answer.
+      finalText = assistantMsg.content ?? ""
+      break
+    }
+
+    if (!finalText && !lastError && iteration >= maxIterations) {
+      lastError = `Reached max iterations (${maxIterations}) without a final answer`
+    }
+  } catch (err) {
+    if (err instanceof GroqError) {
+      lastError = `Groq error ${err.status}: ${err.message}`
+    } else {
+      lastError = err instanceof Error ? err.message : String(err)
+    }
+    console.error("[agents] runAgent failed:", lastError)
+  }
+
+  const run: AgentRun = {
+    id: runId,
+    agent: opts.agent,
+    model,
+    user_id: opts.userId ?? null,
+    input: opts.messages[opts.messages.length - 1]?.content?.toString() ?? "",
+    output: finalText,
+    tool_calls: toolCallsLog,
+    iterations: iteration,
+    tokens_in: tokensIn,
+    tokens_out: tokensOut,
+    duration_ms: Date.now() - startedAt,
+    success: !lastError && finalText !== null,
+    error: lastError,
+  }
+
+  await finishRun(run, opts.context).catch((e) =>
+    console.error("[agents] finishRun failed:", e),
+  )
+
+  return run
+}
+
+async function executeOneCall(
+  call: ToolCall,
+): Promise<{ name: string; args: Record<string, unknown>; result: ToolResult }> {
+  const name = call.function.name
+  let args: Record<string, unknown> = {}
+  try {
+    args = call.function.arguments ? JSON.parse(call.function.arguments) : {}
+  } catch (e) {
+    return {
+      name,
+      args: {},
+      result: {
+        success: false,
+        error: `Invalid JSON arguments from model: ${(e as Error).message}`,
+      },
+    }
+  }
+
+  const result = await executeTool(name, args)
+  return { name, args, result }
+}
+
+function isCritical(toolName: string): boolean {
+  return ["database_delete", "ban_user", "database_rpc"].includes(toolName)
+}
