@@ -152,9 +152,8 @@ export function buildAssistantTools(params: {
         .string()
         .optional()
         .describe("اسم الخلية لحصر البحث فيها (اختياري). إذا تُرك فارغاً يبحث في كل خلايا المستخدم"),
-      limit: z.coerce.number().min(1).max(30).optional().describe("عدد النتائج (افتراضي 15)"),
     }),
-    execute: async ({ query, cellName, limit }) => {
+    execute: async ({ query, cellName }) => {
       let targetCellIds = safeCellIds
       if (cellName) {
         const cell = resolveCell(cellName)
@@ -172,7 +171,7 @@ export function buildAssistantTools(params: {
         .in("group_id", targetCellIds)
         .ilike("content", `%${query}%`)
         .order("created_at", { ascending: false })
-        .limit(limit || 15)
+        .limit(15)
 
       return {
         count: rows?.length || 0,
@@ -192,9 +191,8 @@ export function buildAssistantTools(params: {
       "جلب أحدث الرسائل من خلية محددة (آخر النقاشات فيها). استخدمها عند السؤال 'ماذا يحدث في خلية كذا؟' أو 'لخص آخر نقاشات الخلية الفلانية'.",
     inputSchema: z.object({
       cellName: z.string().describe("اسم الخلية المراد جلب رسائلها"),
-      limit: z.coerce.number().min(1).max(50).optional().describe("عدد الرسائل (افتراضي 25)"),
     }),
-    execute: async ({ cellName, limit }) => {
+    execute: async ({ cellName }) => {
       const cell = resolveCell(cellName)
       if (!cell) {
         return { error: `لم يتم العثور على خلية باسم "${cellName}" ضمن خلاياك.`, messages: [] }
@@ -205,7 +203,7 @@ export function buildAssistantTools(params: {
         .select("content, created_at, profiles!messages_sender_id_fkey (display_name, username), conversation_nodes (title)")
         .eq("group_id", cell.id)
         .order("created_at", { ascending: false })
-        .limit(limit || 25)
+        .limit(25)
 
       return {
         cell: cell.name,
@@ -224,16 +222,14 @@ export function buildAssistantTools(params: {
   const getMyRecentMessages = tool({
     description:
       "جلب آخر رسائل المستخدم نفسه عبر كل الخلايا. استخدمها عند السؤال 'ماذا كتبت مؤخراً؟' أو 'ذكّرني بآخر مشاركاتي'.",
-    inputSchema: z.object({
-      limit: z.coerce.number().min(1).max(30).optional().describe("عدد الرسائل (افتراضي 15)"),
-    }),
-    execute: async ({ limit }) => {
+    inputSchema: z.object({}),
+    execute: async () => {
       const { data: rows } = await supabase
         .from("messages")
         .select("content, created_at, groups (name), conversation_nodes (title)")
         .eq("sender_id", userId)
         .order("created_at", { ascending: false })
-        .limit(limit || 15)
+        .limit(15)
 
       return {
         count: rows?.length || 0,
@@ -256,9 +252,8 @@ export function buildAssistantTools(params: {
         .enum(["pending", "approved", "rejected", "closed"])
         .optional()
         .describe("حالة القرار لتصفية النتائج (اختياري)"),
-      limit: z.coerce.number().min(1).max(20).optional().describe("عدد القرارات (افتراضي 10)"),
     }),
-    execute: async ({ cellName, status, limit }) => {
+    execute: async ({ cellName, status }) => {
       let targetCellIds = safeCellIds
       if (cellName) {
         const cell = resolveCell(cellName)
@@ -268,10 +263,10 @@ export function buildAssistantTools(params: {
 
       let q = supabase
         .from("decisions")
-        .select("title, description, status, created_at, voting_ends_at, groups (name), profiles!decisions_created_by_fkey (display_name)")
+        .select("title, description, status, created_at, voting_ends_at, groups (name)")
         .in("group_id", targetCellIds)
         .order("created_at", { ascending: false })
-        .limit(limit || 10)
+        .limit(10)
 
       if (status) q = q.eq("status", status)
 
@@ -284,7 +279,6 @@ export function buildAssistantTools(params: {
           description: d.description,
           status: DECISION_STATUS_AR[d.status] || d.status,
           cell: d.groups?.name || "خلية",
-          created_by: d.profiles?.display_name || "عضو",
           date: d.created_at,
           voting_ends_at: d.voting_ends_at || null,
         })),
@@ -300,15 +294,14 @@ export function buildAssistantTools(params: {
         .enum(["pending", "completed", "in_progress"])
         .optional()
         .describe("حالة المهمة (اختياري، افتراضياً كل الحالات)"),
-      limit: z.coerce.number().min(1).max(30).optional().describe("عدد المهام (افتراضي 15)"),
     }),
-    execute: async ({ status, limit }) => {
+    execute: async ({ status }) => {
       let q = supabase
         .from("extracted_tasks")
         .select("task_content, status, due_date, created_at, completed_at, groups (name)")
         .or(`assigned_to.eq.${userId},created_by.eq.${userId}`)
         .order("created_at", { ascending: false })
-        .limit(limit || 15)
+        .limit(15)
 
       if (status) q = q.eq("status", status)
 
@@ -332,9 +325,8 @@ export function buildAssistantTools(params: {
       "جلب الملخصات اليومية والذاكرة الجماعية لخلايا المستخدم (المواضيع، القرارات، الأفكار، النقاط المعلقة). استخدمها عند السؤال 'لخص ما حدث' أو 'ما أهم النقاط الأخيرة؟'.",
     inputSchema: z.object({
       cellName: z.string().optional().describe("اسم الخلية لحصر الملخصات (اختياري)"),
-      limit: z.coerce.number().min(1).max(10).optional().describe("عدد الملخصات (افتراضي 5)"),
     }),
-    execute: async ({ cellName, limit }) => {
+    execute: async ({ cellName }) => {
       let targetCellIds = safeCellIds
       if (cellName) {
         const cell = resolveCell(cellName)
@@ -347,7 +339,7 @@ export function buildAssistantTools(params: {
         .select("summary_date, raw_message_count, topics, decisions, ideas, pending_items, groups (name)")
         .in("group_id", targetCellIds)
         .order("summary_date", { ascending: false })
-        .limit(limit || 5)
+        .limit(5)
 
       return {
         count: rows?.length || 0,
@@ -369,9 +361,8 @@ export function buildAssistantTools(params: {
       "جلب عقد المحادثة (المواضيع/الأسئلة/الأفكار/الإعلانات) في خلايا المستخدم. استخدمها عند السؤال عن المواضيع المطروحة أو هيكل النقاشات.",
     inputSchema: z.object({
       cellName: z.string().optional().describe("اسم الخلية لحصر العقد (اختياري)"),
-      limit: z.coerce.number().min(1).max(20).optional().describe("عدد العقد (افتراضي 10)"),
     }),
-    execute: async ({ cellName, limit }) => {
+    execute: async ({ cellName }) => {
       let targetCellIds = safeCellIds
       if (cellName) {
         const cell = resolveCell(cellName)
@@ -384,7 +375,7 @@ export function buildAssistantTools(params: {
         .select("title, description, node_type, created_at, groups (name)")
         .in("group_id", targetCellIds)
         .order("created_at", { ascending: false })
-        .limit(limit || 10)
+        .limit(10)
 
       return {
         count: rows?.length || 0,
@@ -404,15 +395,14 @@ export function buildAssistantTools(params: {
       "جلب إشعارات المستخدم (افتراضياً غير المقروءة). استخدمها عند السؤال 'هل لدي إشعارات؟' أو 'ماذا فاتني؟'.",
     inputSchema: z.object({
       unreadOnly: z.boolean().optional().describe("الاقتصار على غير المقروءة (افتراضي true)"),
-      limit: z.coerce.number().min(1).max(20).optional().describe("عدد الإشعارات (افتراضي 10)"),
     }),
-    execute: async ({ unreadOnly, limit }) => {
+    execute: async ({ unreadOnly }) => {
       let q = supabase
         .from("notifications")
         .select("title, body, type, is_read, created_at, groups (name)")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
-        .limit(limit || 10)
+        .limit(10)
 
       if (unreadOnly !== false) q = q.eq("is_read", false)
 
@@ -435,16 +425,14 @@ export function buildAssistantTools(params: {
   const getMyActivity = tool({
     description:
       "جلب سجل نشاط المستخدم الأخير (الأفعال التي قام بها مع النقاط المكتسبة). استخدمها عند السؤال عن النشاط الأخير أو مصدر النقاط.",
-    inputSchema: z.object({
-      limit: z.coerce.number().min(1).max(30).optional().describe("عدد السجلات (افتراضي 15)"),
-    }),
-    execute: async ({ limit }) => {
+    inputSchema: z.object({}),
+    execute: async () => {
       const { data: rows } = await supabase
         .from("user_activity_log")
         .select("activity_type, activity_category, points_earned, created_at, groups (name)")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
-        .limit(limit || 15)
+        .limit(15)
 
       return {
         count: rows?.length || 0,
