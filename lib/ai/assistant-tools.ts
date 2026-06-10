@@ -152,7 +152,7 @@ export function buildAssistantTools(params: {
         .string()
         .optional()
         .describe("اسم الخلية لحصر البحث فيها (اختياري). إذا تُرك فارغاً يبحث في كل خلايا المستخدم"),
-      limit: z.number().min(1).max(30).optional().describe("عدد النتائج (افتراضي 15)"),
+      limit: z.coerce.number().min(1).max(30).optional().describe("عدد النتائج (افتراضي 15)"),
     }),
     execute: async ({ query, cellName, limit }) => {
       let targetCellIds = safeCellIds
@@ -192,7 +192,7 @@ export function buildAssistantTools(params: {
       "جلب أحدث الرسائل من خلية محددة (آخر النقاشات فيها). استخدمها عند السؤال 'ماذا يحدث في خلية كذا؟' أو 'لخص آخر نقاشات الخلية الفلانية'.",
     inputSchema: z.object({
       cellName: z.string().describe("اسم الخلية المراد جلب رسائلها"),
-      limit: z.number().min(1).max(50).optional().describe("عدد الرسائل (افتراضي 25)"),
+      limit: z.coerce.number().min(1).max(50).optional().describe("عدد الرسائل (افتراضي 25)"),
     }),
     execute: async ({ cellName, limit }) => {
       const cell = resolveCell(cellName)
@@ -225,7 +225,7 @@ export function buildAssistantTools(params: {
     description:
       "جلب آخر رسائل المستخدم نفسه عبر كل الخلايا. استخدمها عند السؤال 'ماذا كتبت مؤخراً؟' أو 'ذكّرني بآخر مشاركاتي'.",
     inputSchema: z.object({
-      limit: z.number().min(1).max(30).optional().describe("عدد الرسائل (افتراضي 15)"),
+      limit: z.coerce.number().min(1).max(30).optional().describe("عدد الرسائل (افتراضي 15)"),
     }),
     execute: async ({ limit }) => {
       const { data: rows } = await supabase
@@ -256,7 +256,7 @@ export function buildAssistantTools(params: {
         .enum(["pending", "approved", "rejected", "closed"])
         .optional()
         .describe("حالة القرار لتصفية النتائج (اختياري)"),
-      limit: z.number().min(1).max(20).optional().describe("عدد القرارات (افتراضي 10)"),
+      limit: z.coerce.number().min(1).max(20).optional().describe("عدد القرارات (افتراضي 10)"),
     }),
     execute: async ({ cellName, status, limit }) => {
       let targetCellIds = safeCellIds
@@ -300,7 +300,7 @@ export function buildAssistantTools(params: {
         .enum(["pending", "completed", "in_progress"])
         .optional()
         .describe("حالة المهمة (اختياري، افتراضياً كل الحالات)"),
-      limit: z.number().min(1).max(30).optional().describe("عدد المهام (افتراضي 15)"),
+      limit: z.coerce.number().min(1).max(30).optional().describe("عدد المهام (افتراضي 15)"),
     }),
     execute: async ({ status, limit }) => {
       let q = supabase
@@ -332,7 +332,7 @@ export function buildAssistantTools(params: {
       "جلب الملخصات اليومية والذاكرة الجماعية لخلايا المستخدم (المواضيع، القرارات، الأفكار، النقاط المعلقة). استخدمها عند السؤال 'لخص ما حدث' أو 'ما أهم النقاط الأخيرة؟'.",
     inputSchema: z.object({
       cellName: z.string().optional().describe("اسم الخلية لحصر الملخصات (اختياري)"),
-      limit: z.number().min(1).max(10).optional().describe("عدد الملخصات (افتراضي 5)"),
+      limit: z.coerce.number().min(1).max(10).optional().describe("عدد الملخصات (افتراضي 5)"),
     }),
     execute: async ({ cellName, limit }) => {
       let targetCellIds = safeCellIds
@@ -369,7 +369,7 @@ export function buildAssistantTools(params: {
       "جلب عقد المحادثة (المواضيع/الأسئلة/الأفكار/الإعلانات) في خلايا المستخدم. استخدمها عند السؤال عن المواضيع المطروحة أو هيكل النقاشات.",
     inputSchema: z.object({
       cellName: z.string().optional().describe("اسم الخلية لحصر العقد (اختياري)"),
-      limit: z.number().min(1).max(20).optional().describe("عدد العقد (افتراضي 10)"),
+      limit: z.coerce.number().min(1).max(20).optional().describe("عدد العقد (افتراضي 10)"),
     }),
     execute: async ({ cellName, limit }) => {
       let targetCellIds = safeCellIds
@@ -404,7 +404,7 @@ export function buildAssistantTools(params: {
       "جلب إشعارات المستخدم (افتراضياً غير المقروءة). استخدمها عند السؤال 'هل لدي إشعارات؟' أو 'ماذا فاتني؟'.",
     inputSchema: z.object({
       unreadOnly: z.boolean().optional().describe("الاقتصار على غير المقروءة (افتراضي true)"),
-      limit: z.number().min(1).max(20).optional().describe("عدد الإشعارات (افتراضي 10)"),
+      limit: z.coerce.number().min(1).max(20).optional().describe("عدد الإشعارات (افتراضي 10)"),
     }),
     execute: async ({ unreadOnly, limit }) => {
       let q = supabase
@@ -436,7 +436,7 @@ export function buildAssistantTools(params: {
     description:
       "جلب سجل نشاط المستخدم الأخير (الأفعال التي قام بها مع النقاط المكتسبة). استخدمها عند السؤال عن النشاط الأخير أو مصدر النقاط.",
     inputSchema: z.object({
-      limit: z.number().min(1).max(30).optional().describe("عدد السجلات (افتراضي 15)"),
+      limit: z.coerce.number().min(1).max(30).optional().describe("عدد السجلات (افتراضي 15)"),
     }),
     execute: async ({ limit }) => {
       const { data: rows } = await supabase
