@@ -158,18 +158,18 @@ export default function AssistantPage() {
                 </Card>
                 <Card
                   className="cursor-pointer hover:bg-accent transition-colors"
-                  onClick={() => setInput("اقترح أفكار لتحسين التواصل")}
+                  onClick={() => setInput("ابحث في رسائلي عن أهم النقاشات الأخيرة")}
                 >
                   <CardContent className="p-4">
-                    <p className="text-sm font-medium">اقترح أفكار لتحسين التواصل</p>
+                    <p className="text-sm font-medium">ابحث في رسائلي عن أهم النقاشات</p>
                   </CardContent>
                 </Card>
                 <Card
                   className="cursor-pointer hover:bg-accent transition-colors"
-                  onClick={() => setInput("ما هي نقاط القوة في مجموعتنا؟")}
+                  onClick={() => setInput("ما هي مهامي المعلقة حالياً؟")}
                 >
                   <CardContent className="p-4">
-                    <p className="text-sm font-medium">ما هي نقاط القوة في مجموعتنا؟</p>
+                    <p className="text-sm font-medium">ما هي مهامي المعلقة حالياً؟</p>
                   </CardContent>
                 </Card>
               </div>

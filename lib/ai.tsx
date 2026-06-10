@@ -1,5 +1,5 @@
 import { createGroq } from "@ai-sdk/groq"
-import { generateText, streamText } from "ai"
+import { generateText, streamText, stepCountIs, type ModelMessage, type ToolSet } from "ai"
 
 const groq = createGroq({
   apiKey: process.env.GROQ_API_KEY,
@@ -7,6 +7,44 @@ const groq = createGroq({
 
 export function getAIModel() {
   return groq("qwen/qwen3-32b")
+}
+
+/**
+ * نموذج مخصص لاستدعاء الأدوات (function calling).
+ * نستخدم نموذجاً يدعم الأدوات بشكل موثوق بدل qwen3-32b الذي وُجد للنص فقط.
+ */
+export function getAIToolModel() {
+  return groq("llama-3.3-70b-versatile")
+}
+
+/**
+ * توليد نص باستخدام نظام الأدوات متعدد الخطوات.
+ * يمرر مجموعة الأدوات للنموذج فيقرر متى ينادي كلاً منها،
+ * ثم يبني الإجابة النهائية بناءً على نتائجها.
+ */
+export async function generateWithTools(params: {
+  system: string
+  messages: ModelMessage[]
+  tools: ToolSet
+  maxSteps?: number
+  temperature?: number
+}): Promise<string> {
+  const { system, messages, tools, maxSteps = 6, temperature = 0.4 } = params
+
+  try {
+    const { text } = await generateText({
+      model: getAIToolModel(),
+      system,
+      messages,
+      tools,
+      stopWhen: stepCountIs(maxSteps),
+      temperature,
+    })
+    return cleanThinkingTags(text)
+  } catch (error) {
+    console.error("[v0] AI Tools Error:", error)
+    throw new Error("حدث خطأ في خدمة الذكاء الاصطناعي")
+  }
 }
 
 function cleanThinkingTags(text: string): string {

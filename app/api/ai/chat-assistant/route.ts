@@ -1,11 +1,13 @@
 import { createClient, createServiceClient } from "@/lib/supabase/server"
-import { generateAIText } from "@/lib/ai"
+import { generateWithTools } from "@/lib/ai"
+import { buildAssistantTools } from "@/lib/ai/assistant-tools"
+import type { ModelMessage } from "ai"
 
 export async function POST(req: Request) {
   try {
-    const { messages, userId } = await req.json()
+    const { messages } = await req.json()
 
-    console.log("[v0] Chat assistant request:", { messagesCount: messages?.length, userId })
+    console.log("[v0] Chat assistant request:", { messagesCount: messages?.length })
 
     if (!messages || !Array.isArray(messages)) {
       return Response.json({ error: "رسائل غير صالحة" }, { status: 400 })
@@ -13,7 +15,7 @@ export async function POST(req: Request) {
 
     const supabase = await createClient()
 
-    // التحقق من المستخدم
+    // التحقق من المستخدم — نعتمد على الجلسة فقط، لا على userId من العميل (حماية)
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -25,302 +27,89 @@ export async function POST(req: Request) {
 
     const serviceSupabase = createServiceClient()
 
-    // 1. معلومات المستخدم الشاملة
-    const { data: profile } = await serviceSupabase
-      .from("profiles")
-      .select("display_name, username, bio, total_points, responsibility_score")
-      .eq("id", user.id)
-      .single()
+    // جلب اسم المستخدم وخلاياه مرة واحدة (تُستخدم في نظام الصلاحيات وحل أسماء الخلايا)
+    const [{ data: profile }, { data: memberships }] = await Promise.all([
+      serviceSupabase.from("profiles").select("display_name, username").eq("id", user.id).single(),
+      serviceSupabase
+        .from("group_members")
+        .select("role, groups (id, name, description, goal, cell_category)")
+        .eq("user_id", user.id),
+    ])
 
-    // عدد الرسائل المرسلة
-    const { count: messagesCount } = await serviceSupabase
-      .from("messages")
-      .select("*", { count: "exact", head: true })
-      .eq("sender_id", user.id)
+    const userCells = (memberships || [])
+      .map((m: any) => {
+        const g = m.groups
+        if (!g?.id) return null
+        return {
+          id: g.id as string,
+          name: (g.name as string) || "خلية",
+          role: (m.role as string) || "member",
+          description: (g.description as string) || null,
+          goal: (g.goal as string) || null,
+          cell_category: (g.cell_category as string) || null,
+        }
+      })
+      .filter(Boolean) as Array<{
+      id: string
+      name: string
+      role: string
+      description: string | null
+      goal: string | null
+      cell_category: string | null
+    }>
 
-    // عدد العقد المنشأة
-    const { count: nodesCount } = await serviceSupabase
-      .from("conversation_nodes")
-      .select("*", { count: "exact", head: true })
-      .eq("created_by", user.id)
+    const userName = profile?.display_name || profile?.username || "مستخدم"
 
-    // عدد القرارات المصوت عليها
-    const { count: votesCount } = await serviceSupabase
-      .from("decision_votes")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", user.id)
+    // بناء الأدوات المحصورة بصلاحيات هذا المستخدم
+    const tools = buildAssistantTools({
+      supabase: serviceSupabase,
+      userId: user.id,
+      userCells,
+    })
 
-    // عدد القرارات المنشأة
-    const { count: decisionsCreatedCount } = await serviceSupabase
-      .from("decisions")
-      .select("*", { count: "exact", head: true })
-      .eq("created_by", user.id)
+    const today = new Date().toLocaleDateString("ar", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
 
-    // عدد التفاعلات
-    const { count: reactionsCount } = await serviceSupabase
-      .from("message_reactions")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", user.id)
-
-    // عدد المهام المكتملة
-    const { count: tasksCompletedCount } = await serviceSupabase
-      .from("extracted_tasks")
-      .select("*", { count: "exact", head: true })
-      .eq("assigned_to", user.id)
-      .eq("status", "completed")
-
-    // بناء الإحصائيات المحسوبة
-    const calculatedStats = {
-      messages_sent: messagesCount || 0,
-      nodes_created: nodesCount || 0,
-      decisions_voted: votesCount || 0,
-      decisions_created: decisionsCreatedCount || 0,
-      reactions_given: reactionsCount || 0,
-      tasks_completed: tasksCompletedCount || 0,
-    }
-
-    // 3. الخلايا المنضمة
-    const { data: userGroups } = await serviceSupabase
-      .from("group_members")
-      .select(`
-        role,
-        groups (
-          id,
-          name,
-          description,
-          goal,
-          cell_category,
-          max_members
-        )
-      `)
-      .eq("user_id", user.id)
-
-    // 4. آخر 10 رسائل من المستخدم
-    const { data: recentMessages } = await serviceSupabase
-      .from("messages")
-      .select(`
-        content,
-        created_at,
-        groups (name),
-        conversation_nodes (title)
-      `)
-      .eq("sender_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(10)
-
-    // 5. آخر 5 قرارات من الخلايا المنضمة
-    const groupIds = userGroups?.map((gm) => (gm.groups as any)?.id).filter(Boolean) || []
-    const { data: recentDecisions } = await serviceSupabase
-      .from("decisions")
-      .select(`
-        title,
-        description,
-        status,
-        created_at,
-        groups (name),
-        profiles!decisions_created_by_fkey (display_name)
-      `)
-      .in("group_id", groupIds.length > 0 ? groupIds : [""])
-      .order("created_at", { ascending: false })
-      .limit(5)
-
-    // 6. آخر 5 عقد من الخلايا المنضمة
-    const { data: recentNodes } = await serviceSupabase
-      .from("conversation_nodes")
-      .select(`
-        title,
-        description,
-        node_type,
-        created_at,
-        groups (name)
-      `)
-      .in("group_id", groupIds.length > 0 ? groupIds : [""])
-      .order("created_at", { ascending: false })
-      .limit(5)
-
-    // 7. الإنجازات والألقاب
-    const { data: userTitles } = await serviceSupabase
-      .from("user_titles")
-      .select(`
-        earned_at,
-        titles (
-          name_ar,
-          description_ar,
-          rarity,
-          category
-        )
-      `)
-      .eq("user_id", user.id)
-      .eq("is_visible", true)
-
-    // 8. آخر 3 ملخصات يومية
-    const { data: recentSummaries } = await serviceSupabase
-      .from("daily_summaries")
-      .select(`
-        summary_date,
-        raw_message_count,
-        topics,
-        decisions,
-        groups (name)
-      `)
-      .in("group_id", groupIds.length > 0 ? groupIds : [""])
-      .order("summary_date", { ascending: false })
-      .limit(3)
-
-    // 9. المهام النشطة
-    const { data: activeTasks } = await serviceSupabase
-      .from("extracted_tasks")
-      .select(`
-        task_content,
-        status,
-        due_date,
-        groups (name)
-      `)
-      .or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`)
-      .eq("status", "pending")
-      .order("created_at", { ascending: false })
-      .limit(5)
-
-    // 10. آخر الإشعارات غير المقروءة
-    const { data: unreadNotifications } = await serviceSupabase
-      .from("notifications")
-      .select("title, body, type, created_at")
-      .eq("user_id", user.id)
-      .eq("is_read", false)
-      .order("created_at", { ascending: false })
-      .limit(5)
-
-    // بناء السياق الشامل
-    const context = `
-أنت المساعد الذكي الشخصي لتطبيق Synaptic Space - منصة محادثات ومناقشات جماعية ذكية.
+    const system = `أنت المساعد الذكي الشخصي لتطبيق Synaptic Space — منصة محادثات ومناقشات جماعية ذكية تُنظَّم في "خلايا" (مجموعات).
 
 ⚠️ تعليمات لغوية حتمية:
-- الرد يجب أن يكون عربياً فصحياً فقط بلا استثناء
-- لا تستخدم أي كلمات بلغات أخرى (إنجليزية، صينية، فرنسية، أو أي لغة أخرى)
-- لا تخلط اللغات في أي جزء من الرد
-- لا تكتب كلمات أجنبية حتى لو كانت أسماء تقنية
-- استثناء وحيد: اسم التطبيق "Synaptic Space" فقط
-- إذا احتجت لشرح مصطلح تقني ترجم للعربية الفصحى
+- الرد يجب أن يكون بالعربية الفصحى فقط، بلا أي كلمات أجنبية (إنجليزية أو غيرها).
+- الاستثناء الوحيد المسموح: اسم التطبيق "Synaptic Space".
+- إن احتجت لمصطلح تقني فترجمه للعربية.
 
-# معلومات المستخدم الأساسية
-الاسم: ${profile?.display_name || profile?.username || "مستخدم"}
-${profile?.bio ? `السيرة الذاتية: ${profile.bio}` : ""}
-النقاط الإجمالية: ${profile?.total_points || 0}
-مقياس المسؤولية: ${profile?.responsibility_score || 0}
+# هويتك ودورك
+- أنت تتحدث مع: ${userName}.
+- التاريخ اليوم: ${today}.
+- عدد خلايا المستخدم: ${userCells.length}.
+- مهمتك: الإجابة عن أسئلة المستخدم حول نشاطه ورسائله وقراراته ومهامه وخلاياه، وتقديم رؤى وتلخيصات مفيدة.
 
-# إحصائيات النشاط الفعلية
-- الرسائل المرسلة: ${calculatedStats.messages_sent}
-- المواضيع المنشأة: ${calculatedStats.nodes_created}
-- القرارات المصوت عليها: ${calculatedStats.decisions_voted}
-- القرارات المنشأة: ${calculatedStats.decisions_created}
-- التفاعلات: ${calculatedStats.reactions_given}
-- المهام المكتملة: ${calculatedStats.tasks_completed}
+# كيفية العمل (مهم جداً)
+- لديك أدوات تصل لبيانات المستخدم الحقيقية. **استخدم الأدوات دائماً للحصول على البيانات قبل الإجابة** — لا تختلق أي معلومة.
+- اختر الأداة المناسبة حسب السؤال: للبحث في الرسائل استخدم searchMessages، للقرارات getDecisions، للمهام getTasks، للملخصات getCellSummaries، وهكذا.
+- يمكنك استدعاء أكثر من أداة على التوالي لتجميع إجابة كاملة.
+- إذا لم تُرجع الأدوات بيانات، قل بوضوح إنه لا توجد معلومات متاحة — لا تخمّن.
+- لا تذكر أسماء الأدوات أو تفاصيلها التقنية للمستخدم؛ قدّم الإجابة بشكل طبيعي وودود.
+- إن سأل المستخدم عن خلية بالاسم، استخدم اسمها كما ذكره في معامل cellName.
 
-# الخلايا المشترك فيها (${userGroups?.length || 0} خلية)
-${
-  userGroups && userGroups.length > 0
-    ? userGroups
-        .map((gm: any) => {
-          const group = gm.groups
-          return `• ${group?.name} - دورك: ${gm.role === "admin" ? "مشرف" : gm.role === "moderator" ? "مراقب" : "عضو"}
-  ${group?.description ? `الوصف: ${group.description}` : ""}
-  ${group?.goal ? `الهدف: ${group.goal}` : ""}
-  ${group?.cell_category ? `النوع: ${group.cell_category === "project" ? "مشروع" : "نقاش"}` : ""}`
-        })
-        .join("\n")
-    : "لا توجد خلايا حالياً"
-}
+# أسلوبك
+- ودود، محترف، موجز ومباشر. استخدم تنسيق Markdown (قوائم، عناوين) عند الحاجة لتنظيم الإجابة.`
 
-# آخر رسائل المستخدم (${recentMessages?.length || 0})
-${
-  recentMessages && recentMessages.length > 0
-    ? recentMessages
-        .map(
-          (msg: any) =>
-            `• [${msg.groups?.name || "خلية"}${msg.conversation_nodes?.title ? ` > ${msg.conversation_nodes.title}` : ""}]: ${msg.content?.substring(0, 120)}...`,
-        )
-        .join("\n")
-    : "لا توجد رسائل سابقة"
-}
+    // تحويل سجل المحادثة إلى صيغة الرسائل
+    const modelMessages: ModelMessage[] = messages
+      .filter((m: any) => m?.content && (m.role === "user" || m.role === "assistant"))
+      .map((m: any) => ({ role: m.role, content: String(m.content) }))
 
-# آخر القرارات في الخلايا (${recentDecisions?.length || 0})
-${
-  recentDecisions && recentDecisions.length > 0
-    ? recentDecisions
-        .map(
-          (d: any) =>
-            `• ${d.title} [${d.status === "pending" ? "قيد الانتظار" : d.status === "approved" ? "مقبول" : "مرفوض"}]
-في: ${d.groups?.name || "خلية"}`,
-        )
-        .join("\n")
-    : "لا توجد قرارات حديثة"
-}
+    console.log("[v0] Generating AI response with tool system...", { cells: userCells.length })
 
-# آخر المواضيع (${recentNodes?.length || 0})
-${
-  recentNodes && recentNodes.length > 0
-    ? recentNodes
-        .map(
-          (n: any) =>
-            `• ${n.title} [${n.node_type === "question" ? "سؤال" : n.node_type === "idea" ? "فكرة" : n.node_type === "announcement" ? "إعلان" : "نقاش"}]
-في: ${n.groups?.name || "خلية"}`,
-        )
-        .join("\n")
-    : "لا توجد مواضيع حديثة"
-}
+    const response = await generateWithTools({
+      system,
+      messages: modelMessages,
+      tools,
+      maxSteps: 6,
+    })
 
-# الإنجازات والألقاب (${userTitles?.length || 0})
-${
-  userTitles && userTitles.length > 0
-    ? userTitles.map((ut: any) => `• ${ut.titles?.name_ar} - ${ut.titles?.description_ar}`).join("\n")
-    : "لا توجد ألقاب حتى الآن"
-}
-
-# المهام النشطة (${activeTasks?.length || 0})
-${
-  activeTasks && activeTasks.length > 0
-    ? activeTasks.map((t: any) => `• ${t.task_content} - في ${t.groups?.name || "خلية"}`).join("\n")
-    : "لا توجد مهام معلقة"
-}
-
-${
-  unreadNotifications && unreadNotifications.length > 0
-    ? `# إشعارات غير مقروءة (${unreadNotifications.length})
-${unreadNotifications.map((n: any) => `• ${n.title}: ${n.body?.substring(0, 60)}...`).join("\n")}`
-    : ""
-}
-
-# دورك ومسؤولياتك:
-
-1. أنت مساعد شخصي متخصص في Synaptic Space فقط
-2. استخدم اللغة العربية الفصحى الواضحة فقط - منع قاطع لخلط الكلمات الأجنبية
-3. أجب بناءً على البيانات الحقيقية المتوفرة أعلاه
-4. قدم رؤى وتحليلات ذكية
-5. اقترح أفكاراً لتحسين المشاركة
-6. لخص المحادثات والقرارات عند الطلب
-7. ساعد في فهم الإحصائيات
-8. شجع على المشاركة الإيجابية
-9. كن ودوداً ومحترفاً ومفيداً
-10. إذا لم تكن المعلومة متوفرة قل ذلك بوضوح
-
-تذكر: أنت تتحدث مع ${profile?.display_name || "مستخدم"}.
-`.trim()
-
-    // بناء الـ prompt من المحادثة
-    const conversationHistory = messages
-      .map((msg: any) => `${msg.role === "user" ? "المستخدم" : "المساعد"}: ${msg.content}`)
-      .join("\n")
-
-    const fullPrompt = `${context}\n\nالمحادثة:\n${conversationHistory}\n\nالمساعد:`
-
-    console.log("[v0] Generating AI response with comprehensive context...")
-    console.log("[v0] Calculated stats:", calculatedStats)
-    const response = await generateAIText(fullPrompt)
     console.log("[v0] AI response generated successfully")
 
-    const cleanedResponse = response.replace(/<Thinking>[\s\S]*?<\/think>/gi, "").trim()
-
-    return Response.json({ success: true, response: cleanedResponse })
+    return Response.json({ success: true, response: response.trim() })
   } catch (error) {
     console.error("[v0] Chat assistant error:", error)
     return Response.json(
