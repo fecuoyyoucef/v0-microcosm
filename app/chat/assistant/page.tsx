@@ -89,9 +89,18 @@ export default function AssistantPage() {
         }),
       })
 
-      if (!response.ok) throw new Error("Failed to get response")
+      const data = await response.json().catch(() => null)
 
-      const data = await response.json()
+      if (!response.ok) {
+        // رسالة ودّية عند الانشغال/تجاوز الحدّ أو أي خطأ من الخادم
+        const fallback =
+          response.status === 429
+            ? "الخدمة مشغولة حالياً بسبب كثرة الطلبات. يرجى الانتظار بضع ثوانٍ ثم المحاولة مرة أخرى."
+            : "عذراً، حدث خطأ. يرجى المحاولة مرة أخرى."
+        setMessages((prev) => [...prev, { role: "assistant", content: data?.response || fallback }])
+        return
+      }
+
       setMessages((prev) => [...prev, { role: "assistant", content: data.response }])
     } catch (error) {
       console.error("Error:", error)

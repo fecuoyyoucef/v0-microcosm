@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { getAIModel } from "@/lib/ai"
-import { generateText } from "ai"
+import { generateAIText } from "@/lib/ai"
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,14 +12,14 @@ export async function POST(request: NextRequest) {
 
     const { text } = await request.json()
 
-    const { text: correctedText } = await generateText({
-      model: getAIModel(),
-      prompt: `أنت مصحح لغوي للغة العربية. قم بتصحيح الأخطاء النحوية والإملائية في النص التالي، واحتفظ بالمعنى والأسلوب. إذا كان النص صحيحاً، أرجعه كما هو.
+    const correctedText = await generateAIText(
+      `أنت مصحح لغوي للغة العربية. قم بتصحيح الأخطاء النحوية والإملائية في النص التالي، واحتفظ بالمعنى والأسلوب. إذا كان النص صحيحاً، أرجعه كما هو.
 
 النص: "${text}"
 
 أرجع النص المصحح فقط بدون أي تفسيرات أو إضافات.`,
-    })
+      { maxTokens: 800, temperature: 0.3 },
+    )
 
     return NextResponse.json({ corrected: correctedText.trim() })
   } catch (error) {

@@ -1,6 +1,5 @@
-import { generateText } from "ai"
 import { NextResponse } from "next/server"
-import { getAIModel } from "@/lib/ai"
+import { generateAIText } from "@/lib/ai"
 
 export async function POST(request: Request) {
   const { text, targetLang = "en" } = await request.json()
@@ -20,9 +19,8 @@ export async function POST(request: Request) {
   const targetLangName = langNames[targetLang] || targetLang
 
   try {
-    const { text: raw } = await generateText({
-      model: getAIModel(),
-      prompt: `You are a translation engine. Translate the user text to ${targetLangName}.
+    const raw = await generateAIText(
+      `You are a translation engine. Translate the user text to ${targetLangName}.
 Rules:
 - Output ONLY the translated text.
 - Do not add explanations, notes, quotes, prefixes, or any reasoning.
@@ -31,7 +29,8 @@ Rules:
 
 User text:
 ${text}`,
-    })
+      { maxTokens: 1000, temperature: 0.3 },
+    )
 
     // Strip any <think>...</think> blocks (some reasoning models leak them)
     let translated = raw.replace(/<think>[\s\S]*?<\/think>/gi, "")

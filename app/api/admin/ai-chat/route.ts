@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
-import { generateText } from "ai"
+import { generateAIChat } from "@/lib/ai"
 import { verifyAdmin } from "@/lib/admin-auth"
 
 export async function POST(request: Request) {
@@ -49,10 +49,10 @@ export async function POST(request: Request) {
       .map((msg: any) => `${msg.role === "user" ? "المستخدم" : "المساعد"}: ${msg.content}`)
       .join("\n")
 
-    const { text } = await generateText({
-      model: "anthropic/claude-sonnet-4-20250514",
+    const text = await generateAIChat({
       system: systemPrompt,
       prompt: `${conversationHistory}\n\nالمستخدم: ${message}\n\nالمساعد:`,
+      temperature: 0.7,
     })
 
     return NextResponse.json({ response: text })

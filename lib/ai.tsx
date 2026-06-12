@@ -1,26 +1,149 @@
 import { createGroq } from "@ai-sdk/groq"
-import { generateText, streamText, stepCountIs, type ModelMessage, type ToolSet } from "ai"
+import { createXai } from "@ai-sdk/xai"
+import { generateText, streamText, stepCountIs, type LanguageModel, type ModelMessage, type ToolSet } from "ai"
+
+/**
+ * طبقة موحّدة للذكاء الاصطناعي مع تسلسل بديل تلقائي (Fallback Chain).
+ *
+ * الترتيب: Groq (مجاني) → Grok / xAI → Vercel AI Gateway.
+ *
+ * - نبدأ دائماً بـ Groq المجاني لتقليل التكلفة.
+ * - عند تجاوز حدّ المعدّل (429) أو فشل المزوّد، ننتقل تلقائياً للمزوّد التالي.
+ * - كل مزوّد يُعاد عليه المحاولة مع تأخير متصاعد قبل الانتقال للذي يليه.
+ *
+ * ملاحظة مهمة: المشروع يستخدم AI SDK v5، والمعامل الصحيح لحدّ الإخراج هو
+ * `maxOutputTokens` وليس `maxTokens`. استخدام الاسم الخاطئ كان يجعل النموذج
+ * يولّد بلا حدّ ويستنزف حدّ التوكنز في الطبقة المجانية → 429 متكرر.
+ */
 
 const groq = createGroq({
   apiKey: process.env.GROQ_API_KEY,
 })
 
-export function getAIModel() {
-  return groq("qwen/qwen3-32b")
+const xai = createXai({
+  apiKey: process.env.XAI_API_KEY,
+})
+
+/**
+ * هل مفتاح Grok / xAI متاح؟ (الطبقة البديلة الثانية)
+ */
+function hasXai(): boolean {
+  return Boolean(process.env.XAI_API_KEY)
 }
 
 /**
- * نموذج مخصص لاستدعاء الأدوات (function calling).
- * نستخدم نموذجاً يدعم الأدوات بشكل موثوق بدل qwen3-32b الذي وُجد للنص فقط.
+ * هل بوابة Vercel AI Gateway متاحة؟
+ * على Vercel تعمل بدون مفتاح لمزوّدين مدعومين؛ خارجها تحتاج AI_GATEWAY_API_KEY.
  */
+function hasGateway(): boolean {
+  return Boolean(process.env.AI_GATEWAY_API_KEY || process.env.VERCEL)
+}
+
+/**
+ * تسلسل النماذج للمهام النصية العامة (تصنيف، ترجمة، تلخيص...).
+ * استبدلنا نموذج التفكير qwen3-32b بنموذج أسرع غير تفكيري لتقليل
+ * استهلاك التوكنز وتفادي الردّ الفارغ المليء بوسوم <think>.
+ */
+function getTextModelChain(): LanguageModel[] {
+  const chain: LanguageModel[] = [groq("llama-3.3-70b-versatile")]
+  if (hasXai()) chain.push(xai("grok-4"))
+  if (hasGateway()) chain.push("groq/llama-3.3-70b-versatile")
+  return chain
+}
+
+/**
+ * تسلسل النماذج لاستدعاء الأدوات (function calling).
+ */
+function getToolModelChain(): LanguageModel[] {
+  const chain: LanguageModel[] = [groq("llama-3.3-70b-versatile")]
+  if (hasXai()) chain.push(xai("grok-4"))
+  if (hasGateway()) chain.push("groq/llama-3.3-70b-versatile")
+  return chain
+}
+
+/**
+ * النموذج الأساسي (يُحتفظ به للتوافق مع الكود القديم).
+ */
+export function getAIModel() {
+  return groq("llama-3.3-70b-versatile")
+}
+
 export function getAIToolModel() {
   return groq("llama-3.3-70b-versatile")
 }
 
 /**
- * توليد نص باستخدام نظام الأدوات متعدد الخطوات.
- * يمرر مجموعة الأدوات للنموذج فيقرر متى ينادي كلاً منها،
- * ثم يبني الإجابة النهائية بناءً على نتائجها.
+ * هل الخطأ ناتج عن تجاوز حدّ المعدّل (rate limit / TPM)؟
+ */
+function isRateLimitError(error: unknown): boolean {
+  const e = error as any
+  const status = e?.statusCode ?? e?.status ?? e?.response?.status
+  if (status === 429) return true
+  const msg = String(e?.message || e || "").toLowerCase()
+  return (
+    msg.includes("rate limit") ||
+    msg.includes("rate_limit") ||
+    msg.includes("too many requests") ||
+    msg.includes("429")
+  )
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/**
+ * منفّذ عام يجرّب كل نموذج في التسلسل بالترتيب.
+ * - لكل نموذج: إعادة محاولة مع تأخير متصاعد عند 429.
+ * - عند فشل النموذج نهائياً ننتقل للنموذج التالي في التسلسل.
+ * - إذا فشل الجميع نرمي الخطأ المناسب.
+ */
+async function runWithFallback<T>(
+  chain: LanguageModel[],
+  run: (model: LanguageModel) => Promise<T>,
+  opts: { retriesPerModel?: number } = {},
+): Promise<T> {
+  const retriesPerModel = opts.retriesPerModel ?? 2
+  let lastError: unknown
+  let sawRateLimit = false
+
+  for (let i = 0; i < chain.length; i++) {
+    const model = chain[i]
+    for (let attempt = 0; attempt <= retriesPerModel; attempt++) {
+      try {
+        return await run(model)
+      } catch (error) {
+        lastError = error
+        if (isRateLimitError(error)) {
+          sawRateLimit = true
+          if (attempt < retriesPerModel) {
+            const delay = 1000 * Math.pow(2, attempt) + Math.floor(Math.random() * 400)
+            console.log(
+              `[v0] Provider ${i + 1}/${chain.length} rate limited, retry ${attempt + 1}/${retriesPerModel} in ${delay}ms`,
+            )
+            await sleep(delay)
+            continue
+          }
+          // استنفدنا محاولات هذا المزوّد → انتقل للتالي
+          console.log(`[v0] Provider ${i + 1}/${chain.length} exhausted, falling back to next provider`)
+          break
+        }
+        // خطأ غير متعلق بالحدّ → جرّب المزوّد التالي مباشرة
+        console.error(`[v0] Provider ${i + 1}/${chain.length} error, falling back:`, error)
+        break
+      }
+    }
+  }
+
+  if (sawRateLimit) {
+    throw new Error("RATE_LIMIT")
+  }
+  console.error("[v0] All AI providers failed:", lastError)
+  throw new Error("حدث خطأ في خدمة الذكاء الاصطناعي")
+}
+
+/**
+ * توليد نص باستخدام نظام الأدوات متعدد الخطوات، مع تسلسل بديل بين المزوّدين.
  */
 export async function generateWithTools(params: {
   system: string
@@ -29,30 +152,52 @@ export async function generateWithTools(params: {
   maxSteps?: number
   temperature?: number
 }): Promise<string> {
-  const { system, messages, tools, maxSteps = 6, temperature = 0.4 } = params
+  const { system, messages, tools, maxSteps = 5, temperature = 0.4 } = params
+  const chain = getToolModelChain()
 
-  try {
-    const { text } = await generateText({
-      model: getAIToolModel(),
+  return runWithFallback(chain, async (model) => {
+    const result = await generateText({
+      model,
       system,
       messages,
       tools,
       stopWhen: stepCountIs(maxSteps),
       temperature,
     })
-    return cleanThinkingTags(text)
-  } catch (error) {
-    console.error("[v0] AI Tools Error:", error)
-    throw new Error("حدث خطأ في خدمة الذكاء الاصطناعي")
-  }
+
+    let text = cleanThinkingTags(result.text || "")
+
+    // الحالة: انتهت الخطوات والنموذج ما زال ينادي أدوات دون نصّ نهائي.
+    if (!text) {
+      try {
+        const finalize = await generateText({
+          model,
+          system,
+          messages: [
+            ...messages,
+            ...result.response.messages,
+            {
+              role: "user",
+              content:
+                "بناءً على المعلومات التي جمعتها أعلاه، اكتب الآن الإجابة النهائية للمستخدم بالعربية الفصحى فقط، دون استدعاء أي أدوات إضافية.",
+            },
+          ],
+          temperature,
+        })
+        text = cleanThinkingTags(finalize.text || "")
+      } catch (finalizeError) {
+        console.error("[v0] AI finalize step error:", finalizeError)
+      }
+    }
+
+    return text
+  })
 }
 
 function cleanThinkingTags(text: string): string {
-  // Remove all variations: <Thinking>...</Thinking>, <Thinking>...</Thinking>, etc.
-  let cleaned = text.replace(/<Thinking>[\s\S]*?<\/thinking>/gi, "")
-  cleaned = cleaned.replace(/<Thinking>[\s\S]*?<\/Thinking>/gi, "")
-  cleaned = cleaned.replace(/<Thinking>[\s\S]*?<\/think>/gi, "")
-  cleaned = cleaned.replace(/<Think>[\s\S]*?<\/Think>/gi, "")
+  // Remove all variations: <think>...</think>, <thinking>...</thinking>, etc.
+  let cleaned = text.replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
+  cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, "")
 
   // Remove any other XML-like thinking tags
   cleaned = cleaned.replace(/<[^>]*?think[^>]*?>[\s\S]*?<\/[^>]*?>/gi, "")
@@ -67,18 +212,45 @@ export async function generateAIText(
     temperature?: number
   },
 ): Promise<string> {
-  try {
+  const chain = getTextModelChain()
+  const text = await runWithFallback(chain, async (model) => {
     const { text } = await generateText({
-      model: getAIModel(),
-      prompt: prompt,
-      maxTokens: options?.maxTokens || 2000,
-      temperature: options?.temperature || 0.7,
+      model,
+      prompt,
+      maxOutputTokens: options?.maxTokens ?? 2000,
+      temperature: options?.temperature ?? 0.7,
     })
-    return cleanThinkingTags(text)
-  } catch (error) {
-    console.error("[v0] AI Error:", error)
-    throw new Error("حدث خطأ في خدمة الذكاء الاصطناعي")
-  }
+    return text
+  })
+  return cleanThinkingTags(text)
+}
+
+/**
+ * توليد نص من سجل رسائل (system + messages) عبر تسلسل المزوّدين البديل.
+ * تستخدمه المسارات التي كانت تستدعي generateText مباشرة بنموذج واحد،
+ * لتحصل تلقائياً على إعادة المحاولة والانتقال للمزوّد التالي عند 429.
+ */
+export async function generateAIChat(params: {
+  system?: string
+  prompt?: string
+  messages?: ModelMessage[]
+  maxTokens?: number
+  temperature?: number
+}): Promise<string> {
+  const { system, prompt, messages, maxTokens = 2000, temperature = 0.7 } = params
+  const chain = getTextModelChain()
+  const text = await runWithFallback(chain, async (model) => {
+    const { text } = await generateText({
+      model,
+      ...(system ? { system } : {}),
+      ...(messages ? { messages } : {}),
+      ...(prompt ? { prompt } : {}),
+      maxOutputTokens: maxTokens,
+      temperature,
+    })
+    return text
+  })
+  return cleanThinkingTags(text)
 }
 
 export async function generateAIStream(
@@ -88,19 +260,15 @@ export async function generateAIStream(
     temperature?: number
   },
 ): Promise<ReadableStream> {
-  try {
-    const result = streamText({
-      model: getAIModel(),
-      prompt: prompt,
-      maxTokens: options?.maxTokens || 2000,
-      temperature: options?.temperature || 0.7,
-    })
+  // البثّ يستخدم المزوّد الأساسي مباشرة؛ يتولى استدعاء toDataStream البثّ نفسه.
+  const result = streamText({
+    model: getAIModel(),
+    prompt,
+    maxOutputTokens: options?.maxTokens ?? 2000,
+    temperature: options?.temperature ?? 0.7,
+  })
 
-    return result.toDataStream()
-  } catch (error) {
-    console.error("[v0] AI Stream Error:", error)
-    throw new Error("حدث خطأ في خدمة الذكاء الاصطناعي")
-  }
+  return result.toUIMessageStream() as unknown as ReadableStream
 }
 
 export async function analyzeText(text: string, analysisType: "sentiment" | "topics" | "keywords"): Promise<any> {

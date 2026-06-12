@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { getAIModel } from "@/lib/ai"
-import { generateText } from "ai"
+import { generateAIText } from "@/lib/ai"
 import { checkFeatureServer } from "@/lib/features-server"
 
 export async function POST(request: NextRequest) {
@@ -26,14 +25,14 @@ export async function POST(request: NextRequest) {
       fr: "الفرنسية",
     }
 
-    const { text } = await generateText({
-      model: getAIModel(),
-      prompt: `ترجم النص التالي إلى ${langNames[targetLang] || targetLang}:
+    const text = await generateAIText(
+      `ترجم النص التالي إلى ${langNames[targetLang] || targetLang}:
 
 "${content}"
 
 أرجع الترجمة فقط بدون أي نص إضافي.`,
-    })
+      { maxTokens: 800, temperature: 0.3 },
+    )
 
     return NextResponse.json({ translation: text.trim() })
   } catch (error) {
