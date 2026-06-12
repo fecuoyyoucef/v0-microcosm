@@ -1,6 +1,7 @@
 import { tool } from "ai"
 import * as z from "zod"
 import type { createServiceClient } from "@/lib/supabase/server"
+import { extractKeywords, relevanceScore } from "@/lib/ai/arabic-search"
 
 type ServiceClient = ReturnType<typeof createServiceClient>
 
@@ -155,9 +156,9 @@ export function buildAssistantTools(params: {
 
   const searchMessages = tool({
     description:
-      "البحث في الرسائل بكلمة مفتاحية عبر كل خلايا المستخدم أو داخل خلية محددة. استخدمها للإجابة عن أسئلة مثل 'ماذا قيل عن الميزانية؟' أو 'ابحث عن نقاش حول كذا'. يعيد الرسائل المطابقة مع اسم المرسل والخلية والتاريخ.",
+      "البحث في الرسائل عن موضوع أو فكرة عبر كل خلايا المستخدم أو داخل خلية محددة. مرّر الموضوع أو الكلمات الدالة فقط (مثل 'الميزانية' أو 'موعد الاجتماع') — وليس الجملة الكاملة للسؤال. استخدمها للإجابة عن أسئلة مثل 'ماذا قيل عن الميزانية؟' أو 'ابحث عن نقاش حول كذا'. يعيد الرسائل الأكثر صلة مع اسم المرسل والخلية والتاريخ.",
     inputSchema: z.object({
-      query: z.string().describe("الكلمة أو العبارة المراد البحث عنها في محتوى الرسائل"),
+      query: z.string().describe("الموضوع أو الكلمات الدالة (وليس الجملة الكاملة). مثال: 'الميزانية'، 'الاجتماع القادم'"),
       cellName: z
         .string()
         .optional()
@@ -173,19 +174,53 @@ export function buildAssistantTools(params: {
         targetCellIds = [cell.id]
       }
 
-      const { data: rows } = await supabase
-        .from("messages")
-        .select(
-          "content, created_at, sender_id, groups (name), conversation_nodes (title), profiles!messages_sender_id_fkey (display_name, username)",
-        )
-        .in("group_id", targetCellIds)
-        .ilike("content", `%${query}%`)
-        .order("created_at", { ascending: false })
-        .limit(10)
+      // استخراج الكلمات المفتاحية بعد تطبيع النص العربي (يحلّ مشكلة البحث الحرفي)
+      const keywords = extractKeywords(query)
+
+      const selectCols =
+        "content, created_at, sender_id, groups (name), conversation_nodes (title), profiles!messages_sender_id_fkey (display_name, username)"
+
+      // المرحلة 1: بحث في القاعدة بـ OR على كل كلمة مفتاحية (أوسع بكثير من المطابقة الحرفية)
+      let rows: any[] = []
+      if (keywords.length > 0) {
+        const orFilter = keywords.map((kw) => `content.ilike.%${kw}%`).join(",")
+        const { data } = await supabase
+          .from("messages")
+          .select(selectCols)
+          .in("group_id", targetCellIds)
+          .or(orFilter)
+          .order("created_at", { ascending: false })
+          .limit(40)
+        rows = data || []
+      }
+
+      // المرحلة 2 (احتياطية): إن لم يُرجع البحث شيئاً، اجلب أحدث الرسائل وصفِّها بالتطبيع
+      // محلياً — يلتقط الحالات التي تفشل فيها ilike بسبب اختلاف الهمزات/التشكيل.
+      if (rows.length === 0) {
+        const { data } = await supabase
+          .from("messages")
+          .select(selectCols)
+          .in("group_id", targetCellIds)
+          .order("created_at", { ascending: false })
+          .limit(120)
+        const candidates = data || []
+        rows = candidates.filter((m: any) => relevanceScore(m.content || "", keywords) > 0)
+      }
+
+      // ترتيب النتائج حسب الصلة (عدد الكلمات المطابقة) ثم الأحدث
+      const ranked = rows
+        .map((m: any) => ({ row: m, score: relevanceScore(m.content || "", keywords) }))
+        .sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score
+          return new Date(b.row.created_at).getTime() - new Date(a.row.created_at).getTime()
+        })
+        .slice(0, 10)
+        .map((r) => r.row)
 
       return {
-        count: rows?.length || 0,
-        results: (rows || []).map((m: any) => ({
+        count: ranked.length,
+        keywords_used: keywords,
+        results: ranked.map((m: any) => ({
           content: truncate(m.content),
           sender: m.profiles?.display_name || m.profiles?.username || "عضو",
           cell: m.groups?.name || "خلية",

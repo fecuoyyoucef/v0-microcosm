@@ -53,10 +53,16 @@ function getTextModelChain(): LanguageModel[] {
 
 /**
  * تسلسل النماذج لاستدعاء الأدوات (function calling).
+ *
+ * نبدأ بـ Grok / xAI عندما يكون متاحاً لأنه أقوى بوضوح في فهم القصد العربي
+ * واختيار الأداة الصحيحة وتسلسل الخطوات — وهي نقطة ضعف Llama التي كانت
+ * تجعل المساعد يتصرف ببدائية (يختار searchMessages دائماً ويمرّر الجملة كاملة).
+ * نُبقي Llama المجاني كطبقة احتياطية عند فشل Grok أو تجاوز حدّه.
  */
 function getToolModelChain(): LanguageModel[] {
-  const chain: LanguageModel[] = [groq("llama-3.3-70b-versatile")]
+  const chain: LanguageModel[] = []
   if (hasXai()) chain.push(xai("grok-4"))
+  chain.push(groq("llama-3.3-70b-versatile"))
   if (hasGateway()) chain.push("groq/llama-3.3-70b-versatile")
   return chain
 }

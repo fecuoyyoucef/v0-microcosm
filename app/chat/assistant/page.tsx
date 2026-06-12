@@ -255,7 +255,7 @@ export default function AssistantPage() {
               {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <ArrowRight className="w-5 h-5" />}
             </Button>
           </div>
-          <p className="text-[10px] text-muted-foreground text-center mt-2">المساعد الذكي مدعوم بنموذج Groq AI</p>
+          <p className="text-[10px] text-muted-foreground text-center mt-2">المساعد الذكي مدعوم بالذكاء الاصطناعي</p>
         </div>
       </div>
     </div>
