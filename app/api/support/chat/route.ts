@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { getAIModel } from "@/lib/ai"
-import { generateText } from "ai"
+import { generateAIText } from "@/lib/ai"
 import { APP_KNOWLEDGE_BASE } from "@/lib/support/knowledge-base"
 
 const INQUIRY_SYSTEM_PROMPT = `أنت وكيل دعم عملاء محترف ومتخصص في تطبيق Synaptic Space.
@@ -146,10 +145,10 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Generating AI response...")
 
-    const { text } = await generateText({
-      model: getAIModel(),
-      prompt: `${systemPrompt}\n\n=== Previous Conversation ===\n${conversationContext}\n\nUser: ${message}\n\nAgent:`,
-    })
+    const text = await generateAIText(
+      `${systemPrompt}\n\n=== Previous Conversation ===\n${conversationContext}\n\nUser: ${message}\n\nAgent:`,
+      { maxTokens: 1000, temperature: 0.5 },
+    )
 
     console.log("[v0] AI response generated:", text.substring(0, 50) + "...")
 
@@ -232,6 +231,15 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error("[v0] Support chat error:", error)
+    if (error instanceof Error && error.message === "RATE_LIMIT") {
+      return NextResponse.json(
+        {
+          error: "rate_limit",
+          response: "الخدمة مشغولة حالياً بسبب كثرة الطلبات. يرجى الانتظار بضع ثوانٍ ثم المحاولة مرة أخرى.",
+        },
+        { status: 429 },
+      )
+    }
     return NextResponse.json({ error: "Failed to process message" }, { status: 500 })
   }
 }

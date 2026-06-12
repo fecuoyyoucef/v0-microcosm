@@ -41,6 +41,16 @@ interface UserCell {
 }
 
 /**
+ * اقتطاع المحتوى الطويل للحدّ من استهلاك التوكنات (rate limit / context).
+ * نتائج الأدوات هي أكبر مصدر لاستهلاك السياق، لذا نبقي كل رسالة موجزة.
+ */
+function truncate(value: string | null | undefined, max = 280): string | null {
+  if (!value) return null
+  const v = String(value)
+  return v.length > max ? v.slice(0, max) + "…" : v
+}
+
+/**
  * يبني مجموعة الأدوات للمستخدم الحالي.
  * نجلب الخلايا مرة واحدة ونمررها للأدوات لضبط الصلاحيات وحل الأسماء.
  */
@@ -171,12 +181,12 @@ export function buildAssistantTools(params: {
         .in("group_id", targetCellIds)
         .ilike("content", `%${query}%`)
         .order("created_at", { ascending: false })
-        .limit(15)
+        .limit(10)
 
       return {
         count: rows?.length || 0,
         results: (rows || []).map((m: any) => ({
-          content: m.content,
+          content: truncate(m.content),
           sender: m.profiles?.display_name || m.profiles?.username || "عضو",
           cell: m.groups?.name || "خلية",
           node: m.conversation_nodes?.title || null,
@@ -203,14 +213,14 @@ export function buildAssistantTools(params: {
         .select("content, created_at, profiles!messages_sender_id_fkey (display_name, username), conversation_nodes (title)")
         .eq("group_id", cell.id)
         .order("created_at", { ascending: false })
-        .limit(25)
+        .limit(15)
 
       return {
         cell: cell.name,
         count: rows?.length || 0,
         // نرتبها تصاعدياً ليكون السياق منطقياً للقراءة
         messages: (rows || []).reverse().map((m: any) => ({
-          content: m.content,
+          content: truncate(m.content),
           sender: m.profiles?.display_name || m.profiles?.username || "عضو",
           node: m.conversation_nodes?.title || null,
           date: m.created_at,
@@ -234,7 +244,7 @@ export function buildAssistantTools(params: {
       return {
         count: rows?.length || 0,
         messages: (rows || []).map((m: any) => ({
-          content: m.content,
+          content: truncate(m.content),
           cell: m.groups?.name || "خلية",
           node: m.conversation_nodes?.title || null,
           date: m.created_at,
@@ -276,7 +286,7 @@ export function buildAssistantTools(params: {
         count: rows?.length || 0,
         decisions: (rows || []).map((d: any) => ({
           title: d.title,
-          description: d.description,
+          description: truncate(d.description),
           status: DECISION_STATUS_AR[d.status] || d.status,
           cell: d.groups?.name || "خلية",
           date: d.created_at,
@@ -381,7 +391,7 @@ export function buildAssistantTools(params: {
         count: rows?.length || 0,
         nodes: (rows || []).map((n: any) => ({
           title: n.title,
-          description: n.description || null,
+          description: truncate(n.description),
           type: NODE_TYPE_AR[n.node_type] || n.node_type,
           cell: n.groups?.name || "خلية",
           date: n.created_at,

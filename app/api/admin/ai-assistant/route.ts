@@ -1,8 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
-import { generateText } from "ai"
-import { getAIModel } from "@/lib/ai"
+import { generateAIChat } from "@/lib/ai"
 
 export async function POST(req: NextRequest) {
   const cookieStore = await cookies()
@@ -36,12 +35,9 @@ export async function POST(req: NextRequest) {
 
 ${context ? `**سياق إضافي**: ${context}` : ""}`
 
-    const { text } = await generateText({
-      model: getAIModel(),
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: query },
-      ],
+    const text = await generateAIChat({
+      system: systemPrompt,
+      messages: [{ role: "user", content: query }],
       temperature: 0.7,
       maxTokens: 1000,
     })

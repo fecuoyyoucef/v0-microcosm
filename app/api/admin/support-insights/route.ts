@@ -1,8 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
-import { getAIModel } from "@/lib/ai"
-import { generateText } from "ai"
+import { generateAIChat } from "@/lib/ai"
 
 export async function GET(request: NextRequest) {
   const cookieStore = await cookies()
@@ -66,8 +65,7 @@ export async function GET(request: NextRequest) {
           ...(reports?.map((r) => r.issue_description) || []),
         ]
 
-        const { text } = await generateText({
-          model: getAIModel(),
+        const text = await generateAIChat({
           prompt: `أنت محلل بيانات لتطبيق Synaptic Space. لديك ${allIssues.length} بلاغ من المستخدمين.
 
 البلاغات:

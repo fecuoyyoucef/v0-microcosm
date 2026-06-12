@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { getAIModel } from "@/lib/ai"
-import { generateText } from "ai"
+import { generateAIChat } from "@/lib/ai"
 import { checkFeatureServer } from "@/lib/features-server"
 
 export async function POST(request: NextRequest) {
@@ -47,8 +46,9 @@ export async function POST(request: NextRequest) {
 
     const messagesText = messages.map((m: any) => `${m.sender?.display_name || "مستخدم"}: ${m.content}`).join("\n")
 
-    const { text } = await generateText({
-      model: getAIModel(),
+    const text = await generateAIChat({
+      maxTokens: 400,
+      temperature: 0.5,
       prompt: `قيّم جودة النقاش التالي من 0 إلى 100 بناءً على:
 - التنوع في الآراء
 - عمق المحتوى

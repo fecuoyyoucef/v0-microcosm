@@ -96,24 +96,56 @@ export async function POST(req: Request) {
 - ودود، محترف، موجز ومباشر. استخدم تنسيق Markdown (قوائم، عناوين) عند الحاجة لتنظيم الإجابة.`
 
     // تحويل سجل المحادثة إلى صيغة الرسائل
-    const modelMessages: ModelMessage[] = messages
-      .filter((m: any) => m?.content && (m.role === "user" || m.role === "assistant"))
-      .map((m: any) => ({ role: m.role, content: String(m.content) }))
+    // نقتصر على آخر 8 رسائل ونقتطع الطويلة جداً للحدّ من استهلاك التوكنات (rate limit)
+    const MAX_HISTORY = 8
+    const MAX_MSG_CHARS = 4000
+    const filtered = messages.filter((m: any) => m?.content && (m.role === "user" || m.role === "assistant"))
+    const modelMessages: ModelMessage[] = filtered.slice(-MAX_HISTORY).map((m: any) => {
+      let content = String(m.content)
+      if (content.length > MAX_MSG_CHARS) content = content.slice(0, MAX_MSG_CHARS) + "…"
+      return { role: m.role, content }
+    })
 
-    console.log("[v0] Generating AI response with tool system...", { cells: userCells.length })
+    console.log("[v0] Generating AI response with tool system...", {
+      cells: userCells.length,
+      historySent: modelMessages.length,
+    })
 
     const response = await generateWithTools({
       system,
       messages: modelMessages,
       tools,
-      maxSteps: 6,
+      maxSteps: 5,
     })
+
+    const finalText = response.trim()
+
+    // حماية من الردّ الفارغ بعد كل المحاولات
+    if (!finalText) {
+      return Response.json({
+        success: true,
+        response: "لم أتمكن من صياغة إجابة هذه المرة. هل يمكنك إعادة صياغة سؤالك أو تحديده أكثر؟",
+      })
+    }
 
     console.log("[v0] AI response generated successfully")
 
-    return Response.json({ success: true, response: response.trim() })
+    return Response.json({ success: true, response: finalText })
   } catch (error) {
     console.error("[v0] Chat assistant error:", error)
+
+    // رسالة واضحة عند تجاوز حدّ المعدّل
+    if (error instanceof Error && error.message === "RATE_LIMIT") {
+      return Response.json(
+        {
+          error: "rate_limit",
+          response:
+            "الخدمة مشغولة حالياً بسبب كثرة الطلبات. يرجى الانتظار بضع ثوانٍ ثم المحاولة مرة أخرى.",
+        },
+        { status: 429 },
+      )
+    }
+
     return Response.json(
       {
         error: "حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى.",

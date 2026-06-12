@@ -1,8 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
-import { getAIModel } from "@/lib/ai"
-import { generateText } from "ai"
+import { generateAIChat } from "@/lib/ai"
 
 // GET - جلب آخر تقرير أسبوعي
 export async function GET(request: NextRequest) {
@@ -91,10 +90,7 @@ export async function POST(request: NextRequest) {
     }
 
     // استخدام AI لتحليل البيانات واقتراح تحسينات
-    const model = getAIModel()
-
-    const { text } = await generateText({
-      model,
+    const text = await generateAIChat({
       prompt: `أنت محلل نظام ذكي لتطبيق Synaptic Space. قم بتحليل البيانات التالية واقترح تحسينات:
 
 إحصائيات الأسبوع الماضي:

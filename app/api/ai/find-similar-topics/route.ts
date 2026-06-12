@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { getAIModel } from "@/lib/ai"
-import { generateText } from "ai"
+import { generateAIChat } from "@/lib/ai"
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,8 +25,9 @@ export async function POST(request: NextRequest) {
 
     const nodesList = existingNodes.map((n) => `- ${n.title}`).join("\n")
 
-    const { text } = await generateText({
-      model: getAIModel(),
+    const text = await generateAIChat({
+      maxTokens: 200,
+      temperature: 0.4,
       prompt: `لديك موضوع جديد بعنوان: "${title}"
 
 والمواضيع الموجودة:

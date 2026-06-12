@@ -1,8 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
-import { getAIModel } from "@/lib/ai"
-import { generateText } from "ai"
+import { generateAIChat } from "@/lib/ai"
 
 // GET - جلب الاقتراحات الأسبوعية
 export async function GET(request: NextRequest) {
@@ -91,9 +90,7 @@ export async function POST(request: NextRequest) {
     })
 
     // توليد اقتراحات بالذكاء الاصطناعي
-    const model = getAIModel()
-    const { text } = await generateText({
-      model,
+    const text = await generateAIChat({
       prompt: `أنت مساعد ذكي لمالك تطبيق Synaptic Space. قم بتحليل البيانات التالية وقدم 5-7 اقتراحات ملموسة للتحسين.
 
 البيانات الأسبوعية:

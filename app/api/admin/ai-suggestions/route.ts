@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
-import { generateText } from "ai"
-import { getAIModel } from "@/lib/ai"
+import { generateAIChat } from "@/lib/ai"
 import { verifyAdmin } from "@/lib/admin-auth"
 
 export async function GET() {
@@ -62,12 +61,9 @@ export async function GET() {
   ]
 }`
 
-    console.log("[v0] Calling AI model with getAIModel()...")
+    console.log("[v0] Calling AI model with fallback chain...")
 
-    const { text } = await generateText({
-      model: getAIModel(),
-      prompt,
-    })
+    const text = await generateAIChat({ prompt, maxTokens: 1200, temperature: 0.7 })
 
     console.log("[v0] AI Response received:", text.substring(0, 200))
 
