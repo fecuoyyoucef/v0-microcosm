@@ -34,7 +34,7 @@ interface CellSurvey {
   min_responsibility_score?: number
 }
 
-interface MatchResult {
+export interface MatchResult {
   groupId: string
   groupName: string
   groupDescription?: string
@@ -47,6 +47,7 @@ interface MatchResult {
   styleScore: number
   sharedInterests: string[]
   cellType?: string
+  aiExplanation?: string
 }
 
 // حساب درجة تطابق الاهتمامات (40% من الدرجة الكلية)
@@ -179,25 +180,26 @@ export async function getSuggestedCells(userId: string, limit = 10): Promise<Mat
     return []
   }
 
-  // جلب الخلايا التي لم ينضم إليها المستخدم
-  const { data: groups } = await supabase
+  // جلب الخلايا التي ينتمي إليها المستخدم حالياً (لاستبعادها)
+  const { data: memberships } = await supabase.from("group_members").select("group_id").eq("user_id", userId)
+
+  const joinedGroupIds = new Set((memberships || []).map((m) => m.group_id))
+
+  // جلب جميع الخلايا مع بياناتها
+  const { data: allGroups } = await supabase
     .from("groups")
     .select(`
       id,
       name,
       description,
-      image_url,
-      cell_type,
+      avatar_url,
+      cell_category,
       group_members(count)
     `)
-    .not(
-      "id",
-      "in",
-      `(
-      SELECT group_id FROM group_members WHERE user_id = '${userId}'
-    )`,
-    )
-    .limit(50)
+    .limit(100)
+
+  // استبعاد الخلايا التي انضم إليها المستخدم بالفعل
+  const groups = (allGroups || []).filter((g) => !joinedGroupIds.has(g.id))
 
   if (!groups?.length) {
     return []
@@ -227,7 +229,7 @@ export async function getSuggestedCells(userId: string, limit = 10): Promise<Mat
       groupId: group.id,
       groupName: group.name,
       groupDescription: group.description,
-      groupImage: group.image_url,
+      groupImage: group.avatar_url,
       memberCount: (group.group_members as any)?.[0]?.count || 0,
       compatibilityScore: scores.total,
       interestsScore: scores.interests.score,
@@ -235,7 +237,7 @@ export async function getSuggestedCells(userId: string, limit = 10): Promise<Mat
       goalScore: scores.goal,
       styleScore: scores.style,
       sharedInterests: scores.interests.shared,
-      cellType: group.cell_type,
+      cellType: group.cell_category,
     })
   }
 
@@ -293,6 +295,36 @@ export async function getUserCellCompatibility(
       interests: userSurvey.interests,
     },
   }
+}
+
+// تحسين قائمة الخلايا المقترحة باستخدام الذكاء الاصطناعي (للخلايا الأعلى توافقاً فقط)
+export async function getEnhancedMatches(userId: string, results: MatchResult[]): Promise<MatchResult[]> {
+  if (!results.length) return results
+
+  // نحسّن فقط أفضل 3 خلايا لتجنب الكثير من الطلبات
+  const topCount = Math.min(3, results.length)
+  const enhanced = [...results]
+
+  await Promise.all(
+    enhanced.slice(0, topCount).map(async (cell, index) => {
+      try {
+        const result = await getEnhancedCompatibility(userId, cell.groupId)
+        if (result) {
+          enhanced[index] = {
+            ...cell,
+            compatibilityScore: result.finalScore,
+            aiExplanation: result.explanation,
+          }
+        }
+      } catch {
+        // نتجاهل الأخطاء ونبقي على الدرجة الأساسية
+      }
+    }),
+  )
+
+  // إعادة الترتيب بعد التحسين
+  enhanced.sort((a, b) => b.compatibilityScore - a.compatibilityScore)
+  return enhanced
 }
 
 export async function getEnhancedCompatibility(

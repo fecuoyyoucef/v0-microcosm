@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { getSuggestedCells, getEnhancedCompatibility } from "@/lib/synaptic-matching"
+import { getSuggestedCells, getEnhancedMatches } from "@/lib/synaptic-matching"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -68,10 +68,12 @@ export function SuggestedCells({ userId }: SuggestedCellsProps) {
         // تجربة تحسين التوافق باستخدام الذكاء الاصطناعي
         if (suggested.length > 0) {
           try {
-            const enhanced = await getEnhancedCompatibility(userId, suggested)
+            const enhanced = await getEnhancedMatches(userId, suggested)
             if (enhanced && enhanced.length > 0) {
               suggested = enhanced
-              setEnhancedMode(true)
+              if (enhanced.some((c) => c.aiExplanation)) {
+                setEnhancedMode(true)
+              }
             }
           } catch (error) {
             console.log("[v0] AI enhancement not available, using basic matching")
@@ -94,18 +96,23 @@ export function SuggestedCells({ userId }: SuggestedCellsProps) {
     setRequestingJoin(groupId)
 
     try {
-      const { error } = await supabase.from("join_requests").insert({
-        group_id: groupId,
-        user_id: userId,
-        status: "pending",
+      const res = await fetch("/api/groups/join-cell", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupId }),
       })
 
-      if (error) {
-        if (error.code === "23505") {
-          alert("لقد أرسلت طلب انضمام مسبقاً")
+      const data = await res.json()
+
+      if (!res.ok) {
+        if (data?.error === "Already a member") {
+          alert("أنت عضو في هذه الخلية بالفعل")
         } else {
-          throw error
+          throw new Error(data?.error || "فشل الطلب")
         }
+      } else if (data.type === "joined") {
+        alert("تم الانضمام إلى الخلية بنجاح")
+        setCells((prev) => prev.filter((c) => c.groupId !== groupId))
       } else {
         alert("تم إرسال طلب الانضمام بنجاح")
         setCells((prev) => prev.filter((c) => c.groupId !== groupId))
