@@ -194,12 +194,22 @@ export async function getSuggestedCells(userId: string, limit = 10): Promise<Mat
       description,
       avatar_url,
       cell_category,
+      settings,
       group_members(count)
     `)
     .limit(100)
 
-  // استبعاد الخلايا التي انضم إليها المستخدم بالفعل
-  const groups = (allGroups || []).filter((g) => !joinedGroupIds.has(g.id))
+  // استبعاد الخلايا التي انضم إليها المستخدم بالفعل،
+  // والخلايا الخاصة أو غير المُفعّلة للظهور في التوصيات (حفظاً للخصوصية)
+  const groups = (allGroups || []).filter((g) => {
+    if (joinedGroupIds.has(g.id)) return false
+    const settings = (g.settings as any) || {}
+    // الخلايا الخاصة لا تظهر في المطابقة
+    if (settings.privacy_type === "private") return false
+    // يجب أن تكون مُفعّلة للظهور في التوصيات
+    if (settings.show_in_recommendations === false) return false
+    return true
+  })
 
   if (!groups?.length) {
     return []

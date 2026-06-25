@@ -30,6 +30,11 @@ export async function POST(request: NextRequest) {
         responsibility_score: 100,
         progress_score: cell_category === "project" ? 0 : null,
         last_activity_date: new Date().toISOString(),
+        // افتراضياً: الخلية الجديدة خاصة ولا تظهر في نظام المطابقة لحفظ الخصوصية
+        settings: {
+          privacy_type: "private",
+          show_in_recommendations: false,
+        },
       })
       .select()
       .single()
