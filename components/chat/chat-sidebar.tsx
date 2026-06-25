@@ -39,6 +39,7 @@ import {
   LinkIcon as Link2Icon,
   TrophyIcon,
   FireIcon,
+  GlobeAltIcon,
 } from "@heroicons/react/24/solid"
 import { ArrowPathIcon as Loader2Icon } from "@heroicons/react/24/outline"
 import type { Profile } from "@/lib/types"
@@ -67,6 +68,7 @@ const translations = {
     about: "حول التطبيق",
     signOut: "تسجيل الخروج",
     home: "الصفحة الرئيسية",
+    explore: "اكتشف الخلايا",
     notifications: "الإشعارات",
     comingSoon: "قريباً",
     createGroup: "إنشاء خلية جديدة",
@@ -104,6 +106,7 @@ const translations = {
     about: "About",
     signOut: "Sign Out",
     home: "Home",
+    explore: "Explore Cells",
     notifications: "Notifications",
     comingSoon: "Coming Soon",
     createGroup: "Create New Cell",
@@ -141,6 +144,7 @@ const translations = {
     about: "À propos",
     signOut: "Déconnexion",
     home: "Accueil",
+    explore: "Explorer les Cellules",
     notifications: "Notifications",
     comingSoon: "Bientôt",
     createGroup: "Créer une Nouvelle Cellule",
@@ -510,6 +514,13 @@ export function ChatSidebar({ currentUserId, groups, onSignOut }: ChatSidebarPro
                   {unreadNotifications}
                 </span>
               )}
+            </div>
+          </Link>
+
+          <Link href="/chat/explore" onClick={closeSidebar}>
+            <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary transition-colors cursor-pointer">
+              <GlobeAltIcon className="w-5 h-5 text-primary" />
+              <span className="text-sm font-medium">{t.explore}</span>
             </div>
           </Link>
 
