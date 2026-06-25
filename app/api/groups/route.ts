@@ -12,11 +12,15 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, description, cell_category, goal } = body
+    const { name, description, cell_category, goal, privacy_type, show_in_recommendations } = body
 
     if (!name || !name.trim()) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 })
     }
+
+    // الخصوصية والظهور — افتراضياً خاصة ومخفية من المطابقة لحفظ الخصوصية
+    const privacy = privacy_type === "open" ? "open" : "private"
+    const showInRecommendations = show_in_recommendations === true
 
     const { data: group, error: groupError } = await supabase
       .from("groups")
@@ -30,10 +34,10 @@ export async function POST(request: NextRequest) {
         responsibility_score: 100,
         progress_score: cell_category === "project" ? 0 : null,
         last_activity_date: new Date().toISOString(),
-        // افتراضياً: الخلية الجديدة خاصة ولا تظهر في نظام المطابقة لحفظ الخصوصية
+        // الخصوصية والظهور في المطابقة بحسب اختيار المستخدم عند الإنشاء
         settings: {
-          privacy_type: "private",
-          show_in_recommendations: false,
+          privacy_type: privacy,
+          show_in_recommendations: showInRecommendations,
         },
       })
       .select()
