@@ -12,8 +12,6 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
 import { ChevronLeft, Hash, FileText, Menu, Clock, Lock } from "lucide-react"
 import Link from "next/link"
-import { format } from "date-fns"
-import { ar } from "date-fns/locale"
 import type { Group, NotebookPage, GroupMember } from "@/lib/types"
 import { PAGE_TYPE_META } from "./page-types"
 import { cn } from "@/lib/utils"
@@ -169,9 +167,14 @@ export function NotebookContainer({
               <div className="flex items-center gap-1.5">
                 <Clock className="w-3 h-3" />
                 <span>
-                  {format(new Date(selectedPage.updated_at), "d MMM yyyy - p", {
-                    locale: ar,
-                  })}
+                  {new Intl.DateTimeFormat("ar", {
+                    timeZone: "UTC",
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  }).format(new Date(selectedPage.updated_at))}
                 </span>
               </div>
             </div>
