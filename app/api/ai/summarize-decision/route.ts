@@ -2,17 +2,27 @@ import { generateAIText } from "@/lib/ai"
 
 export async function POST(request: Request) {
   try {
-    const { description } = await request.json()
+    const body = await request.json()
+    const description = typeof body?.description === "string" ? body.description.trim() : ""
 
     if (!description) {
       return Response.json({ error: "الوصف مطلوب" }, { status: 400 })
     }
 
-    const text = await generateAIText(`لخص هذه الفكرة في عنوان قصير (5-10 كلمات):\n\n${description}`)
+    // منع إرسال نصوص ضخمة إلى المزوّد وحماية حدود السياق
+    const boundedDescription = description.slice(0, 12000)
+    const text = await generateAIText(
+      `لخص هذه الفكرة في عنوان قصير (5-10 كلمات). أعد العنوان فقط دون علامات اقتباس:\n\n${boundedDescription}`,
+      { maxTokens: 80, temperature: 0.4 },
+    )
 
     return Response.json({ summary: text.trim() })
   } catch (error) {
-    console.error("Summarize error:", error)
-    return Response.json({ error: "فشل في إنشاء الملخص" }, { status: 500 })
+    console.error("[v0] Summarize decision error:", error)
+    const isRateLimit = error instanceof Error && error.message === "RATE_LIMIT"
+    return Response.json(
+      { error: isRateLimit ? "الخدمة مشغولة حالياً، حاول بعد لحظات" : "فشل في إنشاء الملخص، يمكنك كتابة العنوان يدوياً" },
+      { status: isRateLimit ? 429 : 503 },
+    )
   }
 }
