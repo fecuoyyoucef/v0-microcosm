@@ -50,7 +50,7 @@ export function TimelineView({ summaries, triggers, groupId }: TimelineViewProps
   }
 
   return (
-    <ScrollArea className="flex-1">
+    <ScrollArea className="flex-1 min-h-0">
       <div className="p-6 max-w-3xl mx-auto">
         {/* Memory Triggers */}
         {triggers.length > 0 && (

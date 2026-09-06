@@ -132,7 +132,7 @@ export function TablePage({ page, members: _members, currentUserId: _currentUser
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden min-h-0">
       <div className="flex-1 overflow-y-auto overflow-x-hidden w-full">
         <div className="px-4 md:px-8 py-6 max-w-6xl mx-auto w-full min-w-0">
           {/* Hero */}

@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import type { Group, CollectiveMemory } from "@/lib/types"
+import { MarkdownRenderer } from "@/components/ui/markdown-renderer"
 import { format } from "date-fns"
 import { ar } from "date-fns/locale"
 
@@ -36,7 +37,7 @@ export function CollectiveMemoryContainer({
   const [activeTab, setActiveTab] = useState("timeline")
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full min-h-0 bg-background">
       {/* Header */}
       <div className="h-14 border-b border-border px-4 flex items-center justify-between bg-card/50 shrink-0">
         <div className="flex items-center gap-3">
@@ -55,7 +56,7 @@ export function CollectiveMemoryContainer({
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden min-h-0">
         <div className="px-4 py-2 border-b border-border bg-card/30 shrink-0">
           <TabsList className="bg-secondary/50">
             <TabsTrigger value="timeline" className="gap-2">
@@ -98,7 +99,7 @@ export function CollectiveMemoryContainer({
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <p className="text-sm leading-relaxed">{memory.summary}</p>
+                  <MarkdownRenderer content={memory.summary} className="text-sm" />
 
                   {Array.isArray(memory.highlights) && memory.highlights.length > 0 && (
                     <div>

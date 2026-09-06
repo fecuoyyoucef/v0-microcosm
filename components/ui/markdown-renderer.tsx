@@ -9,7 +9,7 @@ interface MarkdownRendererProps {
 
 export function MarkdownRenderer({ content, className }: MarkdownRendererProps) {
   return (
-    <div className={`text-sm leading-relaxed ${className || ""}`}>
+    <div className={`text-sm leading-relaxed break-words overflow-wrap-anywhere ${className || ""}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{

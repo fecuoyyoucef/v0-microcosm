@@ -45,9 +45,10 @@ function hasGateway(): boolean {
  * استهلاك التوكنز وتفادي الردّ الفارغ المليء بوسوم <think>.
  */
 function getTextModelChain(): LanguageModel[] {
-  const chain: LanguageModel[] = [groq("openai/gpt-oss-120b")]
+  const chain: LanguageModel[] = []
+  if (hasGateway()) chain.push("openai/gpt-5.5-pro")
   if (hasXai()) chain.push(xai("grok-4.6"))
-  if (hasGateway()) chain.push("groq/openai/gpt-oss-120b")
+  chain.push(groq("openai/gpt-oss-120b"))
   return chain
 }
 
@@ -61,20 +62,24 @@ function getTextModelChain(): LanguageModel[] {
  */
 function getToolModelChain(): LanguageModel[] {
   const chain: LanguageModel[] = []
+  if (hasGateway()) chain.push("openai/gpt-5.5-pro")
   if (hasXai()) chain.push(xai("grok-4.6"))
   chain.push(groq("openai/gpt-oss-120b"))
-  if (hasGateway()) chain.push("groq/openai/gpt-oss-120b")
   return chain
 }
 
 /**
  * النموذج الأساسي (يُحتفظ به للتوافق مع الكود القديم).
  */
-export function getAIModel() {
+export function getAIModel(): LanguageModel {
+  if (hasGateway()) return "openai/gpt-5.5-pro"
+  if (hasXai()) return xai("grok-4.6")
   return groq("openai/gpt-oss-120b")
 }
 
-export function getAIToolModel() {
+export function getAIToolModel(): LanguageModel {
+  if (hasGateway()) return "openai/gpt-5.5-pro"
+  if (hasXai()) return xai("grok-4.6")
   return groq("openai/gpt-oss-120b")
 }
 
