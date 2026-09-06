@@ -63,6 +63,17 @@ const translations = {
     cellNamePlaceholder: "مثال: فريق العمل",
     description: "الوصف (اختياري)",
     descPlaceholder: "وصف مختصر للخلية...",
+    privacyTitle: "الخصوصية والظهور",
+    privacyLabel: "نوع الخلية",
+    privateOption: "خاصة",
+    privateDesc: "الانضمام يتطلب موافقة المشرف. مناسبة للفرق المغلقة والمجموعات الخاصة.",
+    openOption: "عامة",
+    openDesc: "يمكن لأي شخص الانضمام مباشرة دون موافقة.",
+    matchingLabel: "الظهور في نظام المطابقة",
+    matchingOnTitle: "ظاهرة",
+    matchingOnDesc: "ستُقترح خليتك تلقائياً على المستخدمين المتوافقين معها في صفحة الاكتشاف لزيادة الأعضاء.",
+    matchingOffTitle: "مخفية",
+    matchingOffDesc: "لن تظهر خليتك في الاكتشاف أو التوصيات. خصوصية كاملة.",
     creating: "جاري الإنشاء...",
     create: "إنشاء",
     members: "أعضاء",
@@ -114,6 +125,17 @@ const translations = {
     cellNamePlaceholder: "e.g., Work Team",
     description: "Description (optional)",
     descPlaceholder: "Brief description...",
+    privacyTitle: "Privacy & Visibility",
+    privacyLabel: "Cell type",
+    privateOption: "Private",
+    privateDesc: "Joining requires admin approval. Ideal for closed teams and private groups.",
+    openOption: "Public",
+    openDesc: "Anyone can join directly without approval.",
+    matchingLabel: "Visibility in matching system",
+    matchingOnTitle: "Visible",
+    matchingOnDesc: "Your cell will be automatically suggested to compatible users on the Explore page to grow membership.",
+    matchingOffTitle: "Hidden",
+    matchingOffDesc: "Your cell won't appear in discovery or recommendations. Full privacy.",
     creating: "Creating...",
     create: "Create",
     members: "members",
@@ -163,8 +185,19 @@ const translations = {
     createCellDesc: "Créez un nouvel espace",
     cellName: "Nom",
     cellNamePlaceholder: "ex: Équipe",
-    description: "Description",
+    description: "Description (optionnel)",
     descPlaceholder: "Description...",
+    privacyTitle: "Confidentialité et visibilité",
+    privacyLabel: "Type de cellule",
+    privateOption: "Privée",
+    privateDesc: "L'adhésion nécessite l'approbation de l'administrateur. Idéal pour les équipes fermées.",
+    openOption: "Publique",
+    openDesc: "Tout le monde peut rejoindre directement sans approbation.",
+    matchingLabel: "Visibilité dans le système de correspondance",
+    matchingOnTitle: "Visible",
+    matchingOnDesc: "Votre cellule sera automatiquement suggérée aux utilisateurs compatibles sur la page Explorer.",
+    matchingOffTitle: "Masquée",
+    matchingOffDesc: "Votre cellule n'apparaîtra pas dans la découverte ni les recommandations. Confidentialité totale.",
     creating: "Création...",
     create: "Créer",
     members: "membres",
@@ -218,6 +251,8 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [newGroupName, setNewGroupName] = useState("")
   const [newGroupDescription, setNewGroupDescription] = useState("")
+  const [newGroupPrivacy, setNewGroupPrivacy] = useState<"private" | "open">("private")
+  const [newGroupShowInMatching, setNewGroupShowInMatching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showCellSurvey, setShowCellSurvey] = useState(false)
   const [newGroupId, setNewGroupId] = useState<string | null>(null)
@@ -433,6 +468,8 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
       const requestBody = {
         name: newGroupName.trim(),
         description: newGroupDescription.trim() || null,
+        privacy_type: newGroupPrivacy,
+        show_in_recommendations: newGroupShowInMatching,
       }
 
       const response = await fetch("/api/groups", {
@@ -450,6 +487,8 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
 
       setNewGroupName("")
       setNewGroupDescription("")
+      setNewGroupPrivacy("private")
+      setNewGroupShowInMatching(false)
       setIsCreateDialogOpen(false)
       setGroups((prev) => [...prev, data])
       setNewGroupId(data.id)
@@ -940,6 +979,68 @@ export function HomePageContent({ groups: initialGroups, userId, profile, hasCom
                 rows={3}
               />
             </div>
+
+            {/* Privacy & visibility choices */}
+            <div className="space-y-4 rounded-xl border border-border bg-muted/30 p-4">
+              <p className="text-sm font-semibold text-foreground">{t.privacyTitle}</p>
+
+              {/* Question 1: cell type (private / open) */}
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">{t.privacyLabel}</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(
+                    [
+                      { value: "private" as const, title: t.privateOption, desc: t.privateDesc },
+                      { value: "open" as const, title: t.openOption, desc: t.openDesc },
+                    ]
+                  ).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setNewGroupPrivacy(opt.value)}
+                      className={cn(
+                        "flex flex-col gap-1 rounded-xl border p-3 text-right transition-colors",
+                        newGroupPrivacy === opt.value
+                          ? "border-primary bg-primary/10"
+                          : "border-border bg-background hover:bg-secondary",
+                      )}
+                    >
+                      <span className="text-sm font-medium text-foreground">{opt.title}</span>
+                      <span className="text-xs leading-relaxed text-muted-foreground">{opt.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Question 2: visibility in matching (visible / hidden) */}
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">{t.matchingLabel}</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(
+                    [
+                      { value: true, title: t.matchingOnTitle, desc: t.matchingOnDesc },
+                      { value: false, title: t.matchingOffTitle, desc: t.matchingOffDesc },
+                    ]
+                  ).map((opt) => (
+                    <button
+                      key={String(opt.value)}
+                      type="button"
+                      onClick={() => setNewGroupShowInMatching(opt.value)}
+                      className={cn(
+                        "flex flex-col gap-1 rounded-xl border p-3 text-right transition-colors",
+                        newGroupShowInMatching === opt.value
+                          ? "border-primary bg-primary/10"
+                          : "border-border bg-background hover:bg-secondary",
+                      )}
+                    >
+                      <span className="text-sm font-medium text-foreground">{opt.title}</span>
+                      <span className="text-xs leading-relaxed text-muted-foreground">{opt.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
             <Button
               onClick={createGroup}
               disabled={!newGroupName.trim() || isCreating}

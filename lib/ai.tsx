@@ -46,7 +46,7 @@ function hasGateway(): boolean {
  */
 function getTextModelChain(): LanguageModel[] {
   const chain: LanguageModel[] = [groq("llama-3.3-70b-versatile")]
-  if (hasXai()) chain.push(xai("grok-4"))
+  if (hasXai()) chain.push(xai("grok-4.6"))
   if (hasGateway()) chain.push("groq/llama-3.3-70b-versatile")
   return chain
 }
@@ -61,7 +61,7 @@ function getTextModelChain(): LanguageModel[] {
  */
 function getToolModelChain(): LanguageModel[] {
   const chain: LanguageModel[] = []
-  if (hasXai()) chain.push(xai("grok-4"))
+  if (hasXai()) chain.push(xai("grok-4.6"))
   chain.push(groq("llama-3.3-70b-versatile"))
   if (hasGateway()) chain.push("groq/llama-3.3-70b-versatile")
   return chain
