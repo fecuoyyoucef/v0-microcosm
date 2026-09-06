@@ -11,7 +11,7 @@ export type AgentKind = "chief" | "moderator" | "support" | "analyst" | "develop
 export type RiskLevel = "low" | "medium" | "high" | "critical"
 
 export type GroqModel =
-  | "llama-3.3-70b-versatile"
+  | "openai/gpt-oss-120b"
   | "llama-3.1-8b-instant"
   | "mixtral-8x7b-32768"
   | "gemma2-9b-it"

@@ -45,9 +45,9 @@ function hasGateway(): boolean {
  * استهلاك التوكنز وتفادي الردّ الفارغ المليء بوسوم <think>.
  */
 function getTextModelChain(): LanguageModel[] {
-  const chain: LanguageModel[] = [groq("llama-3.3-70b-versatile")]
+  const chain: LanguageModel[] = [groq("openai/gpt-oss-120b")]
   if (hasXai()) chain.push(xai("grok-4.6"))
-  if (hasGateway()) chain.push("groq/llama-3.3-70b-versatile")
+  if (hasGateway()) chain.push("groq/openai/gpt-oss-120b")
   return chain
 }
 
@@ -62,8 +62,8 @@ function getTextModelChain(): LanguageModel[] {
 function getToolModelChain(): LanguageModel[] {
   const chain: LanguageModel[] = []
   if (hasXai()) chain.push(xai("grok-4.6"))
-  chain.push(groq("llama-3.3-70b-versatile"))
-  if (hasGateway()) chain.push("groq/llama-3.3-70b-versatile")
+  chain.push(groq("openai/gpt-oss-120b"))
+  if (hasGateway()) chain.push("groq/openai/gpt-oss-120b")
   return chain
 }
 
@@ -71,11 +71,11 @@ function getToolModelChain(): LanguageModel[] {
  * النموذج الأساسي (يُحتفظ به للتوافق مع الكود القديم).
  */
 export function getAIModel() {
-  return groq("llama-3.3-70b-versatile")
+  return groq("openai/gpt-oss-120b")
 }
 
 export function getAIToolModel() {
-  return groq("llama-3.3-70b-versatile")
+  return groq("openai/gpt-oss-120b")
 }
 
 /**

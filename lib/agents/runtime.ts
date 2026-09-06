@@ -32,7 +32,7 @@ import type {
 } from "./types"
 
 const DEFAULT_MAX_ITERATIONS = 6
-const DEFAULT_MODEL = "llama-3.3-70b-versatile" as const
+const DEFAULT_MODEL = "openai/gpt-oss-120b" as const
 
 /** Hard cap on output tokens per Groq call. Prevents 2000-token monologues. */
 const DEFAULT_MAX_OUTPUT_TOKENS = 700
