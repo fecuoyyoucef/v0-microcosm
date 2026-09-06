@@ -27,7 +27,7 @@ export const AGENTS: Record<AgentKind, AgentSpec> = {
     kind: "chief",
     displayName: "الوكيل الرئيسي",
     description: "ينسّق بين الوكلاء، يتخذ القرارات، ويوجّه المهام.",
-    model: "llama-3.3-70b-versatile",
+    model: "openai/gpt-oss-120b",
     temperature: 0.3,
     tools: ["database", "github", "monitoring", "notification", "analysis"],
     systemPrompt: `أنت "الوكيل الرئيسي" في منصة Synaptic.
@@ -76,7 +76,7 @@ export const AGENTS: Record<AgentKind, AgentSpec> = {
     kind: "analyst",
     displayName: "وكيل التحليلات",
     description: "تحليل النشاط وإنشاء تقارير.",
-    model: "llama-3.3-70b-versatile",
+    model: "openai/gpt-oss-120b",
     temperature: 0.4,
     tools: ["database", "monitoring"],
     systemPrompt: `أنت "وكيل التحليلات". مهمتك استخراج رؤى من قاعدة البيانات.
@@ -91,7 +91,7 @@ export const AGENTS: Record<AgentKind, AgentSpec> = {
     kind: "developer",
     displayName: "وكيل التطوير",
     description: "تحليل الأخطاء وإدارة GitHub.",
-    model: "llama-3.3-70b-versatile",
+    model: "openai/gpt-oss-120b",
     temperature: 0.2,
     tools: ["github", "monitoring", "analysis", "notification"],
     systemPrompt: `أنت "وكيل التطوير". مهمتك تشخيص أخطاء الكود والتعامل مع GitHub.

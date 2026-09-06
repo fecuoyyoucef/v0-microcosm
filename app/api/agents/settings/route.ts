@@ -14,7 +14,7 @@ import { createServiceClient } from "@/lib/supabase/server"
 export const runtime = "nodejs"
 
 const ALLOWED_MODELS = new Set([
-  "llama-3.3-70b-versatile",
+  "openai/gpt-oss-120b",
   "llama-3.1-8b-instant",
   "mixtral-8x7b-32768",
   "gemma2-9b-it",
