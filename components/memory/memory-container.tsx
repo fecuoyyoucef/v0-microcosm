@@ -24,7 +24,7 @@ export function MemoryContainer({ groupId, group, summaries, triggers, currentUs
   const [isGenerateOpen, setIsGenerateOpen] = useState(false)
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-background">
+    <div className="flex-1 flex flex-col h-full min-h-0 bg-background">
       {/* Header */}
       <div className="h-14 border-b border-border px-4 flex items-center justify-between bg-card/50">
         <div className="flex items-center gap-3">
@@ -48,7 +48,7 @@ export function MemoryContainer({ groupId, group, summaries, triggers, currentUs
       </div>
 
       {/* Tabs Navigation */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden min-h-0">
         <div className="px-4 py-2 border-b border-border bg-card/30">
           <TabsList className="bg-secondary/50">
             <TabsTrigger value="timeline" className="gap-2">

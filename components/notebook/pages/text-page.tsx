@@ -11,6 +11,7 @@ import type { NotebookPage, GroupMember, NotebookContribution } from "@/lib/type
 import { format } from "date-fns"
 import { ar } from "date-fns/locale"
 import { cn } from "@/lib/utils"
+import { MarkdownRenderer } from "@/components/ui/markdown-renderer"
 
 interface TextPageProps {
   page: NotebookPage
@@ -115,7 +116,7 @@ export function TextPage({ page, members, currentUserId }: TextPageProps) {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden min-h-0">
       <ScrollArea className="flex-1">
         <div className="px-4 md:px-8 py-6 max-w-3xl mx-auto">
           {/* Page Hero */}
@@ -212,9 +213,7 @@ export function TextPage({ page, members, currentUserId }: TextPageProps) {
                         </span>
                       </div>
 
-                      <p className="text-[15px] leading-relaxed whitespace-pre-wrap text-foreground/90 pr-1">
-                        {text}
-                      </p>
+                      <MarkdownRenderer content={text} className="text-[15px] text-foreground/90 pr-1 break-words" />
                     </div>
                   </article>
                 )
