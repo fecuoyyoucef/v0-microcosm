@@ -117,8 +117,8 @@ export function TextPage({ page, members, currentUserId }: TextPageProps) {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-      <ScrollArea className="flex-1">
-        <div className="px-4 md:px-8 py-6 max-w-3xl mx-auto">
+      <ScrollArea className="flex-1 min-h-0">
+        <div className="px-4 md:px-8 py-6 max-w-3xl mx-auto min-h-full">
           {/* Page Hero */}
           <div className="mb-8 pb-6 border-b border-border">
             <div className="flex items-start gap-3 mb-3">
