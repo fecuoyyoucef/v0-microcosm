@@ -2,8 +2,9 @@
 
 import type React from "react"
 
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import * as XLSX from "xlsx"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
@@ -31,6 +32,7 @@ import { toast } from "sonner"
 import {
   Plus,
   FileText,
+  FileUp,
   ListTodo,
   Table2,
   Link2,
@@ -81,6 +83,8 @@ export function NotebookSidebar({
   const [searchQuery, setSearchQuery] = useState("")
   const [pageToDelete, setPageToDelete] = useState<NotebookPage | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isImporting, setIsImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
   const filteredPages = useMemo(() => {
@@ -124,6 +128,64 @@ export function NotebookSidebar({
       setCreateError(`خطأ غير متوقع: ${msg}`)
     } finally {
       setIsCreating(false)
+    }
+  }
+
+  const importFile = async (file: File) => {
+    const extension = file.name.split(".").pop()?.toLowerCase()
+    const isMarkdown = extension === "md" || extension === "markdown"
+    const isSpreadsheet = ["csv", "tsv", "xls", "xlsx"].includes(extension || "")
+
+    if (!isMarkdown && !isSpreadsheet) {
+      toast.error("نوع الملف غير مدعوم", { description: "استخدم Markdown أو CSV أو TSV أو Excel." })
+      return
+    }
+
+    setIsImporting(true)
+    try {
+      let pageType: Exclude<NotebookPageType, "canvas"> = "text"
+      let content: Record<string, unknown>
+      let title = file.name.replace(/\.(markdown?|csv|tsv|xlsx?)$/i, "") || "صفحة مستوردة"
+
+      if (isMarkdown) {
+        content = { blocks: [{ id: crypto.randomUUID(), text: await file.text() }] }
+      } else {
+        pageType = "table"
+        const buffer = await file.arrayBuffer()
+        const workbook = XLSX.read(buffer, { type: "array" })
+        const sheet = workbook.Sheets[workbook.SheetNames[0]]
+        const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "" })
+        const normalized = rows
+          .map((row) => row.map((cell) => String(cell ?? "").trim()))
+          .filter((row) => row.some(Boolean))
+        const columns = normalized[0] || ["العمود 1"]
+        content = {
+          columns: columns.map((column, index) => column || `العمود ${index + 1}`),
+          rows: normalized.slice(1).map((cells) => ({
+            id: crypto.randomUUID(),
+            cells: columns.map((_, index) => cells[index] || ""),
+          })),
+        }
+      }
+
+      const { data, error } = await supabase
+        .from("notebook_pages")
+        .insert({ group_id: groupId, title, page_type: pageType, content, created_by: currentUserId })
+        .select()
+        .single()
+
+      if (error) throw error
+      if (data) {
+        onPageCreated(data.id)
+        toast.success("تم استيراد الصفحة")
+      }
+    } catch (error) {
+      toast.error("تعذّر استيراد الملف", {
+        description: error instanceof Error ? error.message : "تحقق من محتوى الملف وحاول مجدداً.",
+      })
+    } finally {
+      setIsImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ""
     }
   }
 
@@ -197,7 +259,29 @@ export function NotebookSidebar({
             </div>
           </div>
 
-          <Dialog
+          <input
+            ref={importInputRef}
+            type="file"
+            className="sr-only"
+            accept=".md,.markdown,.csv,.tsv,.xls,.xlsx"
+            onChange={(event) => {
+              const file = event.target.files?.[0]
+              if (file) void importFile(file)
+            }}
+          />
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5"
+              onClick={() => importInputRef.current?.click()}
+              disabled={isImporting}
+              aria-label="استيراد ملف"
+            >
+              {isImporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileUp className="h-3.5 w-3.5" />}
+              <span className="text-xs">استيراد</span>
+            </Button>
+            <Dialog
             open={isCreateOpen}
             onOpenChange={(open) => {
               setIsCreateOpen(open)
@@ -300,7 +384,8 @@ export function NotebookSidebar({
                 </Button>
               </div>
             </DialogContent>
-          </Dialog>
+            </Dialog>
+          </div>
         </div>
 
         {/* Search */}
@@ -318,8 +403,8 @@ export function NotebookSidebar({
       </div>
 
       {/* Page list */}
-      <ScrollArea className="flex-1">
-        <div className="p-2 space-y-1">
+      <ScrollArea className="flex-1 min-h-0">
+        <div className="p-2 space-y-1 min-h-full">
           {pages.length === 0 ? (
             <div className="text-center py-12 px-4">
               <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
