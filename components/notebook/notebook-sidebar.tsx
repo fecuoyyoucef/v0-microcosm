@@ -175,10 +175,26 @@ export function NotebookSidebar({
         .single()
 
       if (error) throw error
-      if (data) {
-        onPageCreated(data.id)
-        toast.success("تم استيراد الصفحة")
+      if (!data) throw new Error("لم يتم إنشاء الصفحة")
+
+      // صفحات النص تعرض مساهمات notebook_contributions، لذلك يجب حفظ محتوى Markdown هناك أيضاً.
+      if (isMarkdown) {
+        const markdown = String((content.blocks as Array<{ text?: string }> | undefined)?.[0]?.text || "").trim()
+        if (!markdown) throw new Error("ملف Markdown فارغ")
+
+        const { error: contributionError } = await supabase.from("notebook_contributions").insert({
+          page_id: data.id,
+          user_id: currentUserId,
+          content: { text: markdown },
+        })
+        if (contributionError) {
+          await supabase.from("notebook_pages").delete().eq("id", data.id)
+          throw contributionError
+        }
       }
+
+      onPageCreated(data.id)
+      toast.success("تم استيراد الصفحة")
     } catch (error) {
       toast.error("تعذّر استيراد الملف", {
         description: error instanceof Error ? error.message : "تحقق من محتوى الملف وحاول مجدداً.",

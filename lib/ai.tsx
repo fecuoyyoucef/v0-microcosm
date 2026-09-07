@@ -201,6 +201,11 @@ export async function generateWithTools(params: {
       }
     }
 
+    // لا نعتبر الرد الفارغ نجاحاً؛ نرمي الخطأ كي ينتقل التنفيذ إلى النموذج التالي.
+    if (!text) {
+      throw new Error("EMPTY_RESPONSE")
+    }
+
     return text
   })
 }
