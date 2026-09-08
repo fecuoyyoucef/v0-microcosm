@@ -4,7 +4,18 @@ export type UpperLayerPermission = "all" | "admin_only" | "selected_members"
 
 export type GroupType = "primary" | "secondary"
 
-export type BackgroundStyle = "neural_mesh" | "neural_network" | "matrix_code" | "neuron_cell" | "none"
+export type BackgroundStyle =
+  | "neural_mesh"
+  | "neural_network"
+  | "matrix_code"
+  | "neuron_cell"
+  | "aurora"
+  | "ocean_depth"
+  | "paper_grid"
+  | "sunset_glow"
+  | "none"
+
+export type MessageTheme = "teal" | "ocean" | "violet" | "amber" | "rose" | "slate"
 
 export type CellCategory = "project" | "discussion"
 
@@ -20,6 +31,9 @@ export interface GroupSettings {
   show_in_recommendations?: boolean
   /** Default target language for the in-cell "ترجمة" action. "auto" = detect (Arabic→English, otherwise→Arabic) */
   translation_language?: TranslationLanguage
+  /** Admins control appearance by default; members can customize only when enabled. */
+  allow_member_appearance_changes?: boolean
+  message_theme?: MessageTheme
 }
 
 export interface SupervisorPermissions {
