@@ -469,7 +469,7 @@ export function MessageInput({
         </div>
       )}
 
-      <div className="p-2 w-full max-w-full">
+      <div className="px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 w-full max-w-full">
         {/* File previews */}
         {filePreviews.length > 0 && (
           <div className="flex flex-wrap gap-2 p-2 border-t border-border">
@@ -559,7 +559,7 @@ export function MessageInput({
               onChange={handleContentChange}
               onKeyDown={handleKeyDown}
               placeholder="اكتب رسالة... (@للإشارة)"
-              className="min-h-[32px] max-h-20 resize-none border-0 bg-transparent px-2 text-sm py-1.5 focus-visible:ring-0 flex-1 min-w-0"
+              className="min-h-[34px] max-h-32 resize-none border-0 bg-transparent px-2 text-sm leading-6 py-1.5 focus-visible:ring-0 flex-1 min-w-0"
               rows={1}
             />
 
@@ -647,7 +647,7 @@ export function MessageInput({
         </div>
 
         {/* Hint text */}
-        <p className="text-[9px] text-muted-foreground/60 mt-1 text-center">
+        <p className="text-[10px] text-muted-foreground/60 mt-1.5 text-center hidden sm:block">
           Enter للإرسال • Shift+Enter لسطر جديد • اكتب @ للإشارة لشخص
         </p>
       </div>

@@ -552,9 +552,9 @@ export const MessageList = React.memo(function MessageList({
         key={message.id}
         id={`message-${message.id}`}
         className={cn(
-          "flex gap-2 group/msg transition-all duration-300",
+          "flex gap-1.5 group/msg transition-all duration-200",
           isOwn ? "flex-row-reverse" : "flex-row",
-          message._isLastInGroup ? "mb-2" : "mb-0.5",
+          message._isLastInGroup ? "mb-2.5" : "mb-0.5",
         )}
         onTouchStart={(e) => handleTouchStart(e, message)}
         onTouchMove={handleTouchMove}
@@ -583,7 +583,7 @@ export const MessageList = React.memo(function MessageList({
         )}
 
         {/* Bubble column */}
-        <div className={cn("flex flex-col max-w-[78%] sm:max-w-[68%]", isOwn ? "items-end" : "items-start")}>
+        <div className={cn("flex min-w-0 flex-col max-w-[86%] sm:max-w-[72%]", isOwn ? "items-end" : "items-start")}>
           {/* Sender name (only first in group, non-own messages) */}
           {!isOwn && message._showName && (message.sender?.display_name || message.sender?.username) && (
             <Link
@@ -685,7 +685,7 @@ export const MessageList = React.memo(function MessageList({
 
             {/* Content */}
             {message.content && message.content !== "📁 مرفقات" && (
-              <p className="text-[15px] leading-relaxed whitespace-pre-wrap px-3.5 pt-2 pb-1.5">
+              <p className="text-[14px] leading-[1.65] whitespace-pre-wrap px-3.5 pt-2 pb-1.5 sm:text-[15px]">
                 {message.content}
               </p>
             )}
@@ -722,8 +722,12 @@ export const MessageList = React.memo(function MessageList({
             >
               {isEdited && <span className="italic">معدّلة</span>}
               {isPinned && <Pin className="h-2.5 w-2.5 fill-current" />}
-              <span>{time}</span>
-              {isOwn && (
+              {message.id.startsWith("temp-") ? (
+                <span className="inline-flex items-center gap-1 opacity-70">جاري الإرسال</span>
+              ) : (
+                <span>{time}</span>
+              )}
+              {isOwn && !message.id.startsWith("temp-") && (
                 // Two-state read receipt driven by message.is_read, which the
                 // container derives from the other members' read cursor:
                 //  - single tick  = delivered (no one has read up to here yet)
