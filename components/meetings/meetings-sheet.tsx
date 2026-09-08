@@ -41,6 +41,7 @@ export function MeetingsSheet({
   const [loading, setLoading] = useState(true)
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [endingId, setEndingId] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
 
   const load = useCallback(async () => {
@@ -95,6 +96,20 @@ export function MeetingsSheet({
     },
     [toast],
   )
+
+  const handleEnd = useCallback(async (id: string) => {
+    setEndingId(id)
+    try {
+      const res = await fetch(`/api/meetings/${id}/end`, { method: "POST", credentials: "include" })
+      if (!res.ok) throw new Error()
+      await load()
+      toast({ title: "تم إنهاء الاجتماع" })
+    } catch {
+      toast({ title: "تعذّر إنهاء الاجتماع", variant: "destructive" })
+    } finally {
+      setEndingId(null)
+    }
+  }, [load, toast])
 
   // Upcoming + active are the "live" meetings; ended/cancelled go to history.
   const live = meetings.filter((m) => m.status === "scheduled" || m.status === "active")
@@ -155,7 +170,9 @@ export function MeetingsSheet({
                           now={now}
                           isAdmin={isAdmin}
                           cancelling={cancellingId === m.id}
+                          ending={endingId === m.id}
                           onCancel={() => handleCancel(m.id)}
+                          onEnd={() => handleEnd(m.id)}
                         />
                       ))}
                     </section>
@@ -171,7 +188,9 @@ export function MeetingsSheet({
                           now={now}
                           isAdmin={isAdmin}
                           cancelling={false}
+                          ending={false}
                           onCancel={() => {}}
+                          onEnd={() => {}}
                         />
                       ))}
                     </section>
@@ -200,13 +219,17 @@ function MeetingRow({
   now,
   isAdmin,
   cancelling,
+  ending,
   onCancel,
+  onEnd,
 }: {
   meeting: Meeting
   now: number
   isAdmin: boolean
   cancelling: boolean
+  ending: boolean
   onCancel: () => void
+  onEnd: () => void
 }) {
   const startMs = new Date(meeting.starts_at).getTime()
   const endMs = meeting.duration_min ? startMs + meeting.duration_min * 60000 : null
@@ -280,6 +303,12 @@ function MeetingRow({
         <span className="text-xs text-muted-foreground">{dateLabel}</span>
         <span className="text-xs text-muted-foreground">{sub}</span>
       </div>
+
+      {isAdmin && meeting.status === "active" && (
+        <Button size="sm" variant="outline" className="h-8 shrink-0 text-xs text-destructive" onClick={onEnd} disabled={ending}>
+          {ending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "إنهاء"}
+        </Button>
+      )}
 
       {isAdmin && meeting.status === "scheduled" && (
         <Button

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
-import { Loader2, Users, Sparkles, ChevronLeft, UserPlus } from "lucide-react"
+import { Loader2, Users, Sparkles, ChevronLeft, UserPlus, ChevronUp, ChevronDown, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 
@@ -33,6 +33,8 @@ export function SuggestedCells({ userId }: SuggestedCellsProps) {
   const [enabled, setEnabled] = useState(false)
   const [enhancedMode, setEnhancedMode] = useState(false)
   const [requestingJoin, setRequestingJoin] = useState<string | null>(null)
+  const [collapsed, setCollapsed] = useState(false)
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set())
   const router = useRouter()
   const supabase = createClient()
 
@@ -81,7 +83,7 @@ export function SuggestedCells({ userId }: SuggestedCellsProps) {
         }
 
         console.log("[v0] Loaded suggested cells:", suggested.length)
-        setCells(suggested)
+        setCells(suggested.slice(0, 10))
       } catch (error) {
         console.error("[v0] Error loading suggested cells:", error)
       } finally {
@@ -169,22 +171,30 @@ export function SuggestedCells({ userId }: SuggestedCellsProps) {
             </Badge>
           )}
         </div>
-        <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => router.push("/chat/explore")}>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCollapsed((value) => !value)} aria-label={collapsed ? "توسيع المجموعات المقترحة" : "طي المجموعات المقترحة"}>
+            {collapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+          </Button>
+          <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => router.push("/chat/explore")}>
           عرض الكل
-          <ChevronLeft className="w-3 h-3 mr-1" />
-        </Button>
+            <ChevronLeft className="w-3 h-3 mr-1" />
+          </Button>
+        </div>
       </div>
 
-      <ScrollArea className="w-full whitespace-nowrap">
+      {!collapsed && <ScrollArea className="w-full whitespace-nowrap">
         <div className="flex gap-3 pb-2">
-          {cells.slice(0, 5).map((cell) => (
+          {cells.filter((cell) => !dismissed.has(cell.groupId)).slice(0, 10).map((cell) => (
             <Card
               key={cell.groupId}
-              className="w-[200px] shrink-0 bg-card/50 hover:bg-card transition-colors cursor-pointer"
+              className="relative w-[200px] shrink-0 bg-card/50 hover:bg-card transition-colors cursor-pointer"
               onClick={() => router.push(`/chat/${cell.groupId}/preview`)}
             >
               <CardContent className="p-3">
                 <div className="flex items-start gap-2 mb-2">
+                  <Button variant="ghost" size="icon" className="absolute left-1 top-1 h-6 w-6" onClick={(e) => { e.stopPropagation(); setDismissed((prev) => new Set(prev).add(cell.groupId)) }} aria-label={`تجاهل ${cell.groupName}`}>
+                    <X className="h-3 w-3" />
+                  </Button>
                   <Avatar className="w-10 h-10">
                     <AvatarImage src={cell.groupImage || undefined} />
                     <AvatarFallback className="bg-primary/10 text-primary text-sm">
@@ -245,7 +255,7 @@ export function SuggestedCells({ userId }: SuggestedCellsProps) {
           ))}
         </div>
         <ScrollBar orientation="horizontal" />
-      </ScrollArea>
+      </ScrollArea>}
     </div>
   )
 }
