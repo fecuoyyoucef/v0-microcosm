@@ -381,7 +381,7 @@ export function ChatContainer({
   const { onlineUsers, typingUsers, broadcastTyping } = useRealtimePresence(
     groupId,
     currentUserId,
-    currentProfile?.display_name || "مستخدم",
+    currentProfile?.display_name || "مس��خدم",
   )
   
   // Global presence tracks all users in the app (not just this group)
@@ -993,6 +993,7 @@ export function ChatContainer({
           groupId={groupId}
           translationLanguage={translationLanguage}
           isAdmin={currentUserRole === "admin"}
+          messageTheme={groupSettings.message_theme || "teal"}
         />
           <TypingIndicator userNames={typingUserNames} />
         </div>

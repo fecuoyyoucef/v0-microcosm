@@ -64,6 +64,7 @@ export function GroupSettingsForm({
   const [description, setDescription] = useState(group.description || "")
   const [avatarUrl, setAvatarUrl] = useState(group.avatar_url || "")
   const [backgroundStyle, setBackgroundStyle] = useState<BackgroundStyle>(group.background_style || "neural_mesh")
+  const [messageTheme, setMessageTheme] = useState<import("@/lib/types").MessageTheme>(group.settings?.message_theme || "teal")
   const [cellCategory, setCellCategory] = useState<CellCategory>(group.cell_category || "discussion")
   const [goal, setGoal] = useState(group.goal || "")
   const [classificationEnabled, setClassificationEnabled] = useState(false)
@@ -146,8 +147,10 @@ export function GroupSettingsForm({
     }
   }
 
+  const canEditAppearance = isAdmin || settings.allow_member_appearance_changes === true
+
   const handleSave = async () => {
-    if (!isAdmin) return
+    if (!isAdmin && !canEditAppearance) return
 
     if (cellCategory !== group.cell_category) {
       if (!cellTypeChangeStatus?.can_change) {
@@ -163,7 +166,7 @@ export function GroupSettingsForm({
         name,
         description: description || null,
         avatar_url: avatarUrl || null,
-        settings,
+        settings: { ...settings, message_theme: messageTheme },
         background_style: backgroundStyle,
         goal: goal || null,
       }
@@ -725,7 +728,7 @@ export function GroupSettingsForm({
           </TabsContent>
 
           {/* Appearance Tab */}
-          {isAdmin && (
+          {canEditAppearance && (
             <TabsContent value="appearance" className="space-y-4 mt-4">
               <Card>
                 <CardHeader>
@@ -762,6 +765,18 @@ export function GroupSettingsForm({
                         </Label>
                       </div>
 
+                      {[
+                        ["aurora", "شفق قطبي", "ألوان هادئة متدرجة"],
+                        ["ocean_depth", "عمق المحيط", "خلفية زرقاء عميقة"],
+                        ["paper_grid", "شبكة ورقية", "نمط شبكي خفيف"],
+                        ["sunset_glow", "وهج الغروب", "دفء برتقالي هادئ"],
+                      ].map(([value, label, description]) => (
+                        <div key={value} className="flex items-center gap-2 p-3 rounded-lg border hover:bg-secondary cursor-pointer">
+                          <RadioGroupItem value={value} id={value} />
+                          <Label htmlFor={value} className="flex-1 cursor-pointer"><div className="font-medium">{label}</div><div className="text-xs text-muted-foreground">{description}</div></Label>
+                        </div>
+                      ))}
+
                       <div className="flex items-center space-x-2 space-x-reverse p-3 rounded-lg border hover:bg-secondary cursor-pointer">
                         <RadioGroupItem value="none" id="none" />
                         <Label htmlFor="none" className="flex-1 cursor-pointer">
@@ -771,7 +786,14 @@ export function GroupSettingsForm({
                       </div>
                     </div>
                   </RadioGroup>
-                  <Button onClick={handleSave} disabled={isSaving} className="mt-4">
+                  <div className="mt-6 border-t pt-4">
+                    <Label className="text-base font-semibold">ألوان الرسائل</Label>
+                    <RadioGroup value={messageTheme} onValueChange={(value) => setMessageTheme(value as import("@/lib/types").MessageTheme)} className="mt-3 grid grid-cols-2 gap-2">
+                      {[["teal", "فيروزي"], ["ocean", "محيطي"], ["violet", "بنفسجي"], ["amber", "ذهبي"], ["rose", "وردي"], ["slate", "رمادي"]].map(([value, label]) => <Label key={value} htmlFor={`theme-${value}`} className="flex items-center gap-2 rounded-lg border p-2 cursor-pointer"><RadioGroupItem value={value} id={`theme-${value}`} />{label}</Label>)}
+                    </RadioGroup>
+                  </div>
+                  {isAdmin && <div className="mt-4 flex items-center justify-between rounded-lg border p-3"><div><p className="font-medium">السماح للأعضاء بتغيير المظهر</p><p className="text-xs text-muted-foreground">معطل افتراضياً ويتطلب تفعيل المسؤول</p></div><Switch checked={settings.allow_member_appearance_changes === true} onCheckedChange={(checked) => setSettings({ ...settings, allow_member_appearance_changes: checked })} /></div>}
+                  <Button onClick={handleSave} disabled={isSaving || !canEditAppearance} className="mt-4">
                     {isSaving ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin ml-2" />

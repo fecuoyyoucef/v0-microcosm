@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Copy, Edit2, Trash2, Languages, Check, Pin, Reply, MessageSquareText, Loader2 } from "lucide-react"
 import Link from "next/link"
-import type { Message, GroupMember, ConversationNode } from "@/lib/types"
+import type { Message, GroupMember, ConversationNode, MessageTheme } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { toast } from "@/components/ui/use-toast"
 import {
@@ -182,6 +182,7 @@ interface MessageListProps {
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>
   translationLanguage?: "ar" | "en" | "fr"
   isAdmin?: boolean
+  messageTheme?: MessageTheme
 }
 
 export const MessageList = React.memo(function MessageList({
@@ -200,7 +201,17 @@ export const MessageList = React.memo(function MessageList({
   scrollContainerRef,
   translationLanguage = "ar",
   isAdmin = false,
-}: MessageListProps) {
+  messageTheme = "teal",
+  }: MessageListProps) {
+  const messageThemeClasses: Record<MessageTheme, { own: string; other: string }> = {
+    teal: { own: "bg-primary text-primary-foreground", other: "bg-muted text-foreground" },
+    ocean: { own: "bg-sky-700 text-white", other: "bg-sky-950/70 text-sky-50" },
+    violet: { own: "bg-violet-700 text-white", other: "bg-violet-950/70 text-violet-50" },
+    amber: { own: "bg-amber-600 text-white", other: "bg-amber-950/70 text-amber-50" },
+    rose: { own: "bg-rose-700 text-white", other: "bg-rose-950/70 text-rose-50" },
+    slate: { own: "bg-slate-700 text-white", other: "bg-slate-800 text-slate-50" },
+  }
+  const bubbleTheme = messageThemeClasses[messageTheme]
   const supabase = createClient()
 
   const [showActionSheet, setShowActionSheet] = useState(false)
@@ -524,6 +535,7 @@ export const MessageList = React.memo(function MessageList({
     const isOwn = message.sender_id === currentUserId
     const layer = (message.layer || "standard") as keyof typeof layerStyles
     const style = layerStyles[layer] || layerStyles.standard
+  const themedBubble = isOwn ? bubbleTheme.own : bubbleTheme.other
     const dbReactions = (message as any).reactions || []
     const localMsgReactions = localReactions[message.id] || []
     const allReactions = [...dbReactions]
@@ -601,7 +613,7 @@ export const MessageList = React.memo(function MessageList({
             className={cn(
               "relative break-words shadow-sm transition-all overflow-hidden",
               bubbleCorners,
-              isOwn ? style.ownBg : style.otherBg,
+              themedBubble,
               /* Layer accent bar (left side / start side) */
               layer !== "standard" &&
                 "before:content-[''] before:absolute before:top-2 before:bottom-2 before:w-[3px] before:rounded-full before:start-1.5",
