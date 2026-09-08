@@ -62,6 +62,8 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
   const [isInviteOpen, setIsInviteOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false)
+  const [replacementAdminId, setReplacementAdminId] = useState("")
   const [isMembersOpen, setIsMembersOpen] = useState(false)
   const [isMeetingsOpen, setIsMeetingsOpen] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
@@ -139,18 +141,23 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
   }
 
   const handleLeaveGroup = async () => {
+    if (currentUserRole === "admin" && members.filter((member) => member.user_id !== currentUserId).length > 0) {
+      setLeaveDialogOpen(true)
+      return
+    }
     if (!confirm("هل أنت متأكد من مغادرة المجموعة؟")) return
+    await completeLeaveGroup()
+  }
 
+  const completeLeaveGroup = async () => {
     setIsLeaving(true)
     try {
-      const { error } = await supabase
-        .from("group_members")
-        .delete()
-        .eq("group_id", group.id)
-        .eq("user_id", currentUserId)
-
+      if (currentUserRole === "admin" && replacementAdminId) {
+        const { error: promoteError } = await supabase.from("group_members").update({ role: "admin" }).eq("group_id", group.id).eq("user_id", replacementAdminId)
+        if (promoteError) throw promoteError
+      }
+      const { error } = await supabase.from("group_members").delete().eq("group_id", group.id).eq("user_id", currentUserId)
       if (error) throw error
-
       router.push("/chat")
       router.refresh()
     } catch (err) {
@@ -621,6 +628,23 @@ export function ChatHeader({ group, members, currentUserRole, currentUserId, onM
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <Dialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>اختر مسؤولاً بديلاً</DialogTitle>
+                <DialogDescription>يجب تعيين مسؤول آخر قبل مغادرة المجموعة حتى لا تبقى دون مسؤول.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2 py-2">
+                <Label htmlFor="replacement-admin">المسؤول البديل</Label>
+                <select id="replacement-admin" value={replacementAdminId} onChange={(event) => setReplacementAdminId(event.target.value)} className="w-full rounded-md border bg-background p-2 text-sm">
+                  <option value="">اختر عضواً</option>
+                  {members.filter((member) => member.user_id !== currentUserId).map((member) => <option key={member.user_id} value={member.user_id}>{member.profile?.display_name || "مستخدم"}</option>)}
+                </select>
+              </div>
+              <Button disabled={!replacementAdminId || isLeaving} onClick={async () => { setLeaveDialogOpen(false); await completeLeaveGroup() }}>تعيين المسؤول والمغادرة</Button>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </div>
