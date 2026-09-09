@@ -130,7 +130,7 @@ export function GroupSettingsForm({
       const result = await response.json()
       if (!response.ok || !result.pathname) throw new Error(result.error || "Upload failed")
       setAvatarUrl(`/api/storage/file?pathname=${encodeURIComponent(result.pathname)}`)
-      await supabase.from("groups").update({ avatar_url: publicUrl }).eq("id", group.id)
+      await supabase.from("groups").update({ avatar_url: `/api/storage/file?pathname=${encodeURIComponent(result.pathname)}` }).eq("id", group.id)
     } catch (error) {
       console.error("Error uploading avatar:", error)
       alert("حدث خطأ في رفع الصورة")

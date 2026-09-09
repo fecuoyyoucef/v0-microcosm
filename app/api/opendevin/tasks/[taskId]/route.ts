@@ -9,7 +9,7 @@ const OPENDEVIN_API_URL = process.env.OPENDEVIN_API_URL || "http://localhost:808
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { taskId: string } }
+  { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
     const supabase = await createClient()
@@ -23,7 +23,7 @@ export async function GET(
       )
     }
 
-    const { taskId } = params
+    const { taskId } = await params
 
     console.log("[v0] Fetching OpenDevin task status:", taskId)
 
@@ -72,7 +72,7 @@ export async function GET(
  */
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { taskId: string } }
+  { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
     const supabase = await createClient()
@@ -86,7 +86,7 @@ export async function DELETE(
       )
     }
 
-    const { taskId } = params
+    const { taskId } = await params
 
     console.log("[v0] Deleting OpenDevin task:", taskId)
 
