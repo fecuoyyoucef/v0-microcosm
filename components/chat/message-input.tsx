@@ -293,20 +293,17 @@ export function MessageInput({
       setIsUploadingFiles(true)
       try {
         for (const file of selectedFiles) {
-          const fileExt = file.name.split(".").pop()
-          const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
-          const filePath = `${groupId}/${fileName}`
+          const formData = new FormData()
+          formData.append("file", file)
+          formData.append("scope", `groups-${groupId}`)
 
-          const { data, error } = await supabase.storage.from("message-attachments").upload(filePath, file)
-
-          if (error) throw error
-
-          const { data: urlData } = supabase.storage.from("message-attachments").getPublicUrl(filePath)
+          const response = await fetch("/api/storage/upload", { method: "POST", body: formData })
+          const result = await response.json()
+          if (!response.ok || !result.pathname) throw new Error(result.error || "Upload failed")
 
           const fileType = file.type.startsWith("image/") ? "image" : "document"
-
           attachments.push({
-            url: urlData.publicUrl,
+            url: `/api/storage/file?pathname=${encodeURIComponent(result.pathname)}`,
             type: fileType,
             name: file.name,
             size: file.size,

@@ -123,21 +123,13 @@ export function GroupSettingsForm({
 
     setIsUploadingAvatar(true)
     try {
-      const fileExt = file.name.split(".").pop()
-      const fileName = `${group.id}-${Date.now()}.${fileExt}`
-      const filePath = `${group.id}/${fileName}`
-
-      const { error: uploadError } = await supabase.storage
-        .from("group-avatars")
-        .upload(filePath, file, { upsert: true })
-
-      if (uploadError) throw uploadError
-
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("group-avatars").getPublicUrl(filePath)
-
-      setAvatarUrl(publicUrl)
+      const formData = new FormData()
+      formData.append("file", file)
+      formData.append("scope", `groups-${group.id}-avatars`)
+      const response = await fetch("/api/storage/upload", { method: "POST", body: formData })
+      const result = await response.json()
+      if (!response.ok || !result.pathname) throw new Error(result.error || "Upload failed")
+      setAvatarUrl(`/api/storage/file?pathname=${encodeURIComponent(result.pathname)}`)
       await supabase.from("groups").update({ avatar_url: publicUrl }).eq("id", group.id)
     } catch (error) {
       console.error("Error uploading avatar:", error)
