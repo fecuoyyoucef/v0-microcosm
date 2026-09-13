@@ -1,8 +1,8 @@
-import { generateObject, gateway } from "ai"
+import { generateObject } from "ai"
+import { google } from "@ai-sdk/google"
 import { z } from "zod"
 
-// Gemini is routed through Vercel AI Gateway, so no provider-specific API key is exposed.
-const assessmentModel = gateway("google/gemini-3.6-flash")
+const assessmentModel = google("gemini-2.5-flash")
 
 const assessmentSchema = z.object({
   responsibilityScore: z.number().min(0).max(100),

@@ -11,7 +11,7 @@
     "start": "next start"
   },
   "dependencies": {
-    "@ai-sdk/google": "^4.0.69",
+    "@ai-sdk/google": "^2.0.97",
     "@ai-sdk/groq": "2.0.33",
     "@ai-sdk/xai": "2.0.39",
     "@emotion/is-prop-valid": "latest",
