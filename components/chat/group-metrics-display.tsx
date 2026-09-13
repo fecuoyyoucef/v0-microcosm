@@ -72,10 +72,10 @@ export function GroupMetricsDisplay({ group, className }: GroupMetricsDisplayPro
         {responsibilityScore < 60 && (
           <div className="flex items-start gap-2 mt-3 text-xs text-muted-foreground">
             <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-            <p>
+              <p>
               {responsibilityScore < 40
-                ? "الخلية في خطر! بعض الخدمات قد تُحظر قريباً."
-                : "انتبه: معيار المسؤولية منخفض. حافظ على النشاط المنتظم."}
+                ? "الأدلة الحالية تشير إلى مسؤولية منخفضة أو سلوك يحتاج مراجعة بشرية."
+                : "تُحسب المسؤولية من الالتزام والمتابعة والاحترام، وليس من كثرة الرسائل فقط."}
             </p>
           </div>
         )}
@@ -96,7 +96,7 @@ export function GroupMetricsDisplay({ group, className }: GroupMetricsDisplayPro
           </div>
           <Progress value={progressScore} className="h-2" />
           <p className="text-xs text-muted-foreground mt-2">
-            يُحسب بناءً على القرارات المتخذة والعقود المكتملة والنشاط العام
+            يُستخرج من الأدلة الفعلية في الرسائل: ما أُنجز، العوائق، المتابعات، والخطوات التالية؛ لا من الوعود وحدها
           </p>
         </Card>
       )}
