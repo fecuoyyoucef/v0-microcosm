@@ -1,8 +1,8 @@
-import { createXai } from "@ai-sdk/xai"
-import { generateText, Output } from "ai"
+import { generateObject, gateway } from "ai"
 import { z } from "zod"
 
-const assessmentModel = createXai({ apiKey: process.env.XAI_API_KEY })("grok-4.6")
+// Gemini is routed through Vercel AI Gateway, so no provider-specific API key is exposed.
+const assessmentModel = gateway("google/gemini-3.6-flash")
 
 const assessmentSchema = z.object({
   responsibilityScore: z.number().min(0).max(100),
@@ -32,9 +32,9 @@ export async function assessProjectConversation(input: {
 }) {
   const transcript = input.messages.map((message, index) => `[${index}] ${message.author} (${message.createdAt}): ${message.content}`).join("\n")
 
-  const result = await generateText({
+  const result = await generateObject({
     model: assessmentModel,
-    output: Output.object({ schema: assessmentSchema }),
+    schema: assessmentSchema,
     temperature: 0.1,
     system: `أنت مقيّم محايد لمشاريع ومجتمعات عربية. قيّم الأدلة الظاهرة في الرسائل فقط، ولا تستنتج النوايا أو الصفات الشخصية.
 
@@ -54,7 +54,7 @@ export async function assessProjectConversation(input: {
     prompt: `المشروع: ${input.groupName}\nالهدف: ${input.goal || "غير محدد"}\n\nالرسائل:\n${transcript}`,
   })
 
-  return result.output
+  return result.object
 }
 
 export { assessmentSchema }
