@@ -1,5 +1,8 @@
-import { generateText, Output } from "ai"
+import { generateObject } from "ai"
+import { google } from "@ai-sdk/google"
 import { z } from "zod"
+
+const assessmentModel = google("gemini-2.5-flash")
 
 const assessmentSchema = z.object({
   responsibilityScore: z.number().min(0).max(100),
@@ -29,9 +32,9 @@ export async function assessProjectConversation(input: {
 }) {
   const transcript = input.messages.map((message, index) => `[${index}] ${message.author} (${message.createdAt}): ${message.content}`).join("\n")
 
-  const result = await generateText({
-    model: "openai/gpt-6-astra-fast",
-    output: Output.object({ schema: assessmentSchema }),
+  const result = await generateObject({
+    model: assessmentModel,
+    schema: assessmentSchema,
     temperature: 0.1,
     system: `أنت مقيّم محايد لمشاريع ومجتمعات عربية. قيّم الأدلة الظاهرة في الرسائل فقط، ولا تستنتج النوايا أو الصفات الشخصية.
 
@@ -51,7 +54,7 @@ export async function assessProjectConversation(input: {
     prompt: `المشروع: ${input.groupName}\nالهدف: ${input.goal || "غير محدد"}\n\nالرسائل:\n${transcript}`,
   })
 
-  return result.output
+  return result.object
 }
 
 export { assessmentSchema }
