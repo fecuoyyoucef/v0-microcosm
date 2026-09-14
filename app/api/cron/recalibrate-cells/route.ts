@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     try {
       const { data: messages, error: messagesError } = await supabase
         .from("messages")
-        .select("id, content, created_at, sender:profiles!sender_id(display_name)")
+        .select("id, content, created_at, sender_id")
         .eq("group_id", group.id)
         .order("created_at", { ascending: false })
         .limit(200)
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
         goal: group.goal,
         messages: [...messages].reverse().map((message: any) => ({
           id: message.id,
-          author: message.sender?.display_name || "مستخدم",
+          author: message.sender_id || "مستخدم",
           content: message.content,
           createdAt: message.created_at,
         })),
