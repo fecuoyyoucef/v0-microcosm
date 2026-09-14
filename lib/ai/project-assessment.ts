@@ -7,14 +7,14 @@ const assessmentModel = google("gemini-2.5-flash")
 const assessmentSchema = z.object({
   responsibilityScore: z.number().min(0).max(100),
   progressScore: z.number().min(0).max(100),
-  confidence: z.number().min(0).max(1),
+  confidence: z.number().min(0).max(100).transform((value) => (value > 1 ? value / 100 : value)),
   responsibilitySummary: z.string(),
   progressSummary: z.string(),
   evidence: z.array(z.object({
     messageIndex: z.number().int().nonnegative(),
     type: z.enum(["commitment", "delivery", "follow_up", "respect", "harm", "blocker", "decision"]),
     note: z.string(),
-  })).max(12),
+  })).max(24),
   behavior: z.object({
     respect: z.number().min(0).max(100),
     reliability: z.number().min(0).max(100),
@@ -50,7 +50,7 @@ export async function assessProjectConversation(input: {
 - قيّم التقدم مقارنة بهدف المشروع، مع خفض الثقة عندما تكون الأدلة قليلة أو غامضة.
 - لا تجعل الدرجة حكماً تأديبياً آلياً؛ سجّل الأدلة والشكوك بوضوح.
 
-أعد JSON مطابقاً للمخطط. messageIndex يجب أن يشير إلى الرسائل التي تبرر الاستنتاج. harmfulConduct هو مقدار السلوك الضار المرصود، حيث 0 يعني لا دليل و100 يعني سلوك ضار متكرر وواضح.`,
+أعد JSON مطابقاً للمخطط. أعد 24 دليلاً كحد أقصى، واختر الأدلة الأقوى فقط. confidence قيمة من 0 إلى 1 أو من 0 إلى 100 وسيتم توحيدها. messageIndex يجب أن يشير إلى الرسائل التي تبرر الاستنتاج. harmfulConduct هو مقدار السلوك الضار المرصود، حيث 0 يعني لا دليل و100 يعني سلوك ضار متكرر وواضح.`,
     prompt: `المشروع: ${input.groupName}\nالهدف: ${input.goal || "غير محدد"}\n\nالرسائل:\n${transcript}`,
   })
 
