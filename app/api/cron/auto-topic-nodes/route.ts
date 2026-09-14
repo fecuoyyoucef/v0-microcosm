@@ -8,13 +8,21 @@ async function run(request: Request) {
   }
 
   const supabase = createServiceClient()
-  const { data: groups, error } = await (supabase.from("groups") as any)
+  const { data: candidateGroups, error } = await (supabase.from("groups") as any)
     .select("id, created_by, auto_topic_nodes_enabled")
     .eq("auto_topic_nodes_enabled", true)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  const groups = []
+  for (const group of candidateGroups || []) {
+    const { count, error: countError } = await (supabase.from("messages") as any)
+      .select("id", { count: "exact", head: true })
+      .eq("group_id", group.id)
+    if (!countError && (count || 0) > 500) groups.push({ ...group, messageCount: count || 0 })
+  }
+
   const results = []
-  for (const group of groups || []) {
+  for (const group of groups) {
     try {
       results.push(await organizeGroupTopics(supabase, group.id, group.created_by))
     } catch (groupError) {
