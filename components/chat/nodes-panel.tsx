@@ -148,6 +148,13 @@ export function NodesPanel({
     setIsCreating(false)
   }
 
+  const reviewAutoNode = async (nodeId: string, approved: boolean) => {
+    const { error } = approved
+      ? await (supabase.from("conversation_nodes") as any).update({ auto_status: "approved", temporary_until: null }).eq("id", nodeId)
+      : await (supabase.from("conversation_nodes") as any).update({ auto_status: "rejected" }).eq("id", nodeId)
+    if (!error) onNodesUpdate()
+  }
+
   const deleteNode = async (nodeId: string) => {
     if (!confirm("هل أنت متأكد من حذف هذه العقدة؟")) return
 
@@ -274,6 +281,9 @@ export function NodesPanel({
 
           {/* Title */}
           <span className={cn("flex-1 text-sm truncate", isPrimary && "font-medium")}>{node.title}</span>
+          {(node as ConversationNode & { auto_status?: string }).auto_status === "pending" && (
+            <span className="text-[10px] rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-600">مؤقتة</span>
+          )}
 
           {/* Message count */}
           {node.messages_count !== undefined && node.messages_count > 0 && (
@@ -282,6 +292,12 @@ export function NodesPanel({
 
           {/* Actions */}
           <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1">
+            {isAdmin && (node as ConversationNode & { auto_status?: string }).auto_status === "pending" && (
+              <>
+                <Button variant="ghost" size="icon" className="h-6 w-6 text-emerald-600" onClick={(e) => { e.stopPropagation(); reviewAutoNode(node.id, true) }} title="اعتماد العقدة">✓</Button>
+                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={(e) => { e.stopPropagation(); reviewAutoNode(node.id, false) }} title="إلغاء العقدة">×</Button>
+              </>
+            )}
             {/* Generate questions button for primary nodes */}
             {isPrimary && node.messages_count === 0 && (
               <Button
@@ -304,7 +320,7 @@ export function NodesPanel({
             )}
 
             {/* AI Summary for primary nodes only */}
-            {isPrimary && node.messages_count > 0 && (
+            {isPrimary && (node.messages_count ?? 0) > 0 && (
               <Button
                 variant="ghost"
                 size="icon"

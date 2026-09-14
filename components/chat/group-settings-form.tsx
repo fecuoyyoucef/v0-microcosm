@@ -67,6 +67,7 @@ export function GroupSettingsForm({
   const [messageTheme, setMessageTheme] = useState<import("@/lib/types").MessageTheme>(group.settings?.message_theme || "teal")
   const [cellCategory, setCellCategory] = useState<CellCategory>(group.cell_category || "discussion")
   const [goal, setGoal] = useState(group.goal || "")
+  const [autoTopicNodesEnabled, setAutoTopicNodesEnabled] = useState((group as Group & { auto_topic_nodes_enabled?: boolean }).auto_topic_nodes_enabled !== false)
   const [classificationEnabled, setClassificationEnabled] = useState(false)
   const [settings, setSettings] = useState<GroupSettings>(
     group.settings || {
@@ -160,8 +161,9 @@ export function GroupSettingsForm({
         avatar_url: avatarUrl || null,
         settings: { ...settings, message_theme: messageTheme },
         background_style: backgroundStyle,
-        goal: goal || null,
-      }
+    goal: goal || null,
+    auto_topic_nodes_enabled: autoTopicNodesEnabled,
+  }
 
       if (cellCategory !== group.cell_category) {
         updateData.cell_category = cellCategory
@@ -636,7 +638,7 @@ export function GroupSettingsForm({
           <TabsContent value="permissions" className="space-y-4 mt-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">التحكم في الطبقات</CardTitle>
+                <CardTitle className="text-lg">��لتحكم في الطبقات</CardTitle>
                 <CardDescription>من يمكنه إرسال رسائل في الطبقة العلوية</CardDescription>
               </CardHeader>
               <CardContent>
@@ -863,6 +865,14 @@ export function GroupSettingsForm({
                           </Label>
                         </div>
                       </RadioGroup>
+                    </div>
+
+                    <div className="flex items-center justify-between border rounded-lg p-3">
+                      <div>
+                        <p className="font-medium">تنظيم المواضيع تلقائياً</p>
+                        <p className="text-sm text-muted-foreground">يقترح الذكاء الاصطناعي عقداً مؤقتة من المواضيع المهمة بعد 10 رسائل فعالة، ويمكن للمسؤول إلغاؤها أو اعتمادها.</p>
+                      </div>
+                      <Switch checked={autoTopicNodesEnabled} onCheckedChange={setAutoTopicNodesEnabled} disabled={!isAdmin} />
                     </div>
 
                     {/* Show in Recommendations */}
