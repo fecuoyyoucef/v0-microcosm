@@ -29,6 +29,12 @@ export async function POST(request: Request) {
     const targetUserIds = auth.member
       ? Array.from(new Set(requestedUserIds)).filter((id) => typeof id === "string")
       : requestedUserIds.filter((id) => id === auth.user!.id)
+    if (auth.member) {
+      const { data: recipients, error: recipientError } = await auth.supabase.from("group_members").select("user_id").eq("group_id", data.groupId || data.group_id).in("user_id", targetUserIds)
+      if (recipientError || (recipients?.length ?? 0) !== targetUserIds.length) {
+        return NextResponse.json({ error: "Invalid recipients" }, { status: 403 })
+      }
+    }
 
     if (targetUserIds.length === 0) {
       return NextResponse.json({ error: "No user IDs provided" }, { status: 400 })
@@ -110,7 +116,7 @@ export async function POST(request: Request) {
 
         // Remove invalid subscriptions (410 Gone or 404 Not Found)
         if (err.statusCode === 410 || err.statusCode === 404) {
-          await supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint)
+          await auth.supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint)
         }
 
         return { success: false, userId: sub.user_id, error: err.message }
