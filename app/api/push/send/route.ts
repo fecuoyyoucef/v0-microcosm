@@ -1,4 +1,5 @@
 import { requireGroupMember, requireUser } from "@/lib/api-auth"
+import { createServiceClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 
 let webpushConfigured = false
@@ -21,15 +22,16 @@ async function getWebPush() {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { userId, userIds, title, body: messageBody, url, data, useFCM } = body
-    const auth = data?.groupId || data?.group_id ? await requireGroupMember(data.groupId || data.group_id) : await requireUser()
+    const { userId, userIds, title, body: messageBody, url, data } = body
+    const groupId = typeof data?.groupId === "string" ? data.groupId : typeof data?.group_id === "string" ? data.group_id : null
+    const auth = groupId ? await requireGroupMember(groupId) : await requireUser()
     if (auth.response) return auth.response
 
     const requestedUserIds = Array.isArray(userIds) ? userIds : userId ? [userId] : []
-    const targetUserIds = auth.member
+    const targetUserIds = groupId
       ? Array.from(new Set(requestedUserIds)).filter((id) => typeof id === "string")
       : requestedUserIds.filter((id) => id === auth.user!.id)
-    if (auth.member) {
+    if (groupId) {
       const { data: recipients, error: recipientError } = await auth.supabase.from("group_members").select("user_id").eq("group_id", data.groupId || data.group_id).in("user_id", targetUserIds)
       if (recipientError || (recipients?.length ?? 0) !== targetUserIds.length) {
         return NextResponse.json({ error: "Invalid recipients" }, { status: 403 })
@@ -45,25 +47,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Push notifications not configured" }, { status: 500 })
     }
 
-    if (useFCM && process.env.FIREBASE_SERVICE_ACCOUNT) {
-      // إرسال عبر Firebase FCM
-      const fcmResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/push/send-fcm`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      })
-
-      if (fcmResponse.ok) {
-        return fcmResponse
-      }
-
-      console.warn("[Push] FCM failed, falling back to Web Push")
-    }
-
     const webpush = await getWebPush()
-    const { data: subscriptions, error } = await auth.supabase
+    const serviceSupabase = createServiceClient()
+    const { data: subscriptions, error } = await serviceSupabase
       .from("push_subscriptions")
-      .select("*")
+      .select("id, user_id, endpoint, p256dh, auth")
       .in("user_id", targetUserIds)
 
     if (error) {
@@ -76,11 +64,9 @@ export async function POST(request: Request) {
     }
 
     // Use a stable tag per group so notifications replace each other
-    const stableTag = data?.groupId
-      ? `notif-group-${data.groupId}`
-      : data?.group_id
-        ? `notif-group-${data.group_id}`
-        : `notif-${data?.type || "default"}`
+    const stableTag = groupId
+      ? `notif-group-${groupId}`
+      : `notif-${data?.type || "default"}`
 
     const payload = JSON.stringify({
       title: title || "Synaptic Space",
@@ -93,11 +79,10 @@ export async function POST(request: Request) {
       renotify: true,
       requireInteraction: data?.priority === "high",
       ...data,
-      tag: stableTag,
     })
 
     let sentCount = 0
-    const errors = []
+    const errors: Array<{ userId: string; error: string }> = []
 
     const sendPromises = subscriptions.map(async (sub) => {
       try {
@@ -116,7 +101,7 @@ export async function POST(request: Request) {
 
         // Remove invalid subscriptions (410 Gone or 404 Not Found)
         if (err.statusCode === 410 || err.statusCode === 404) {
-          await auth.supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint)
+          await serviceSupabase.from("push_subscriptions").delete().eq("id", sub.id)
         }
 
         return { success: false, userId: sub.user_id, error: err.message }
@@ -138,6 +123,6 @@ export async function POST(request: Request) {
     })
   } catch (error: any) {
     console.error("[Push] Error:", error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: "Push delivery failed" }, { status: 500 })
   }
 }

@@ -1,0 +1,13 @@
+-- PROPOSAL ONLY. Do not run on production in Phase 0/1.
+-- First inspect duplicates without deleting or changing rows:
+-- select user_id, message_id, type, count(*)
+-- from public.notifications
+-- where type = 'new_message' and message_id is not null
+-- group by user_id, message_id, type having count(*) > 1;
+--
+-- After a reviewed, non-destructive remediation plan and backup, add:
+-- create unique index concurrently notifications_new_message_once
+-- on public.notifications (user_id, message_id, type)
+-- where type = 'new_message' and message_id is not null;
+--
+-- Both notification writers must then use an idempotent insert/upsert contract.

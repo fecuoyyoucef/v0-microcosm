@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     if (!userIds.length || userIds.length > 100 || typeof title !== "string" || title.length > 200 || typeof notifBody !== "string" || notifBody.length > 2000) {
       return NextResponse.json({ error: "Invalid notification" }, { status: 400 })
     }
-    if (!auth.member && (userIds.length !== 1 || userIds[0] !== auth.user!.id)) {
+    if (groupId === undefined && (userIds.length !== 1 || userIds[0] !== auth.user!.id)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
     if (groupId) {
