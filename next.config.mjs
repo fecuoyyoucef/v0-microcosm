@@ -8,6 +8,10 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  experimental: {
+    // Keep static generation within constrained CI/Vercel worker memory.
+    cpus: 1,
+  },
 }
 
 // withSentryConfig injects a webpack plugin. The build script uses

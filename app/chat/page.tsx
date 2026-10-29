@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { HomePageContent } from "@/components/chat/home-page-content"
 
+export const dynamic = "force-dynamic"
+
 export default async function ChatPage() {
   try {
     const supabase = await createClient()
