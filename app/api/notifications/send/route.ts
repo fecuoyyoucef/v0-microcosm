@@ -1,21 +1,23 @@
 import { NextResponse } from "next/server"
-import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { requireGroupMember } from "@/lib/api-auth"
+import { createServiceClient } from "@/lib/supabase/server"
 import { sendPushNotificationToMany } from "@/lib/firebase-admin-server"
 
 export async function POST(request: Request) {
   try {
-    const { userIds: rawUserIds, type, title, body, data, groupId, senderId } = await request.json()
+    const { userIds: rawUserIds, type, title, body, data, groupId } = await request.json()
 
-    if (!rawUserIds || rawUserIds.length === 0 || !type || !title) {
+    if (!Array.isArray(rawUserIds) || rawUserIds.length === 0 || rawUserIds.length > 50 || !type || typeof title !== "string" || title.length > 200 || !groupId) {
       return NextResponse.json({ error: "بيانات مفقودة" }, { status: 400 })
     }
 
-    const supabase = await createClient()
-
-    // Exclude the sender from receiving a notification
-    const userIds: string[] = senderId
-      ? rawUserIds.filter((id: string) => id !== senderId)
-      : rawUserIds
+    const auth = await requireGroupMember(groupId)
+    if (auth.response) return auth.response
+    const senderId = auth.user!.id
+    const { data: recipients, error: memberError } = await auth.supabase.from("group_members").select("user_id").eq("group_id", groupId).in("user_id", rawUserIds)
+    if (memberError) return NextResponse.json({ error: "Unable to verify recipients" }, { status: 500 })
+    const allowed = new Set((recipients ?? []).map((member) => member.user_id))
+    const userIds: string[] = rawUserIds.filter((id: string) => allowed.has(id) && id !== senderId)
 
     if (userIds.length === 0) {
       return NextResponse.json({ success: true, notificationsCreated: 0, pushSentCount: 0, pushFailedCount: 0 })
