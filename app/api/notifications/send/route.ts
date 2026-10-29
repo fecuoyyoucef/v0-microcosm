@@ -34,11 +34,11 @@ export async function POST(request: Request) {
       sender_id: senderId || null,
     }))
 
-    const { error: notifError } = await supabase.from("notifications").insert(notifications)
+    const { error: notifError } = await auth.supabase.from("notifications").insert(notifications)
 
     if (notifError) {
-      console.error("[Notifications API] Insert error:", notifError)
-      throw notifError
+      console.error("[Notifications API] Insert failed")
+      return NextResponse.json({ error: "فشل إرسال الإشعار" }, { status: 500 })
     }
 
     let pushSentCount = 0
@@ -87,8 +87,8 @@ export async function POST(request: Request) {
       pushSentCount,
       pushFailedCount,
     })
-  } catch (error: any) {
-    console.error("[Notifications API] Error:", error)
-    return NextResponse.json({ error: "فشل إرسال الإشعار", details: error.message }, { status: 500 })
+  } catch (error) {
+    console.error("[Notifications API] Request failed")
+    return NextResponse.json({ error: "فشل إرسال الإشعار" }, { status: 500 })
   }
 }
