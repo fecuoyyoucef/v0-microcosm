@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     }
 
     const uniqueUserIds = Array.from(new Set(userIds.filter((id: unknown): id is string => typeof id === "string")))
-    if (!auth.member && (uniqueUserIds.length !== 1 || uniqueUserIds[0] !== auth.user!.id)) {
+    if (!groupId && (uniqueUserIds.length !== 1 || uniqueUserIds[0] !== auth.user!.id)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
