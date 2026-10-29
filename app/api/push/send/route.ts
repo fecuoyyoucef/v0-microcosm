@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { requireGroupMember, requireUser } from "@/lib/api-auth"
 import { NextResponse } from "next/server"
 
 let webpushConfigured = false
@@ -7,10 +7,9 @@ async function getWebPush() {
   const webpush = (await import("web-push")).default
 
   if (!webpushConfigured && process.env.VAPID_PRIVATE_KEY) {
-    const vapidPublicKey =
-      process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
-      "BDj8yhVUy0-Ued2Dw4joucx73R8-0HOjAcL5XeUGwxvp_KPrp1uBeFxvmGVXN2pvCnKtR_MG5pSPv0wx3f_OKzs"
+    const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
     const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY.trim()
+    if (!vapidPublicKey) throw new Error("Push notifications are not configured")
 
     webpush.setVapidDetails("mailto:youcef192837@gmail.com", vapidPublicKey, vapidPrivateKey)
     webpushConfigured = true
@@ -23,10 +22,15 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     const { userId, userIds, title, body: messageBody, url, data, useFCM } = body
+    const auth = data?.groupId || data?.group_id ? await requireGroupMember(data.groupId || data.group_id) : await requireUser()
+    if (auth.response) return auth.response
 
-    const targetUserIds = userIds || (userId ? [userId] : [])
+    const requestedUserIds = Array.isArray(userIds) ? userIds : userId ? [userId] : []
+    const targetUserIds = auth.member
+      ? Array.from(new Set(requestedUserIds)).filter((id) => typeof id === "string")
+      : requestedUserIds.filter((id) => id === auth.user!.id)
 
-    if (!targetUserIds || targetUserIds.length === 0) {
+    if (targetUserIds.length === 0) {
       return NextResponse.json({ error: "No user IDs provided" }, { status: 400 })
     }
 
@@ -51,9 +55,7 @@ export async function POST(request: Request) {
     }
 
     const webpush = await getWebPush()
-    const supabase = await createClient()
-
-    const { data: subscriptions, error } = await supabase
+    const { data: subscriptions, error } = await auth.supabase
       .from("push_subscriptions")
       .select("*")
       .in("user_id", targetUserIds)
