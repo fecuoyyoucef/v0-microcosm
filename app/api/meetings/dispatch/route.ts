@@ -2,9 +2,10 @@ import { createServiceClient } from "@/lib/supabase/server"
 import { sendNotification } from "@/lib/notifications-server"
 import { type NextRequest, NextResponse } from "next/server"
 
-// Shared secret with the pg_cron job (see scripts/031_meetings.sql). Kept inline
-// to avoid requiring a new env var; matches the Authorization bearer the cron sends.
-const DISPATCH_TOKEN = "meet_dispatch_cron_synaptic_2026"
+function isAuthorized(request: NextRequest) {
+  const secret = process.env.MEETINGS_DISPATCH_SECRET || process.env.CRON_SECRET
+  return Boolean(secret && request.headers.get("authorization") === `Bearer ${secret}`)
+}
 
 // POST /api/meetings/dispatch
 // Invoked every minute by pg_cron via pg_net. Drives meeting lifecycle:
@@ -14,9 +15,7 @@ const DISPATCH_TOKEN = "meet_dispatch_cron_synaptic_2026"
 // Each transition is guarded by a *_sent_at flag so it fires exactly once even
 // if the cron overlaps or retries.
 export async function POST(request: NextRequest) {
-  // Accept either the cron's bearer token or the platform CRON_SECRET.
-  const auth = request.headers.get("authorization")
-  if (auth !== `Bearer ${DISPATCH_TOKEN}` && auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 

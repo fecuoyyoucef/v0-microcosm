@@ -78,6 +78,8 @@ end $$;
 
 -- Per-minute scheduler (pg_cron + pg_net) -------------------------------------
 -- Calls the dispatch endpoint so reminders fire even when every client is closed.
+-- Configure the Authorization header from a secret manager; never commit the bearer value.
+-- The job must be recreated with the current MEETINGS_DISPATCH_SECRET after rotation.
 create extension if not exists pg_cron;
 create extension if not exists pg_net;
 
@@ -97,7 +99,7 @@ select cron.schedule(
     url     := 'https://v0-synaptic-space.vercel.app/api/meetings/dispatch',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', 'Bearer meet_dispatch_cron_synaptic_2026'
+      'Authorization', 'Bearer ' || current_setting('app.meetings_dispatch_secret', true)
     ),
     body    := '{}'::jsonb
   );

@@ -2,7 +2,17 @@ import { createServiceClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 
 // This endpoint can be called by a cron job to update responsibility scores
-export async function GET() {
+function isAuthorized(request: Request) {
+  const configuredSecret = process.env.CRON_SECRET
+  const authorization = request.headers.get("authorization")
+  return Boolean(configuredSecret && authorization === `Bearer ${configuredSecret}`)
+}
+
+async function run(request: Request) {
+  if (!isAuthorized(request)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
   try {
     const supabase = createServiceClient()
 
@@ -21,6 +31,10 @@ export async function GET() {
   }
 }
 
-export async function POST() {
-  return GET()
+export async function GET(request: Request) {
+  return run(request)
+}
+
+export async function POST(request: Request) {
+  return run(request)
 }
