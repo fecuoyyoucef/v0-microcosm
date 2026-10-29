@@ -4,6 +4,8 @@ import { redirect } from "next/navigation"
 import { AppShell } from "@/components/layout/app-shell"
 import { InstallPromptNotification } from "@/components/pwa/install-button"
 
+export const dynamic = "force-dynamic"
+
 export default async function ChatLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
   const {
